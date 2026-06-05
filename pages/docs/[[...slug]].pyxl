@@ -748,13 +748,13 @@ export default function DocsPage({ data }) {
                 html.dark .docs-content h3 { color: #e4e4e7; }
                 .docs-content h4 { font-size: 1rem; font-weight: 600; margin-top: 1.6rem; margin-bottom: 0.5rem; color: #3f3f46; }
                 html.dark .docs-content h4 { color: #d4d4d8; }
-                .docs-content p { margin-bottom: 1rem; line-height: 1.75; color: #52525b; padding-left: 1.4rem; }
+                .docs-content p { margin-bottom: 1rem; line-height: 1.75; color: #52525b; }
                 html.dark .docs-content p { color: #a1a1aa; }
                 .docs-content a { color: #047857; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
                 html.dark .docs-content a { color: #34d399; }
                 .docs-content a:hover { text-decoration: none; }
                 .docs-content h2 a, .docs-content h3 a, .docs-content h4 a { color: inherit; }
-                .docs-content ul, .docs-content ol { margin-bottom: 1rem; margin-left: 1.4rem; padding-left: 1.5rem; color: #52525b; }
+                .docs-content ul, .docs-content ol { margin-bottom: 1rem; margin-left: 0; padding-left: 1.4rem; color: #52525b; }
                 html.dark .docs-content ul, html.dark .docs-content ol { color: #a1a1aa; }
                 .docs-content li { margin-bottom: 0.35rem; line-height: 1.75; }
                 .docs-content li::marker { color: #10b981; }
@@ -766,12 +766,12 @@ export default function DocsPage({ data }) {
                 .docs-content .code-block code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.8rem; line-height: 1.7; color: #d4d4d8; background: none; padding: 0; border-radius: 0; }
                 .docs-content .code-block .copy-btn { position: absolute; top: 0.55rem; right: 0.55rem; padding: 0.25rem 0.65rem; border-radius: 0.4rem; font-size: 0.7rem; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #d4d4d8; cursor: pointer; transition: all 0.15s; }
                 .docs-content .code-block .copy-btn:hover { background: rgba(255,255,255,0.1); color: white; }
-                .docs-content table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; width: calc(100% - 1.4rem); margin-bottom: 1.25rem; margin-left: 1.4rem; border-collapse: collapse; font-size: 0.875rem; }
+                .docs-content table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; margin-bottom: 1.25rem; border-collapse: collapse; font-size: 0.875rem; }
                 .docs-content th { text-align: left; padding: 0.6rem 0.75rem; font-weight: 600; color: #18181b; border-bottom: 2px solid rgba(0,0,0,0.1); }
                 html.dark .docs-content th { color: #e4e4e7; border-bottom-color: rgba(255,255,255,0.1); }
                 .docs-content td { padding: 0.6rem 0.75rem; border-bottom: 1px solid rgba(0,0,0,0.05); color: #52525b; }
                 html.dark .docs-content td { color: #a1a1aa; border-bottom-color: rgba(255,255,255,0.05); }
-                .docs-content blockquote { border-left: 3px solid #10b981; padding: 0.75rem 1rem; margin: 1rem 0 1rem 1.4rem; border-radius: 0 0.5rem 0.5rem 0; background: rgba(16,185,129,0.05); }
+                .docs-content blockquote { border-left: 3px solid #10b981; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 0.5rem 0.5rem 0; background: rgba(16,185,129,0.05); }
                 .docs-content blockquote p { margin-bottom: 0; }
                 .docs-content strong { color: #18181b; font-weight: 650; }
                 html.dark .docs-content strong { color: #fafafa; }
