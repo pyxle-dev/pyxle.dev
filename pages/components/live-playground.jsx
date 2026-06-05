@@ -253,6 +253,7 @@ export function LivePlayground({
 } = {}) {
     const [source, setSource] = useState(initialSource);
     const [engineStarted, setEngineStarted] = useState(false); // user reached for the playground
+    const [switched, setSwitched] = useState(false);            // an example was switched (vs the initial one)
     const [sandboxHtml, setSandboxHtml] = useState(null);       // lazily-loaded srcdoc string
     const [iframeLive, setIframeLive] = useState(false);        // sandbox has rendered ≥1 frame
     const [pyStatus, setPyStatus] = useState('idle');           // idle|booting|ready|failed|timeout
@@ -338,6 +339,7 @@ export function LivePlayground({
     useEffect(() => {
         if (initialSource === latestSrc.current) return; // initial mount / no change
         setSource(initialSource);
+        setSwitched(true);
         latestSrc.current = initialSource;
         startEngine();
         if (initSentRef.current) postToIframe({ type: 'pg-run', source: initialSource });
@@ -399,7 +401,18 @@ export function LivePlayground({
                             style={{ display: iframeLive ? 'block' : 'none' }}
                         />
                     )}
-                    {!iframeLive && (
+                    {!iframeLive && switched && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                            <span className="relative flex h-2.5 w-2.5">
+                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-70" />
+                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-400" />
+                            </span>
+                            <p className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                                booting Python… <span className="opacity-60">(one-time, a few seconds)</span>
+                            </p>
+                        </div>
+                    )}
+                    {!iframeLive && !switched && (
                         <div className="preview-scope absolute inset-0 overflow-auto p-6">
                             <DefaultPreview data={DEFAULT_DATA} />
                         </div>
