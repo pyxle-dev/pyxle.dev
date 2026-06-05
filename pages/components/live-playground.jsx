@@ -31,11 +31,12 @@ const useIsoLayoutEffect = typeof document !== 'undefined' ? useLayoutEffect : u
    below only sends the source string + the vendored parser files in,
    and receives status out, over postMessage.
 
-   Perf / Lighthouse: NOTHING loads on page load. The sandbox iframe
-   (and therefore React, Sucrase, and the ~10 MB Pyodide) is mounted
-   only when the user first reaches for the playground (hover / focus /
-   tap). SSR + first paint render a static DefaultPreview, so the right
-   pane is alive instantly and works without JS.
+   Perf / Lighthouse: NOTHING heavy loads on page load OR on hover. The
+   sandbox iframe (and therefore React, Sucrase, and the ~10 MB Pyodide)
+   is mounted only when the user first EDITS the code (or, in the REPL,
+   switches to a non-default example). Until then the right pane is a
+   fully-interactive plain-React counter (DefaultPreview), so the ~80% of
+   visitors who never touch the code never pay the Pyodide cost.
    ───────────────────────────────────────────────────────────── */
 
 /* Vendored Pyxle parser files (served same-origin) — fetched by the host
@@ -51,7 +52,7 @@ const VENDOR_FILES = [
     'pyxle/compiler/parser.py',
 ];
 
-const DEFAULT_SOURCE = `# counter.pyxl
+export const DEFAULT_SOURCE = `# counter.pyxl
 
 # Count lives in Python. The @action
 # mutates it on the server (sandboxed here).
@@ -92,18 +93,22 @@ export default function Counter({ data }) {
     );
 }`;
 
-const DEFAULT_DATA = { count: 0 };
-
-/* SSR / first-paint preview — a static mirror of the counter's initial
-   render, so the right pane has content (and works without JS) before the
-   sandbox loads. Once the sandbox renders, the live iframe replaces it. */
-function DefaultPreview({ data }) {
+/* The instant-on default preview — a plain-React mirror of the counter
+   that runs with ZERO Pyodide. It's fully interactive (the button counts
+   in JS), so the ~80% of visitors who never edit the code still get a
+   working demo without ever fetching/booting Python. The moment the user
+   edits, the real sandbox boots and takes over (see LivePlayground).
+   Renders count=0 on both SSR and the first client render → hydration-safe. */
+function DefaultPreview() {
+    const [count, setCount] = useState(0);
     return (
         <div className="card">
             <span className="tag">state lives in Python</span>
-            <h1>{data.count}</h1>
-            <p>Each click runs the @action — real Python.</p>
-            <button type="button">Increment +</button>
+            <h1>{count}</h1>
+            <p>Edit the code → real Python boots.</p>
+            <button type="button" onClick={() => setCount((c) => c + 1)}>
+                Increment +
+            </button>
         </div>
     );
 }
@@ -135,7 +140,7 @@ function currentTheme() {
    transparent text + visible caret, and stays focusable. */
 const INDENT = '    '; // 4 spaces — matches the Python in DEFAULT_SOURCE
 
-function Editor({ value, onChange, onFocus }) {
+function Editor({ value, onChange }) {
     const taRef = useRef(null);
     const preRef = useRef(null);
     const selRef = useRef(null); // [start, end] to restore after a Tab edit
@@ -233,7 +238,6 @@ function Editor({ value, onChange, onFocus }) {
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 onKeyDown={onKeyDown}
-                onFocus={onFocus}
                 onScroll={syncScroll}
                 spellCheck={false}
                 autoCapitalize="off"
@@ -252,8 +256,7 @@ export function LivePlayground({
     paneHeight = 'h-[300px] sm:h-[380px]',
 } = {}) {
     const [source, setSource] = useState(initialSource);
-    const [engineStarted, setEngineStarted] = useState(false); // user reached for the playground
-    const [switched, setSwitched] = useState(false);            // an example was switched (vs the initial one)
+    const [engineStarted, setEngineStarted] = useState(false); // sandbox booted (first edit / non-default example)
     const [sandboxHtml, setSandboxHtml] = useState(null);       // lazily-loaded srcdoc string
     const [iframeLive, setIframeLive] = useState(false);        // sandbox has rendered ≥1 frame
     const [pyStatus, setPyStatus] = useState('idle');           // idle|booting|ready|failed|timeout
@@ -334,16 +337,23 @@ export function LivePlayground({
     useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
     // Switching examples (parent changes initialSource): load it into the
-    // editor and run it. Boots the engine if cold (an interaction), or
-    // re-runs in the already-warm sandbox — no Pyodide reboot.
+    // editor and run it — booting the sandbox if cold, or re-running in the
+    // already-warm one (no Pyodide reboot).
     useEffect(() => {
         if (initialSource === latestSrc.current) return; // initial mount / no change
         setSource(initialSource);
-        setSwitched(true);
         latestSrc.current = initialSource;
         startEngine();
         if (initSentRef.current) postToIframe({ type: 'pg-run', source: initialSource });
     }, [initialSource, startEngine, postToIframe]);
+
+    // A non-default source (a switched REPL example, or a configured
+    // initialSource) can't be mirrored by the JS DefaultPreview — boot the
+    // real engine for it. The counter default stays Pyodide-free until the
+    // user edits. (startEngine is idempotent.)
+    useEffect(() => {
+        if (initialSource !== DEFAULT_SOURCE) startEngine();
+    }, [initialSource, startEngine]);
 
     const statusText =
         pyStatus === 'booting' ? 'booting Python (one-time)…'
@@ -352,16 +362,17 @@ export function LivePlayground({
         : ms ? `${ms}ms · real Python, sandboxed`
         : 'sandboxed preview · no install';
 
+    // Preview pane has three states: the instant-on JS counter (default,
+    // zero Pyodide), the one-time "booting Python…" window, then the live
+    // sandbox iframe.
+    const showDefault = !engineStarted && source === DEFAULT_SOURCE;
+    const showBooting = !iframeLive && !showDefault;
+
     return (
-        // Warm the sandbox the moment the user reaches for the playground
-        // (hover / first tap / editor focus) — never on page load — so
-        // clicking the Increment button runs the real @action with minimal
-        // wait. The sandbox mounts lazily on the first of these.
-        <div
-            className="grid grid-cols-1 sm:grid-cols-2"
-            onPointerEnter={startEngine}
-            onPointerDownCapture={startEngine}
-        >
+        // The sandbox (React + Sucrase + ~10 MB Pyodide) mounts lazily on
+        // the user's first EDIT — never on page load or hover. Until then
+        // the preview is the instant-on JS DefaultPreview below.
+        <div className="grid grid-cols-1 sm:grid-cols-2">
             {/* editor */}
             <div className="flex flex-col border-b border-white/5 sm:border-b-0 sm:border-r">
                 <div className="flex items-center gap-2 border-b border-white/5 px-4 py-2.5">
@@ -376,7 +387,7 @@ export function LivePlayground({
                     </span>
                 </div>
                 <div className={paneHeight}>
-                    <Editor value={source} onChange={onChange} onFocus={startEngine} />
+                    <Editor value={source} onChange={onChange} />
                 </div>
             </div>
 
@@ -401,7 +412,7 @@ export function LivePlayground({
                             style={{ display: iframeLive ? 'block' : 'none' }}
                         />
                     )}
-                    {!iframeLive && switched && (
+                    {showBooting && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
                             <span className="relative flex h-2.5 w-2.5">
                                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-70" />
@@ -412,9 +423,9 @@ export function LivePlayground({
                             </p>
                         </div>
                     )}
-                    {!iframeLive && !switched && (
+                    {showDefault && (
                         <div className="preview-scope absolute inset-0 overflow-auto p-6">
-                            <DefaultPreview data={DEFAULT_DATA} />
+                            <DefaultPreview />
                         </div>
                     )}
                 </div>

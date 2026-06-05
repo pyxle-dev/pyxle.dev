@@ -41,7 +41,7 @@ async def react_emoji(request):
 
 import React, { useState, useEffect } from 'react';
 import { useAction, Link, Head } from 'pyxle/client';
-import { LivePlayground } from './components/live-playground.jsx';
+import { LivePlayground, DEFAULT_SOURCE } from './components/live-playground.jsx';
 import { tokenizeBlock } from './components/code-highlighter.jsx';
 import { ThemeToggle } from './components/theme-toggle.jsx';
 
@@ -157,46 +157,10 @@ function Nav({ version }) {
 
 /* ── Runnable examples (each runs in the isolated in-browser sandbox) ─ */
 
-const EX_COUNTER = `# counter.pyxl
-
-# Count lives in Python. The @action
-# mutates it on the server (sandboxed here).
-count = 0
-
-@server
-async def load(request):
-    return {"count": count}
-
-@action
-async def increment(request):
-    global count
-    count += 1
-    return {"count": count}
-
-
-import React, { useState } from 'react';
-import { useAction } from 'pyxle/client';
-
-export default function Counter({ data }) {
-    const [count, setCount] = useState(data.count);
-    const increment = useAction('increment');
-
-    async function bump() {
-        const res = await increment();
-        if (res.ok) setCount(res.count);
-    }
-
-    return (
-        <div className="card">
-            <span className="tag">state lives in Python</span>
-            <h1>{count}</h1>
-            <p>Each click runs the @action — real Python.</p>
-            <button onClick={bump} disabled={increment.pending}>
-                {increment.pending ? 'Running…' : 'Increment +'}
-            </button>
-        </div>
-    );
-}`;
+// The counter is the LivePlayground default. Reuse that exact source so the
+// zero-Pyodide JS preview (which shows only while source === DEFAULT_SOURCE)
+// also covers this page's initial Counter tab — no boot until the user edits.
+const EX_COUNTER = DEFAULT_SOURCE;
 
 const EX_LOADER = `# greeting.pyxl
 
