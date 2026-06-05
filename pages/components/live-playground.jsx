@@ -54,7 +54,7 @@ const VENDOR_FILES = [
 const DEFAULT_SOURCE = `# counter.pyxl
 
 # Count lives in Python. The @action
-# mutates it — server-side, in-browser.
+# mutates it on the server (sandboxed here).
 count = 0
 
 @server
@@ -347,8 +347,8 @@ export function LivePlayground({
         pyStatus === 'booting' ? 'booting Python (one-time)…'
         : pyStatus === 'failed' ? 'sandbox offline'
         : pyStatus === 'timeout' ? 'stopped — runaway code killed'
-        : ms ? `${ms}ms · real Python, in your browser`
-        : 'runs in your browser · no server';
+        : ms ? `${ms}ms · real Python, sandboxed`
+        : 'sandboxed preview · no install';
 
     return (
         // Warm the sandbox the moment the user reaches for the playground

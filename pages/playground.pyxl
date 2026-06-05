@@ -160,7 +160,7 @@ function Nav({ version }) {
 const EX_COUNTER = `# counter.pyxl
 
 # Count lives in Python. The @action
-# mutates it — server-side, in-browser.
+# mutates it on the server (sandboxed here).
 count = 0
 
 @server
@@ -366,13 +366,13 @@ function Repl() {
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
                         <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
                     </span>
-                    Live · runs in your browser
+                    Live · zero install
                 </span>
                 <h1 className="reveal mt-6 text-balance text-4xl font-semibold leading-[1.0] tracking-[-0.03em] sm:text-6xl" style={{ animationDelay: '60ms' }}>
                     Pyxle, live. <span className="gradient-text">No install.</span>
                 </h1>
                 <p className="reveal mx-auto mt-6 max-w-xl text-pretty text-base sm:text-lg text-zinc-600 dark:text-zinc-400" style={{ animationDelay: '120ms' }}>
-                    Write a real <code className="rounded px-1.5 py-0.5 text-[0.85em] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10">.pyxl</code> and run it instantly — real CPython via Pyodide, the actual Pyxle parser, your <code className="rounded px-1.5 py-0.5 text-[0.85em] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10">@server</code> and <code className="rounded px-1.5 py-0.5 text-[0.85em] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10">@action</code> code, all in an isolated sandbox. Nothing is sent to a server.
+                    Write a real <code className="rounded px-1.5 py-0.5 text-[0.85em] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10">.pyxl</code> and run it instantly — the actual Pyxle parser plus your <code className="rounded px-1.5 py-0.5 text-[0.85em] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10">@server</code> and <code className="rounded px-1.5 py-0.5 text-[0.85em] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10">@action</code> code, in an isolated sandbox. Zero install, nothing leaves your machine. In a real app this Python runs server-side on Starlette — the playground just simulates that here.
                 </p>
             </div>
 
@@ -407,7 +407,7 @@ function Repl() {
                     </div>
                 </div>
                 <p className="mt-4 text-center font-mono text-[11px] uppercase tracking-wider text-zinc-500">
-                    <span className="text-emerald-600 dark:text-emerald-400">↑</span> edit freely · switch examples above · 100% in your browser
+                    <span className="text-emerald-600 dark:text-emerald-400">↑</span> edit freely · switch examples above · sandboxed · zero install
                 </p>
             </div>
         </section>
@@ -606,13 +606,13 @@ export default function PlaygroundPage({ data }) {
     return (
         <>
             <Head>
-                <title>Playground — Run Pyxle in your browser</title>
-                <meta name="description" content="Write a real .pyxl and run it instantly in your browser — real Python via Pyodide, the actual Pyxle parser, @server and @action code. No install, no server." />
+                <title>Playground — Try Pyxle with zero install</title>
+                <meta name="description" content="Try Pyxle with zero install: write a real .pyxl and run it in an isolated in-browser sandbox. The same @server and @action code runs server-side in a real app." />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <meta name="theme-color" content="#0a0a0b" />
                 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-                <meta property="og:title" content="Pyxle Playground — run Pyxle in your browser" />
-                <meta property="og:description" content="Write and run real Pyxle in your browser. No install." />
+                <meta property="og:title" content="Pyxle Playground — try it with zero install" />
+                <meta property="og:description" content="Write and run real Pyxle in an isolated sandbox — zero install. Real apps run this Python server-side." />
                 <meta property="og:type" content="website" />
                 <meta property="og:url" content="https://pyxle.dev/playground" />
                 <meta property="og:image" content="https://pyxle.dev/branding/og-default.png" />
