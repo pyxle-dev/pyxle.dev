@@ -24,7 +24,6 @@ export default function RootLayout({ children }) {
         const c = document.documentElement.classList;
         c.remove('light', 'dark');
         c.add(theme);
-        document.documentElement.style.overflowX = 'clip';
         try { localStorage.setItem('pyxle-theme', theme); } catch(e) {}
     }, [theme]);
 

@@ -101,9 +101,12 @@
         transform: none;
     }
 
-    /* Scroll-driven parallax — progressive enhancement, no JS. */
+    /* Scroll-driven parallax — progressive enhancement, no JS. Desktop only:
+       scroll-linked animations on the root timeline can destabilize mobile
+       compositing (content blanking until a repaint), so gate to ≥768px
+       where they're reliable. Mobile keeps the time-based aurora drift. */
     @supports (animation-timeline: scroll()) {
-        @media (prefers-reduced-motion: no-preference) {
+        @media (prefers-reduced-motion: no-preference) and (min-width: 768px) {
             .parallax-slow,
             .parallax-fast {
                 animation: parallax-drift linear both;
