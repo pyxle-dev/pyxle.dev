@@ -38,74 +38,11 @@ async def subscribe_newsletter(request):
 import React, { useState, useCallback, useEffect } from 'react';
 import { useAction, Link, Head } from 'pyxle/client';
 import { ThemeToggle } from './components/theme-toggle.jsx';
-
-
-/* ─────────────────────────────────────────────────────────────
-   Hand-tokenized hero code snippet. Kept inline (not produced
-   by the runtime tokenizer in code-highlighter.jsx) so the
-   client bundle ships zero tokenizer JS for the landing page.
-   Matches the `.sh-*` classes in tailwind.css.
-   ───────────────────────────────────────────────────────────── */
-
-const HERO_CODE = [
-    [['# pages/dashboard.pyxl', 'sh-cmt']],
-    [],
-    [['@server', 'sh-dec']],
-    [['async', 'sh-kw'], [' ', 'sh-pl'], ['def', 'sh-kw'], [' ', 'sh-pl'], ['load', 'sh-fn'], ['(', 'sh-pl'], ['request', 'sh-pl'], ['):', 'sh-pl']],
-    [['    ', 'sh-pl'], ['return', 'sh-kw'], [' {', 'sh-brc'], ['"user"', 'sh-str'], [': ', 'sh-pl'], ['await', 'sh-kw'], [' db.get_user(request)', 'sh-pl'], ['}', 'sh-brc']],
-    [],
-    [],
-    [['import', 'sh-kw'], [' React ', 'sh-pl'], ['from', 'sh-kw'], [' ', 'sh-pl'], ["'react'", 'sh-str'], [';', 'sh-pl']],
-    [],
-    [['export', 'sh-kw'], [' ', 'sh-pl'], ['default', 'sh-kw'], [' ', 'sh-pl'], ['function', 'sh-kw'], [' ', 'sh-pl'], ['Dashboard', 'sh-comp'], ['({ ', 'sh-brc'], ['data', 'sh-pl'], [' })', 'sh-brc'], [' {', 'sh-brc']],
-    [['    ', 'sh-pl'], ['return', 'sh-kw'], [' (', 'sh-pl']],
-    [['        <', 'sh-tag'], ['main', 'sh-elem'], ['>', 'sh-tag']],
-    [['            <', 'sh-tag'], ['h1', 'sh-elem'], ['>', 'sh-tag'], ['Welcome, ', 'sh-pl'], ['{', 'sh-brc'], ['data.user.name', 'sh-pl'], ['}', 'sh-brc'], ['</', 'sh-tag'], ['h1', 'sh-elem'], ['>', 'sh-tag']],
-    [['        </', 'sh-tag'], ['main', 'sh-elem'], ['>', 'sh-tag']],
-    [['    );', 'sh-pl']],
-    [['}', 'sh-brc']],
-];
-
-const HERO_CODE_TEXT = `# pages/dashboard.pyxl
-
-@server
-async def load(request):
-    return {"user": await db.get_user(request)}
-
-
-import React from 'react';
-
-export default function Dashboard({ data }) {
-    return (
-        <main>
-            <h1>Welcome, {data.user.name}</h1>
-        </main>
-    );
-}`;
+import { LivePlayground } from './components/live-playground.jsx';
+import { tokenizeBlock } from './components/code-highlighter.jsx';
 
 
 /* ── Small primitives ────────────────────────────────────────────── */
-
-function PreTokenized({ lines }) {
-    return (
-        <pre className="overflow-x-auto p-5 sm:p-6 text-[12px] sm:text-[13px] leading-[1.65] font-mono">
-            <code>
-                {lines.map((tokens, i) => (
-                    <React.Fragment key={i}>
-                        {tokens.length === 0 ? '\n' : (
-                            <>
-                                {tokens.map(([text, cls], j) => (
-                                    <span key={j} className={cls}>{text}</span>
-                                ))}
-                                {'\n'}
-                            </>
-                        )}
-                    </React.Fragment>
-                ))}
-            </code>
-        </pre>
-    );
-}
 
 function CopyButton({ text, label = 'Copy' }) {
     const [copied, setCopied] = useState(false);
@@ -126,6 +63,70 @@ function CopyButton({ text, label = 'Copy' }) {
             {copied ? 'Copied' : label}
         </button>
     );
+}
+
+
+/* Live-tokenized code block. tokenizeBlock is a pure function (already in
+   the bundle via the playground editor), so this is SSR-safe and free. */
+function CodeBlock({ code, lang = 'pyxl', className = '' }) {
+    return (
+        <pre className={`overflow-x-auto font-mono leading-[1.7] ${className}`}>
+            <code>
+                {tokenizeBlock(code, lang).map((tokens, i) => (
+                    <React.Fragment key={i}>
+                        {tokens.length === 0 ? '\n' : (
+                            <>
+                                {tokens.map((t, j) => <span key={j} className={t.cls}>{t.text}</span>)}
+                                {'\n'}
+                            </>
+                        )}
+                    </React.Fragment>
+                ))}
+            </code>
+        </pre>
+    );
+}
+
+/* Shared section eyebrow + heading — keeps every band visually consistent
+   with the hero's typographic system. */
+function SectionHead({ eyebrow, title, sub, center = true, children }) {
+    return (
+        <div data-reveal className={center ? 'text-center mb-12' : 'mb-10'}>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">{eyebrow}</p>
+            <h2 className={`mt-3 text-balance text-3xl sm:text-4xl font-semibold tracking-tight ${center ? 'mx-auto max-w-2xl' : ''}`}>{title}</h2>
+            {sub && <p className={`mt-4 text-pretty text-sm sm:text-base text-zinc-600 dark:text-zinc-400 ${center ? 'mx-auto max-w-xl' : 'max-w-xl'}`}>{sub}</p>}
+            {children}
+        </div>
+    );
+}
+
+/* ── Apple-style scroll reveal — native IntersectionObserver ─────────
+   Elements tagged `data-reveal` ease in (fade + rise + whisper of
+   scale) as they enter the viewport. No-JS / reduced-motion callers
+   get everything revealed instantly. */
+function useScrollReveal() {
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const els = Array.from(document.querySelectorAll('[data-reveal]'));
+        const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce || !('IntersectionObserver' in window)) {
+            els.forEach((el) => el.classList.add('is-visible'));
+            return;
+        }
+        const io = new IntersectionObserver(
+            (entries) => {
+                for (const e of entries) {
+                    if (e.isIntersecting) {
+                        e.target.classList.add('is-visible');
+                        io.unobserve(e.target);
+                    }
+                }
+            },
+            { rootMargin: '0px 0px -10% 0px', threshold: 0.12 },
+        );
+        els.forEach((el) => io.observe(el));
+        return () => io.disconnect();
+    }, []);
 }
 
 
@@ -174,7 +175,7 @@ function Nav({ version }) {
 
                 <div className="flex items-center gap-2">
                     <a
-                        href="https://github.com/pyxle-framework/pyxle"
+                        href="https://github.com/pyxle-dev/pyxle"
                         target="_blank"
                         rel="noreferrer"
                         aria-label="Pyxle on GitHub"
@@ -185,7 +186,7 @@ function Nav({ version }) {
                         </svg>
                     </a>
                     <a
-                        href="https://github.com/pyxle-framework/pyxle-dev/blob/main/pages/index.pyxl"
+                        href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/index.pyxl"
                         target="_blank"
                         rel="noreferrer"
                         aria-label="View page source"
@@ -219,7 +220,7 @@ function Nav({ version }) {
                         <Link href="/docs" onClick={() => setOpen(false)} className="py-2 text-sm text-zinc-700 dark:text-zinc-300">Docs</Link>
                         <Link href="/playground" onClick={() => setOpen(false)} className="py-2 text-sm text-zinc-700 dark:text-zinc-300">Playground</Link>
                         <Link href="/benchmarks" onClick={() => setOpen(false)} className="py-2 text-sm text-zinc-700 dark:text-zinc-300">Benchmarks</Link>
-                        <a href="https://github.com/pyxle-framework/pyxle" target="_blank" rel="noreferrer" className="py-2 text-sm text-zinc-700 dark:text-zinc-300">GitHub</a>
+                        <a href="https://github.com/pyxle-dev/pyxle" target="_blank" rel="noreferrer" className="py-2 text-sm text-zinc-700 dark:text-zinc-300">GitHub</a>
                     </div>
                 </div>
             )}
@@ -232,88 +233,192 @@ function Nav({ version }) {
 
 function Hero() {
     return (
-        <section className="relative isolate overflow-hidden px-5 sm:px-6 pt-28 pb-20 sm:pt-36 sm:pb-28">
-            {/* Static gradient mesh — pure CSS, no JS, no canvas. */}
+        <section className="relative isolate overflow-hidden px-5 sm:px-6 pt-28 pb-16 sm:pt-32 sm:pb-24">
+            {/* Aurora mesh backdrop — brand gradient, drifting. */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-                <div className="absolute inset-0 grid-bg opacity-60" />
-                <div
-                    className="absolute left-1/2 top-[-10%] h-[620px] w-[620px] -translate-x-1/2 rounded-full opacity-40 dark:opacity-60"
-                    style={{
-                        background: 'radial-gradient(closest-side, rgba(16,185,129,0.25), transparent 70%)',
-                    }}
-                />
-                <div
-                    className="absolute right-[-10%] top-[30%] h-[420px] w-[420px] rounded-full opacity-30 dark:opacity-50"
-                    style={{
-                        background: 'radial-gradient(closest-side, rgba(59,130,246,0.22), transparent 70%)',
-                    }}
-                />
+                <div className="absolute inset-0 grid-bg opacity-50" />
+                <div className="aurora aurora-anim parallax-slow absolute -inset-x-10 -top-48 h-[760px] origin-top" />
                 <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-white dark:to-[#0a0a0b]" />
             </div>
 
-            <div className="relative mx-auto max-w-4xl text-center">
-                <div className="reveal">
-                    <a
-                        href="https://github.com/pyxle-framework/pyxle/releases"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="focus-ring inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium border-zinc-200 bg-white/60 text-zinc-700 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10 backdrop-blur transition-colors"
-                    >
-                        <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                        Actively shipping — latest release
-                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5-5 5M6 12h12" />
-                        </svg>
-                    </a>
-                </div>
+            <div className="relative mx-auto max-w-3xl text-center">
+                <a
+                    href="https://github.com/pyxle-dev/pyxle/releases"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="reveal focus-ring group inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium border-zinc-200 bg-white/60 text-zinc-700 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10 backdrop-blur transition-colors"
+                >
+                    <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    </span>
+                    Pyxle 0.3.0 — actively shipping
+                    <svg className="h-3 w-3 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5-5 5M6 12h12" />
+                    </svg>
+                </a>
 
-                <h1 className="reveal mt-6 text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl md:text-7xl" style={{ animationDelay: '60ms' }}>
-                    Python + React
-                    <br />
-                    <span className="gradient-text">in one file.</span>
+                <h1 className="reveal mt-6 text-balance text-5xl font-semibold leading-[0.98] tracking-[-0.03em] sm:text-6xl md:text-7xl" style={{ animationDelay: '60ms' }}>
+                    Python <span className="text-zinc-400 dark:text-zinc-500">&amp;</span> React.
+                    {' '}
+                    <span className="gradient-text">One&nbsp;file.</span>
                 </h1>
 
                 <p className="reveal mx-auto mt-6 max-w-xl text-pretty text-base sm:text-lg text-zinc-600 dark:text-zinc-400" style={{ animationDelay: '120ms' }}>
-                    The full-stack Python framework. Async server loaders, React UI, and server actions live together in a single <code className="rounded px-1.5 py-0.5 text-[0.85em] text-emerald-700 dark:text-emerald-400 bg-emerald-500/5 dark:bg-emerald-500/10">.pyxl</code> file. SSR and file routing come with it.
+                    Async server loaders, React UI, and server actions in a single{' '}
+                    <code className="rounded px-1.5 py-0.5 text-[0.85em] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10">.pyxl</code>{' '}
+                    file — SSR and file routing included. See for yourself, below ↓
                 </p>
 
                 <div className="reveal mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row" style={{ animationDelay: '180ms' }}>
                     <Link
                         href="/docs/getting-started/installation"
-                        className="focus-ring inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200 transition-colors"
+                        className="focus-ring group inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200 transition-colors"
                     >
                         Get started
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                        <svg className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5-5 5M6 12h12" />
                         </svg>
                     </Link>
-                    <div className="focus-within:ring-2 focus-within:ring-emerald-500/40 inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-mono border-zinc-200 bg-white text-zinc-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300">
-                        <span className="text-zinc-600 dark:text-zinc-400 select-none">$</span>
-                        <span>pip install pyxle-framework</span>
-                        <CopyButton text="pip install pyxle-framework" label="Copy" />
+                    <div className="focus-within:ring-2 focus-within:ring-emerald-500/40 inline-flex items-center gap-2 rounded-lg border px-3.5 py-2.5 text-sm font-mono border-zinc-200 bg-white text-zinc-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300">
+                        <span className="text-emerald-600 dark:text-emerald-400 select-none">$</span>
+                        <span className="truncate">pip install pyxle-framework</span>
+                        <span className="ml-auto"><CopyButton text="pip install pyxle-framework" label="Copy" /></span>
                     </div>
                 </div>
+            </div>
 
-                {/* Hero code card */}
-                <div className="reveal relative mx-auto mt-14 max-w-2xl" style={{ animationDelay: '260ms' }}>
-                    <div
-                        aria-hidden="true"
-                        className="pointer-events-none absolute -inset-8 -z-10 rounded-[32px] opacity-60"
-                        style={{ background: 'radial-gradient(closest-side, rgba(16,185,129,0.18), rgba(59,130,246,0.10) 60%, transparent 75%)' }}
-                    />
-                    <div className="overflow-hidden rounded-xl border text-left shadow-xl border-zinc-200 bg-[#0b0b0d] dark:border-white/10 dark:bg-[#0e0e10] dark:shadow-black/40">
-                        <div className="flex items-center gap-2 border-b px-4 py-2.5 border-white/5">
-                            <span className="flex gap-1.5" aria-hidden="true">
-                                <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
-                                <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/60" />
-                                <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/40" />
-                            </span>
-                            <span className="ml-2 text-[11px] font-mono text-zinc-400">pages/dashboard.pyxl</span>
-                            <div className="ml-auto">
-                                <CopyButton text={HERO_CODE_TEXT} />
+            {/* The interactive playground — the star of the hero. */}
+            <div className="reveal relative mx-auto mt-14 max-w-5xl" style={{ animationDelay: '260ms' }}>
+                <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -inset-x-8 -top-10 bottom-0 -z-10 opacity-70 blur-2xl"
+                    style={{ background: 'radial-gradient(60% 50% at 50% 0%, rgba(16,185,129,0.26), rgba(59,130,246,0.14) 55%, transparent 78%)' }}
+                />
+                <div className="gradient-edge rounded-2xl p-px shadow-2xl shadow-emerald-500/10 dark:shadow-black/50">
+                    <div className="overflow-hidden rounded-2xl bg-[#0b0b0d] dark:bg-[#0c0c0e]">
+                        <LivePlayground />
+                    </div>
+                </div>
+                <p className="mt-4 text-center font-mono text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-500">
+                    <span className="text-emerald-600 dark:text-emerald-400">↑</span> edit the <span className="text-zinc-700 dark:text-zinc-300">.pyxl</span> — it compiles &amp; renders live, 100% in your browser
+                </p>
+            </div>
+        </section>
+    );
+}
+
+
+/* ── Anatomy: one file vs the usual sprawl (the wedge) ───────────── */
+
+const OLD_WAY_FILES = [
+    'app/api/users/route.ts',
+    'server/users_service.py',
+    'db/schema.sql',
+    'types/user.d.ts',
+    'hooks/use-users.ts',
+    'app/users/page.tsx',
+    'app/users/loading.tsx',
+    'lib/api-client.ts',
+];
+
+const USERS_PYXL = `# users.pyxl
+
+@server
+async def load(request):
+    return {"users": await db.all_users()}
+
+@action
+async def add_user(request):
+    body = await request.json()
+    return {"user": await db.insert(body)}
+
+
+import React from 'react';
+import { useAction } from 'pyxle/client';
+
+export default function Users({ data }) {
+    const add = useAction('add_user');
+    return <UserTable rows={data.users} onAdd={add} />;
+}`;
+
+const ANATOMY_PARTS = [
+    { label: '@server', role: 'loads data → props', dot: 'from-amber-400 to-amber-300' },
+    { label: '@action', role: 'mutates on the server', dot: 'from-emerald-400 to-cyan-400' },
+    { label: 'React', role: 'renders the UI', dot: 'from-cyan-400 to-blue-400' },
+];
+
+function Anatomy() {
+    return (
+        <section className="relative overflow-hidden px-5 sm:px-6 py-20 sm:py-28">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+                <div className="aurora parallax-slow absolute inset-x-0 -top-24 h-[560px] opacity-60" />
+            </div>
+            <div className="mx-auto max-w-6xl">
+                <SectionHead
+                    eyebrow="The whole feature"
+                    title={<>One file does the work of <span className="gradient-text">eight</span>.</>}
+                    sub="A loader, a mutation, and the UI that consumes them — colocated. No route table to wire, no client/server types to keep in sync, no fetch glue between them."
+                />
+
+                <div className="grid items-stretch gap-5 lg:grid-cols-12 lg:gap-6">
+                    {/* The usual sprawl */}
+                    <div data-reveal="left" className="lg:col-span-5">
+                        <div className="flex h-full flex-col rounded-2xl border border-zinc-200 bg-zinc-50/60 p-5 dark:border-white/5 dark:bg-white/[0.015]">
+                            <div className="mb-4 flex items-center justify-between">
+                                <span className="font-mono text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-500">The usual way</span>
+                                <span className="rounded-full border border-zinc-200 px-2 py-0.5 font-mono text-[10px] text-zinc-500 dark:border-white/10 dark:text-zinc-400">8 files</span>
+                            </div>
+                            <ul className="flex-1 space-y-1.5">
+                                {OLD_WAY_FILES.map((f) => (
+                                    <li key={f} className="flex items-center gap-2.5 font-mono text-[12px] text-zinc-400 dark:text-zinc-600">
+                                        <svg className="h-3.5 w-3.5 shrink-0 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                        </svg>
+                                        <span className="truncate line-through decoration-zinc-300 decoration-1 dark:decoration-white/15">{f}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                            <p className="mt-4 border-t border-zinc-200 pt-3 text-[12px] text-zinc-500 dark:border-white/5 dark:text-zinc-500">
+                                Two languages. Types to sync. Glue at every seam.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* The one file */}
+                    <div data-reveal="right" className="lg:col-span-7" style={{ ['--reveal-delay']: '120ms' }}>
+                        <div className="relative h-full">
+                            <div
+                                aria-hidden="true"
+                                className="pointer-events-none absolute -inset-x-6 -top-8 bottom-0 -z-10 opacity-70 blur-2xl"
+                                style={{ background: 'radial-gradient(55% 50% at 60% 0%, rgba(16,185,129,0.22), rgba(59,130,246,0.12) 55%, transparent 78%)' }}
+                            />
+                            <div className="gradient-edge h-full rounded-2xl p-px shadow-xl shadow-emerald-500/10 dark:shadow-black/40">
+                                <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-[#0b0b0d]">
+                                    <div className="flex items-center gap-2 border-b border-white/5 px-4 py-2.5">
+                                        <span className="flex gap-1.5" aria-hidden="true">
+                                            <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
+                                            <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/60" />
+                                            <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/40" />
+                                        </span>
+                                        <span className="ml-1 font-mono text-[11px] text-zinc-400">users.pyxl</span>
+                                        <span className="ml-auto rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-300">1 file</span>
+                                    </div>
+                                    <CodeBlock code={USERS_PYXL} className="flex-1 p-5 text-[12.5px] text-zinc-300" />
+                                    <div className="grid grid-cols-3 gap-px border-t border-white/5 bg-white/5">
+                                        {ANATOMY_PARTS.map((p) => (
+                                            <div key={p.label} className="bg-[#0b0b0d] px-3 py-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`h-2 w-2 rounded-full bg-gradient-to-br ${p.dot}`} />
+                                                    <span className="font-mono text-[11px] text-zinc-200">{p.label}</span>
+                                                </div>
+                                                <p className="mt-1 text-[11px] leading-snug text-zinc-500">{p.role}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <PreTokenized lines={HERO_CODE} />
                     </div>
                 </div>
             </div>
@@ -324,56 +429,71 @@ function Hero() {
 
 /* ── Features (merged with hero code section feel) ───────────────── */
 
-const FEATURES = [
-    {
-        title: 'File-based routing',
-        desc: "Drop a .pyxl file in pages/ and it's a route. Dynamic segments, catch-alls, nested layouts.",
-        d: 'M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026M4.5 9.75V6A2.25 2.25 0 016.75 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44h4.629A2.25 2.25 0 0121.75 9v.75',
-    },
-    {
-        title: 'Async server loaders',
-        desc: '@server functions run on Starlette. Return a dict — it becomes React props. No fetch wiring.',
-        d: 'M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7',
-    },
-    {
-        title: 'Server actions',
-        desc: 'Mutate data with @action. Call from React via useAction() — typed POST handlers, zero glue.',
-        d: 'M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5',
-    },
-    {
-        title: 'SSR + Vite dev',
-        desc: 'Every page is server-rendered then hydrated. Instant HMR in dev, hashed assets in prod.',
-        d: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z',
-    },
-];
+function BentoCell({ className = '', icon, title, children, delay = 0 }) {
+    return (
+        <div
+            data-reveal
+            style={{ ['--reveal-delay']: `${delay}ms` }}
+            className={`group relative flex flex-col rounded-2xl border p-5 sm:p-6 transition-all duration-300 border-zinc-200 bg-white hover:-translate-y-0.5 hover:shadow-lg hover:shadow-zinc-900/5 hover:border-zinc-300 dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10 dark:hover:shadow-black/30 ${className}`}
+        >
+            <div className="mb-4 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 text-emerald-700 transition-colors group-hover:border-emerald-500/30 group-hover:text-emerald-600 dark:border-white/10 dark:bg-white/5 dark:text-emerald-400">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
+                </svg>
+            </div>
+            <h3 className="text-[15px] font-semibold">{title}</h3>
+            {children}
+        </div>
+    );
+}
 
 function Features() {
     return (
         <section id="features" className="relative px-5 sm:px-6 py-16 sm:py-20">
             <div className="mx-auto max-w-6xl">
-                <div className="reveal text-center mb-12">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">What{"'"}s in the box</p>
-                    <h2 className="mt-3 text-balance text-3xl sm:text-4xl font-semibold tracking-tight">
-                        Everything you need, nothing you don{"'"}t.
-                    </h2>
-                </div>
+                <SectionHead
+                    eyebrow="What's in the box"
+                    title="A real framework, not a toy."
+                    sub="One file is the headline. Underneath is a full-stack runtime — routing, SSR, a dev server, and the seams you actually ship on."
+                />
 
-                <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {FEATURES.map((f, i) => (
-                        <div
-                            key={f.title}
-                            className="reveal group rounded-xl border p-5 transition-colors border-zinc-200 bg-white hover:border-zinc-300 dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10"
-                            style={{ animationDelay: `${i * 60}ms` }}
-                        >
-                            <div className="mb-4 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 text-emerald-700 dark:border-white/10 dark:bg-white/5 dark:text-emerald-400">
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d={f.d} />
-                                </svg>
-                            </div>
-                            <h3 className="text-[15px] font-semibold">{f.title}</h3>
-                            <p className="mt-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{f.desc}</p>
+                <div className="grid gap-3 sm:gap-4 lg:grid-cols-6">
+                    {/* Routing — wide, with a mini route map */}
+                    <BentoCell className="lg:col-span-3" icon="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026M4.5 9.75V6A2.25 2.25 0 016.75 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44h4.629A2.25 2.25 0 0121.75 9v.75" title="File-based routing">
+                        <p className="mt-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">Drop a file in <code className="rounded bg-zinc-100 px-1 text-[0.85em] text-emerald-700 dark:bg-white/10 dark:text-emerald-300">pages/</code> and it's a route. Dynamic segments, catch-alls, nested layouts.</p>
+                        <div className="mt-4 space-y-1 rounded-lg border border-zinc-200/70 bg-zinc-50 p-3 font-mono text-[11.5px] dark:border-white/5 dark:bg-white/[0.03]">
+                            {[['pages/index.pyxl', '/'], ['pages/blog/[slug].pyxl', '/blog/:slug'], ['pages/api/health.py', '/api/health']].map(([f, r]) => (
+                                <div key={f} className="flex items-center justify-between gap-3">
+                                    <span className="truncate text-zinc-500 dark:text-zinc-400">{f}</span>
+                                    <span className="shrink-0 text-emerald-700 dark:text-emerald-400">{r}</span>
+                                </div>
+                            ))}
                         </div>
-                    ))}
+                    </BentoCell>
+
+                    {/* SSR — wide, with a flow */}
+                    <BentoCell className="lg:col-span-3" delay={80} icon="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z" title="SSR, then hydrate">
+                        <p className="mt-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">Every page renders on the server for instant first paint, then hydrates into a live React app. SEO and speed, for free.</p>
+                        <div className="mt-4 flex flex-wrap items-center gap-2 font-mono text-[11px]">
+                            {['@server loads', 'HTML streamed', 'React hydrates'].map((s, i) => (
+                                <React.Fragment key={s}>
+                                    <span className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-zinc-600 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300">{s}</span>
+                                    {i < 2 && <span className="text-zinc-400 dark:text-zinc-600">→</span>}
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    </BentoCell>
+
+                    {/* Three compact cells */}
+                    <BentoCell className="lg:col-span-2" delay={40} icon="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" title="Instant HMR">
+                        <p className="mt-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">Vite-powered dev server. Edit a <code className="rounded bg-zinc-100 px-1 text-[0.85em] text-emerald-700 dark:bg-white/10 dark:text-emerald-300">.pyxl</code>, see it instantly — hashed assets in prod.</p>
+                    </BentoCell>
+                    <BentoCell className="lg:col-span-2" delay={120} icon="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.4.604-.4.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.96.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.676.05-3.343.196-4.992.435a.643.643 0 01-.74-.633v0z" title="Middleware & plugins">
+                        <p className="mt-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">ASGI middleware, an official plugin system, and a CLI you can extend. Auth, DB, and more — opt in.</p>
+                    </BentoCell>
+                    <BentoCell className="lg:col-span-2" delay={200} icon="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" title="Deploys anywhere">
+                        <p className="mt-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">It's a standard ASGI app under the hood — <code className="rounded bg-zinc-100 px-1 text-[0.85em] text-emerald-700 dark:bg-white/10 dark:text-emerald-300">pyxle build</code>, then run it anywhere Python runs.</p>
+                    </BentoCell>
                 </div>
             </div>
         </section>
@@ -394,36 +514,47 @@ function Numbers() {
     return (
         <section className="relative px-5 sm:px-6 py-16 sm:py-20">
             <div className="mx-auto max-w-6xl">
-                <div className="reveal flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end mb-8">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">Performance</p>
-                        <h2 className="mt-3 text-balance text-3xl sm:text-4xl font-semibold tracking-tight">Fast where it matters.</h2>
+                <div data-reveal className="relative overflow-hidden rounded-3xl border border-white/10 bg-zinc-950 px-6 py-10 shadow-2xl shadow-emerald-500/5 sm:px-10 sm:py-12">
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+                        <div className="absolute inset-0 grid-bg opacity-40" />
+                        <div className="aurora aurora-anim absolute -inset-x-10 -top-40 h-[440px] opacity-70" />
                     </div>
-                    <Link
-                        href="/benchmarks"
-                        className="focus-ring inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline underline-offset-4"
-                    >
-                        Full benchmark methodology
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5-5 5M6 12h12" />
-                        </svg>
-                    </Link>
-                </div>
-
-                <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border sm:grid-cols-4 border-zinc-200 bg-zinc-200 dark:border-white/10 dark:bg-white/10">
-                    {STATS.map((s) => (
-                        <div
-                            key={s.label}
-                            className="bg-white dark:bg-[#0a0a0b] p-5 sm:p-6"
-                        >
-                            <dd className="flex items-baseline gap-1 text-2xl sm:text-3xl font-semibold tracking-tight tabular-nums">
-                                <span className="gradient-text">{s.value}</span>
-                                {s.unit && <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{s.unit}</span>}
-                            </dd>
-                            <dt className="mt-1 text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">{s.label}</dt>
+                    <div className="relative">
+                        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400">Performance</p>
+                                <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl">Fast where it matters.</h2>
+                                <p className="mt-2 max-w-md text-sm text-zinc-400">Numbers from a reproducible harness — not a synthetic hello-world. Every figure links to the code that produced it.</p>
+                            </div>
+                            <Link
+                                href="/benchmarks"
+                                className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3.5 py-2 text-sm font-medium text-emerald-400 transition-colors hover:bg-white/10"
+                            >
+                                Full methodology
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5-5 5M6 12h12" />
+                                </svg>
+                            </Link>
                         </div>
-                    ))}
-                </dl>
+
+                        <dl className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:grid-cols-4">
+                            {STATS.map((s, i) => (
+                                <div
+                                    key={s.label}
+                                    data-reveal
+                                    style={{ ['--reveal-delay']: `${i * 80}ms` }}
+                                    className="bg-zinc-950 p-5 sm:p-6"
+                                >
+                                    <dd className="flex items-baseline gap-1 text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">
+                                        <span className="gradient-text">{s.value}</span>
+                                        {s.unit && <span className="text-sm font-medium text-zinc-400">{s.unit}</span>}
+                                    </dd>
+                                    <dt className="mt-1 text-xs text-zinc-400 sm:text-sm">{s.label}</dt>
+                                </div>
+                            ))}
+                        </dl>
+                    </div>
+                </div>
             </div>
         </section>
     );
@@ -451,7 +582,7 @@ function ForAgents() {
     return (
         <section id="agents" className="relative px-5 sm:px-6 py-16 sm:py-20">
             <div className="mx-auto max-w-6xl">
-                <div className="reveal text-center mb-12">
+                <div data-reveal className="text-center mb-12">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">For AI coding agents</p>
                     <h2 className="mt-3 text-balance text-3xl sm:text-4xl font-semibold tracking-tight">
                         The framework <span className="gradient-text">AI agents love</span>.
@@ -461,17 +592,49 @@ function ForAgents() {
                     </p>
                 </div>
 
-                <div className="grid gap-3 sm:gap-4 md:grid-cols-3">
-                    {AGENT_POINTS.map((p, i) => (
-                        <div
-                            key={p.title}
-                            className="reveal rounded-xl border p-5 border-zinc-200 bg-white dark:border-white/5 dark:bg-white/[0.02]"
-                            style={{ animationDelay: `${i * 60}ms` }}
-                        >
-                            <h3 className="text-[15px] font-semibold">{p.title}</h3>
-                            <p className="mt-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{p.desc}</p>
+                <div className="grid items-center gap-5 lg:grid-cols-2 lg:gap-8">
+                    {/* The three points */}
+                    <div className="space-y-3">
+                        {AGENT_POINTS.map((p, i) => (
+                            <div
+                                key={p.title}
+                                data-reveal="left"
+                                className="flex gap-3.5 rounded-xl border p-5 border-zinc-200 bg-white dark:border-white/5 dark:bg-white/[0.02]"
+                                style={{ ['--reveal-delay']: `${i * 70}ms` }}
+                            >
+                                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400" />
+                                <div>
+                                    <h3 className="text-[15px] font-semibold">{p.title}</h3>
+                                    <p className="mt-1 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{p.desc}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* The proof: literal machine-parseable check output */}
+                    <div data-reveal="right" style={{ ['--reveal-delay']: '120ms' }}>
+                        <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0d] shadow-xl shadow-black/30">
+                            <div className="flex items-center gap-2 border-b border-white/5 px-4 py-2.5">
+                                <span className="flex gap-1.5" aria-hidden="true">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
+                                    <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/60" />
+                                    <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/40" />
+                                </span>
+                                <span className="ml-1 font-mono text-[11px] text-zinc-400">terminal</span>
+                            </div>
+                            <pre className="overflow-x-auto p-5 font-mono text-[12.5px] leading-[1.85]">
+                                <code>
+                                    <div><span className="sh-cmd">$</span> <span className="text-zinc-200">pyxle check</span></div>
+                                    {'\n'}
+                                    <div><span className="sh-comp">[server]</span> <span className="text-zinc-400">pages/users.pyxl:7:</span> <span className="sh-elem">loader must return a dict</span></div>
+                                    <div><span className="sh-comp">[jsx]</span> <span className="text-zinc-400">pages/users.pyxl:21:</span> <span className="sh-elem">data.users may be undefined</span></div>
+                                    {'\n'}
+                                    <div><span className="sh-elem">✗</span> <span className="text-zinc-300">2 problems</span> <span className="text-zinc-600">·</span> <span className="sh-dec">exit 1</span></div>
+                                </code>
+                            </pre>
                         </div>
-                    ))}
+                        <p className="mt-3 text-center font-mono text-[11px] text-zinc-500 dark:text-zinc-500">one diagnostic per line · grep-friendly · exit 0/1</p>
+                    </div>
                 </div>
 
                 <div className="mt-10 text-center">
@@ -552,13 +715,13 @@ function Demos() {
     return (
         <section className="relative px-5 sm:px-6 py-16 sm:py-20">
             <div className="mx-auto max-w-6xl">
-                <div className="reveal flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end mb-8">
+                <div data-reveal className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end mb-8">
                     <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">Showcase</p>
                         <h2 className="mt-3 text-balance text-3xl sm:text-4xl font-semibold tracking-tight">Apps built with Pyxle.</h2>
                     </div>
                     <a
-                        href="https://github.com/pyxle-framework/pyxle-demos"
+                        href="https://github.com/pyxle-dev/pyxle-demos"
                         target="_blank"
                         rel="noreferrer"
                         className="focus-ring inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline underline-offset-4"
@@ -577,8 +740,9 @@ function Demos() {
                             href={d.href}
                             target="_blank"
                             rel="noreferrer"
-                            className="reveal focus-ring group flex flex-col overflow-hidden rounded-xl border transition-colors border-zinc-200 bg-white hover:border-zinc-300 dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10"
-                            style={{ animationDelay: `${i * 70}ms` }}
+                            data-reveal
+                            className="focus-ring group flex flex-col overflow-hidden rounded-2xl border transition-all duration-300 border-zinc-200 bg-white hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-lg hover:shadow-zinc-900/5 dark:border-white/5 dark:bg-white/[0.02] dark:hover:border-white/10 dark:hover:shadow-black/30"
+                            style={{ ['--reveal-delay']: `${i * 90}ms` }}
                         >
                             <DemoPreview kind={d.kind} gradient={d.gradient} />
                             <div className="p-5">
@@ -633,16 +797,49 @@ function GetStarted() {
     }, [email, subscribe]);
 
     return (
-        <section className="relative px-5 sm:px-6 py-16 sm:py-20">
+        <section className="relative overflow-hidden px-5 sm:px-6 py-20 sm:py-28">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+                <div className="aurora aurora-anim parallax-slow absolute inset-x-0 -bottom-40 h-[560px] opacity-60" />
+                <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-white to-transparent dark:from-[#0a0a0b]" />
+            </div>
             <div className="mx-auto max-w-6xl">
+                {/* Closing punch */}
+                <div data-reveal className="mx-auto mb-14 max-w-2xl text-center">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">Start now</p>
+                    <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight sm:text-5xl">
+                        Your first feature is <span className="gradient-text">one&nbsp;file</span> away.
+                    </h2>
+                    <p className="mx-auto mt-4 max-w-lg text-pretty text-sm sm:text-base text-zinc-600 dark:text-zinc-400">
+                        Install, scaffold, run — then open a <code className="rounded bg-zinc-100 px-1 text-[0.85em] text-emerald-700 dark:bg-white/10 dark:text-emerald-300">.pyxl</code> and ship. MIT-licensed, open source.
+                    </p>
+                    <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+                        <Link
+                            href="/docs/getting-started/installation"
+                            className="focus-ring group inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                        >
+                            Get started
+                            <svg className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5-5 5M6 12h12" />
+                            </svg>
+                        </Link>
+                        <a
+                            href="https://github.com/pyxle-dev/pyxle"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border px-5 py-3 text-sm font-medium border-zinc-200 bg-white text-zinc-800 transition-colors hover:bg-zinc-50 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10"
+                        >
+                            <svg className="h-4 w-4 text-amber-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M11.48 3.5a.56.56 0 011.04 0l2.09 4.94 5.34.46c.5.04.7.66.32.99l-4.05 3.5 1.21 5.22c.11.49-.42.87-.85.61L12 16.98l-4.59 2.74c-.43.26-.96-.12-.85-.61l1.21-5.22-4.05-3.5a.56.56 0 01.32-.99l5.34-.46L11.48 3.5z" />
+                            </svg>
+                            Star on GitHub
+                        </a>
+                    </div>
+                </div>
+
                 <div className="grid gap-10 lg:grid-cols-2 lg:gap-14">
                     {/* Install steps */}
-                    <div className="reveal">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">Get started</p>
-                        <h2 className="mt-3 text-balance text-3xl sm:text-4xl font-semibold tracking-tight">Four commands.</h2>
-                        <p className="mt-3 max-w-md text-sm sm:text-base text-zinc-600 dark:text-zinc-400">
-                            Install, scaffold, run. The whole CLI vocabulary fits on one screen.
-                        </p>
+                    <div data-reveal="left">
+                        <h3 className="font-mono text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Four commands · start to running</h3>
                         <ol className="mt-6 space-y-2">
                             {INSTALL_STEPS.map((step, i) => (
                                 <li
@@ -673,7 +870,7 @@ function GetStarted() {
                     </div>
 
                     {/* Newsletter */}
-                    <div className="reveal" style={{ animationDelay: '80ms' }}>
+                    <div data-reveal="right" style={{ ['--reveal-delay']: '100ms' }}>
                         <div className="relative overflow-hidden rounded-xl border p-6 sm:p-7 border-zinc-200 bg-white dark:border-white/10 dark:bg-white/[0.03]">
                             <div
                                 aria-hidden="true"
@@ -728,22 +925,62 @@ function GetStarted() {
 
 /* ── Footer ──────────────────────────────────────────────────────── */
 
+const FOOTER_COLS = [
+    { h: 'Product', links: [['Docs', '/docs'], ['Playground', '/playground'], ['Benchmarks', '/benchmarks'], ['FAQ', '/docs/faq']] },
+    { h: 'Learn', links: [['Getting started', '/docs/getting-started/installation'], ['Server actions', '/docs/core-concepts/server-actions'], ['For AI agents', '/docs/guides/for-ai-agents']] },
+    { h: 'Community', links: [['GitHub', 'https://github.com/pyxle-dev/pyxle', true], ['Issues', 'https://github.com/pyxle-dev/pyxle/issues', true], ['Releases', 'https://github.com/pyxle-dev/pyxle/releases', true]] },
+];
+
 function Footer() {
+    const linkCls = 'text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors';
     return (
-        <footer className="border-t border-zinc-200 dark:border-white/5 px-5 sm:px-6 py-10">
-            <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-5 sm:flex-row">
-                <div className="flex items-center gap-3">
-                    <img src="/branding/pyxle-mark.svg" alt="" width="20" height="20" className="h-5 w-5 opacity-70" />
-                    <span className="text-sm text-zinc-500 dark:text-zinc-400">Pyxle Framework — MIT</span>
+        <footer className="relative border-t border-zinc-200 dark:border-white/5">
+            <div aria-hidden="true" className="gradient-edge-static absolute inset-x-0 top-0 h-px opacity-80" />
+            <div className="mx-auto max-w-6xl px-5 sm:px-6 py-14">
+                <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="sm:col-span-2 lg:col-span-1">
+                        <Link href="/" aria-label="Pyxle home" className="focus-ring inline-flex items-center gap-2 rounded">
+                            <img src="/branding/pyxle-mark.svg" alt="" width="28" height="28" className="h-7 w-7" />
+                            <span className="text-[15px] font-semibold tracking-tight">Pyxle</span>
+                        </Link>
+                        <p className="mt-3 max-w-xs text-sm text-zinc-500 dark:text-zinc-400">
+                            Python and React in one file. The full-stack framework that gets out of your way.
+                        </p>
+                        <a
+                            href="https://github.com/pyxle-dev/pyxle"
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label="Pyxle on GitHub"
+                            className="focus-ring mt-4 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10"
+                        >
+                            <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M12 .3a12 12 0 00-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.8 2.8 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 016 0C17.3 4.7 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0012 .3" />
+                            </svg>
+                        </a>
+                    </div>
+
+                    {FOOTER_COLS.map((col) => (
+                        <div key={col.h}>
+                            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-500">{col.h}</h3>
+                            <ul className="mt-4 space-y-2.5">
+                                {col.links.map(([label, href, ext]) => (
+                                    <li key={label}>
+                                        {ext
+                                            ? <a href={href} target="_blank" rel="noreferrer" className={linkCls}>{label}</a>
+                                            : <Link href={href} className={linkCls}>{label}</Link>}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
                 </div>
-                <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2" aria-label="Footer">
-                    <Link href="/docs" className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">Docs</Link>
-                    <Link href="/docs/faq" className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">FAQ</Link>
-                    <Link href="/playground" className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">Playground</Link>
-                    <Link href="/benchmarks" className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">Benchmarks</Link>
-                    <a href="https://github.com/pyxle-framework/pyxle" target="_blank" rel="noreferrer" className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">GitHub</a>
-                    <a href="https://github.com/pyxle-framework/pyxle/issues" target="_blank" rel="noreferrer" className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">Issues</a>
-                </nav>
+
+                <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-zinc-200 pt-6 dark:border-white/5 sm:flex-row">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-500">Pyxle Framework — MIT licensed · open source.</p>
+                    <p className="inline-flex items-center gap-1.5 font-mono text-[11px] text-zinc-400 dark:text-zinc-600">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> built with Pyxle
+                    </p>
+                </div>
             </div>
         </footer>
     );
@@ -757,6 +994,7 @@ export const createSlots = () => slots;
 
 export default function Page({ data }) {
     const { version } = data;
+    useScrollReveal();
     return (
         <>
             <Head>
@@ -777,6 +1015,7 @@ export default function Page({ data }) {
             <Nav version={version} />
             <main id="main">
                 <Hero />
+                <Anatomy />
                 <Features />
                 <Numbers />
                 <ForAgents />

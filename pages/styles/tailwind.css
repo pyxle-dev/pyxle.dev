@@ -67,6 +67,174 @@
     }
 }
 
+/* ════════════════════════════════════════════════════════════════
+   Apple-style scroll motion layer (added on top of the existing
+   design — no visual restyle). Below-the-fold content eases in as it
+   enters the viewport: fade + rise + a whisper of scale, refined
+   easing, gentle stagger. Plus off-main-thread scroll parallax for
+   depth on the hero glow.
+
+   Lighthouse-100 invariants:
+     • Animates only opacity / transform — never layout (no CLS).
+     • No-JS users see everything (reveals gated on `html.js`, which the
+       boot script sets before first paint).
+     • LCP-safe: the hero keeps its on-paint `.reveal`; only below-fold
+       sections use the JS-gated scroll reveals.
+     • Parallax uses CSS scroll-driven timelines (no JS, off main
+       thread) and only where supported + motion is allowed.
+     • Fully disabled under prefers-reduced-motion.
+   ════════════════════════════════════════════════════════════════ */
+@layer utilities {
+    html.js [data-reveal] {
+        opacity: 0;
+        transform: translate3d(0, 26px, 0) scale(0.985);
+        transition:
+            opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+            transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        transition-delay: var(--reveal-delay, 0ms);
+    }
+    html.js [data-reveal="left"]  { transform: translate3d(-28px, 0, 0); }
+    html.js [data-reveal="right"] { transform: translate3d(28px, 0, 0); }
+    html.js [data-reveal="fade"]  { transform: translate3d(0, 20px, 0); }
+    html.js [data-reveal].is-visible {
+        opacity: 1;
+        transform: none;
+    }
+
+    /* Scroll-driven parallax — progressive enhancement, no JS. */
+    @supports (animation-timeline: scroll()) {
+        @media (prefers-reduced-motion: no-preference) {
+            .parallax-slow,
+            .parallax-fast {
+                animation: parallax-drift linear both;
+                animation-timeline: scroll(root);
+                animation-range: 0 100vh;
+            }
+            .parallax-fast { --parallax-y: 120px; }
+            .parallax-slow { --parallax-y: 60px; }
+            @keyframes parallax-drift {
+                to { transform: translate3d(0, var(--parallax-y, 60px), 0); }
+            }
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        html.js [data-reveal] { opacity: 1 !important; transform: none !important; transition: none; }
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Premium surface treatments — same emerald→cyan→blue brand, fresher
+   composition: an aurora mesh backdrop and an animated gradient
+   hairline border for elevated artifacts/cards.
+   ════════════════════════════════════════════════════════════════ */
+@layer utilities {
+    /* Aurora mesh — layered brand-gradient glows, drifting slowly. */
+    .aurora {
+        background-image:
+            radial-gradient(55% 48% at 50% -8%, rgba(52,211,153,0.22), transparent 72%),
+            radial-gradient(42% 46% at 84% 4%, rgba(96,165,250,0.18), transparent 72%),
+            radial-gradient(46% 46% at 12% 16%, rgba(34,211,238,0.16), transparent 72%);
+    }
+    html.light .aurora {
+        background-image:
+            radial-gradient(55% 48% at 50% -8%, rgba(16,185,129,0.16), transparent 72%),
+            radial-gradient(42% 46% at 84% 4%, rgba(59,130,246,0.12), transparent 72%),
+            radial-gradient(46% 46% at 12% 16%, rgba(34,211,238,0.10), transparent 72%);
+    }
+    @keyframes aurora-drift {
+        0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+        50%      { transform: translate3d(0, -2%, 0) scale(1.06); }
+    }
+    .aurora-anim { animation: aurora-drift 16s ease-in-out infinite; }
+
+    /* Animated gradient hairline — use as a `p-px` wrapper background. */
+    @keyframes edge-flow { to { background-position: 200% 50%; } }
+    .gradient-edge {
+        background-image: linear-gradient(110deg, #34d399, #22d3ee, #60a5fa, #34d399);
+        background-size: 200% 100%;
+        animation: edge-flow 9s linear infinite;
+    }
+    /* Static gradient hairline for cards (cheaper; no animation). */
+    .gradient-edge-static {
+        background-image: linear-gradient(135deg, rgba(52,211,153,0.5), rgba(34,211,238,0.32) 45%, rgba(96,165,250,0.5));
+    }
+
+    @keyframes float-y {
+        0%, 100% { transform: translate3d(0, 0, 0); }
+        50%      { transform: translate3d(0, -8px, 0); }
+    }
+    .float-y { animation: float-y 7s ease-in-out infinite; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .aurora-anim, .gradient-edge, .float-y { animation: none; }
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Live-playground preview scope — styles the *output* the user's
+   snippet renders (raw tags + a few helper classes), so whatever
+   they type looks good without relying on Tailwind's purge (which
+   can't see runtime-typed class names). Both themes.
+   ════════════════════════════════════════════════════════════════ */
+.preview-scope { color: #18181b; }
+html.dark .preview-scope { color: #fafafa; }
+.preview-scope h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; }
+.preview-scope h2 { font-size: 1.25rem; font-weight: 650; letter-spacing: -0.01em; }
+.preview-scope h3 { font-size: 1.05rem; font-weight: 650; }
+.preview-scope p  { margin-top: 0.5rem; color: #52525b; line-height: 1.6; }
+html.dark .preview-scope p { color: #a1a1aa; }
+.preview-scope a  { color: #059669; text-decoration: underline; text-underline-offset: 2px; }
+html.dark .preview-scope a { color: #34d399; }
+.preview-scope ul { margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.preview-scope li { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.75rem; border-radius: 0.55rem; background: rgba(9,9,11,0.04); font-size: 0.9rem; }
+html.dark .preview-scope li { background: rgba(255,255,255,0.05); }
+.preview-scope li::before { content: ""; width: 6px; height: 6px; border-radius: 9999px; background: linear-gradient(135deg, #34d399, #22d3ee); flex: 0 0 auto; }
+.preview-scope .card {
+    border: 1px solid rgba(9,9,11,0.08);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    background: rgba(9,9,11,0.015);
+}
+html.dark .preview-scope .card { border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); }
+.preview-scope .tag {
+    display: inline-block;
+    margin-bottom: 0.75rem;
+    padding: 0.15rem 0.6rem;
+    border-radius: 9999px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+    color: #047857;
+    background: rgba(16,185,129,0.1);
+    border: 1px solid rgba(16,185,129,0.2);
+}
+html.dark .preview-scope .tag { color: #6ee7b7; }
+.preview-scope button {
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.6rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #052e1a;
+    background: #34d399;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+.preview-scope button:hover { background: #6ee7b7; }
+.preview-scope input {
+    margin-top: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.6rem;
+    border: 1px solid rgba(9,9,11,0.12);
+    background: transparent;
+    font-size: 0.9rem;
+    color: inherit;
+    outline: none;
+}
+html.dark .preview-scope input { border-color: rgba(255,255,255,0.12); }
+.preview-scope input:focus { border-color: rgba(16,185,129,0.5); }
+
 /* ── Syntax highlighting token colors ────────────────────────
    Referenced by the pre-tokenized code blocks in index.pyxl and
    the shared highlighter in pages/components/code-highlighter.jsx.

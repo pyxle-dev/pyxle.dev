@@ -10,7 +10,7 @@ export function useTheme() {
 export const slots = {};
 export const createSlots = () => slots;
 
-const THEME_BOOT = `(function(){try{var t=localStorage.getItem('pyxle-theme');if(t!=='light'&&t!=='dark')t='dark';var c=document.documentElement.classList;c.remove('light','dark');c.add(t);}catch(e){document.documentElement.classList.add('dark');}})();`;
+const THEME_BOOT = `(function(){try{var c=document.documentElement.classList;c.add('js');var t=localStorage.getItem('pyxle-theme');if(t!=='light'&&t!=='dark')t='dark';c.remove('light','dark');c.add(t);}catch(e){document.documentElement.classList.add('dark');document.documentElement.classList.add('js');}})();`;
 
 function readInitialTheme() {
     if (typeof document === 'undefined') return 'dark';

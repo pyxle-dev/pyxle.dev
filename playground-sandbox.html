@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Pyxle playground sandbox</title>
+<!--
+  Isolated execution sandbox for the pyxle.dev live playground.
+
+  This document is embedded by the landing page inside
+  <iframe sandbox="allow-scripts"> — WITHOUT allow-same-origin — so it
+  runs in an OPAQUE origin. User-authored .pyxl code executed here
+  therefore CANNOT read pyxle.dev cookies / localStorage, cannot touch
+  the parent DOM, and cannot make credentialed same-origin requests to
+  pyxle.dev. The only escape hatch is postMessage to the parent, which
+  carries plain data only.
+
+  Inside this opaque origin:
+    • A Web Worker (blob) runs Pyodide (CPython/WASM): the real Pyxle
+      parser, the @server loader, and @action handlers, with a per-call
+      TIMEOUT — a runaway loop is killed via worker.terminate() without
+      freezing this frame or the host page.
+    • This main thread transforms JSX (Sucrase) and renders the user's
+      React component with new Function() — also inside the opaque origin.
+
+  Third-party code:
+    • React / ReactDOM — loaded as classic scripts WITH Subresource
+      Integrity (SRI) below.
+    • Pyodide — loaded in the worker via importScripts() (no SRI: that
+      API takes no integrity, and Pyodide fetches many un-hashed
+      sub-resources regardless). Contained to this powerless sandbox.
+    • Sucrase — dynamic ESM import (no SRI on module imports). Also
+      contained to the sandbox.
+-->
+<style>
+  :root { color-scheme: light dark; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: #ffffff;
+    color: #18181b;
+    -webkit-font-smoothing: antialiased;
+  }
+  html.dark body { background: #0a0a0b; color: #fafafa; }
+  #root { box-sizing: border-box; min-height: 100%; padding: 24px; overflow: auto; }
+
+  code, pre { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace; }
+
+  /* ── Preview-scope styles (ported from the host tailwind.css so the
+        user's output looks identical whether host- or sandbox-rendered) ── */
+  .preview-scope h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; margin: 0; }
+  .preview-scope h2 { font-size: 1.25rem; font-weight: 650; letter-spacing: -0.01em; }
+  .preview-scope h3 { font-size: 1.05rem; font-weight: 650; }
+  .preview-scope p  { margin-top: 0.5rem; color: #52525b; line-height: 1.6; }
+  html.dark .preview-scope p { color: #a1a1aa; }
+  .preview-scope a  { color: #059669; text-decoration: underline; text-underline-offset: 2px; }
+  html.dark .preview-scope a { color: #34d399; }
+  .preview-scope ul { margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.4rem; padding: 0; list-style: none; }
+  .preview-scope li { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.75rem; border-radius: 0.55rem; background: rgba(9,9,11,0.04); font-size: 0.9rem; }
+  html.dark .preview-scope li { background: rgba(255,255,255,0.05); }
+  .preview-scope li::before { content: ""; width: 6px; height: 6px; border-radius: 9999px; background: linear-gradient(135deg, #34d399, #22d3ee); flex: 0 0 auto; }
+  .preview-scope .card { border: 1px solid rgba(9,9,11,0.08); border-radius: 1rem; padding: 1.5rem; background: rgba(9,9,11,0.015); }
+  html.dark .preview-scope .card { border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); }
+  .preview-scope .tag { display: inline-block; margin-bottom: 0.75rem; padding: 0.15rem 0.6rem; border-radius: 9999px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.7rem; color: #047857; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); }
+  html.dark .preview-scope .tag { color: #6ee7b7; }
+  .preview-scope button { margin-top: 1rem; padding: 0.5rem 1rem; border-radius: 0.6rem; font-size: 0.85rem; font-weight: 600; color: #052e1a; background: #34d399; cursor: pointer; border: 0; transition: background-color 0.15s; }
+  .preview-scope button:hover { background: #6ee7b7; }
+  .preview-scope button:disabled { opacity: 0.6; cursor: default; }
+  .preview-scope input { margin-top: 0.5rem; width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border-radius: 0.6rem; border: 1px solid rgba(9,9,11,0.12); background: transparent; font-size: 0.9rem; color: inherit; outline: none; }
+  html.dark .preview-scope input { border-color: rgba(255,255,255,0.12); }
+  .preview-scope input:focus { border-color: rgba(16,185,129,0.5); }
+
+  /* ── Error panel ── */
+  .pg-error { border-radius: 0.5rem; border: 1px solid rgba(239,68,68,0.3); background: rgba(239,68,68,0.05); padding: 1rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.6; color: #dc2626; white-space: pre-wrap; word-break: break-word; }
+  html.dark .pg-error { color: #f87171; }
+  .pg-error .pg-kind { margin-bottom: 0.25rem; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.7; }
+</style>
+</head>
+<body>
+<div id="root" class="preview-scope"></div>
+
+<!-- React + ReactDOM (UMD) with Subresource Integrity, pinned to 18.3.1 -->
+<script
+  src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"
+  integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z"
+  crossorigin="anonymous"></script>
+<script
+  src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"
+  integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1"
+  crossorigin="anonymous"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  var PYODIDE_VERSION = 'v0.27.2';
+  var PYODIDE_BASE = 'https://cdn.jsdelivr.net/pyodide/' + PYODIDE_VERSION + '/full/';
+  var SUCRASE_URL = 'https://esm.sh/sucrase@3.35.1?bundle';
+  var RUN_TIMEOUT_MS = 6000;   // per setup/action call — catches infinite loops
+  var BOOT_TIMEOUT_MS = 45000; // Pyodide download + init
+
+  /* ── Python runner (runs INSIDE Pyodide, in the worker). Keeps the
+        exec'd module namespace alive in _PG["ns"] so Python module state
+        (e.g. a counter global) survives across @action calls, and mirrors
+        the Pyxle server's exact response shapes. ── */
+  var BOOTSTRAP = [
+    'import json, inspect',
+    'from pyxle.compiler.parser import PyxParser',
+    'from pyxle.runtime import server, action, ActionError',
+    '',
+    'class _PgRequest:',
+    '    def __init__(self, payload=None):',
+    '        self.query_params = {}',
+    '        self.path_params = {}',
+    '        self.headers = {}',
+    '        self.cookies = {}',
+    '        self.method = "POST"',
+    '        self.url = "/"',
+    '        self._payload = payload if payload is not None else {}',
+    '    async def json(self):',
+    '        return self._payload',
+    '',
+    '_PG = {"ns": None}',
+    '',
+    'async def _maybe_await(value):',
+    '    if inspect.iscoroutine(value):',
+    '        return await value',
+    '    return value',
+    '',
+    'async def pyxle_setup(src):',
+    '    out = {"ok": True, "jsx": "", "loaderName": None, "actions": [],',
+    '           "data": {}, "error": None, "diagnostics": []}',
+    '    try:',
+    '        res = PyxParser().parse_text(src, tolerant=True)',
+    '        out["jsx"] = res.jsx_code',
+    '        out["loaderName"] = res.loader.name if res.loader else None',
+    '        out["diagnostics"] = [',
+    '            {"section": d.section, "line": d.line, "message": d.message}',
+    '            for d in res.diagnostics',
+    '        ]',
+    '        ns = {"server": server, "action": action, "ActionError": ActionError}',
+    '        try:',
+    '            exec(res.python_code, ns)',
+    '        except Exception as e:',
+    '            _PG["ns"] = None',
+    '            out["error"] = f"{type(e).__name__}: {e}"',
+    '            return json.dumps(out, default=str)',
+    '        _PG["ns"] = ns',
+    '        out["actions"] = [k for k, v in ns.items()',
+    '                          if callable(v) and getattr(v, "__pyxle_action__", False)]',
+    '        if res.loader is not None:',
+    '            fn = ns.get(res.loader.name)',
+    '            if callable(fn):',
+    '                try:',
+    '                    out["data"] = await _maybe_await(fn(_PgRequest()))',
+    '                except Exception as e:',
+    '                    out["error"] = f"{type(e).__name__}: {e}"',
+    '    except Exception as e:',
+    '        out["ok"] = False',
+    '        out["error"] = f"{type(e).__name__}: {e}"',
+    '    return json.dumps(out, default=str)',
+    '',
+    'async def pyxle_action(name, payload_json):',
+    '    ns = _PG.get("ns")',
+    '    if not ns:',
+    '        return json.dumps({"ok": False, "error": "The Python runtime is not ready yet."})',
+    '    fn = ns.get(name)',
+    '    if not callable(fn) or not getattr(fn, "__pyxle_action__", False):',
+    '        return json.dumps({"ok": False, "error": f"No @action named {name}."})',
+    '    try:',
+    '        payload = json.loads(payload_json) if payload_json else {}',
+    '    except Exception:',
+    '        payload = {}',
+    '    try:',
+    '        result = await _maybe_await(fn(_PgRequest(payload)))',
+    '    except ActionError as e:',
+    '        err = {"ok": False, "error": e.message}',
+    '        if e.data:',
+    '            err["data"] = e.data',
+    '        return json.dumps(err, default=str)',
+    '    except Exception as e:',
+    '        return json.dumps({"ok": False, "error": f"{type(e).__name__}: {e}"}, default=str)',
+    '    if not isinstance(result, dict):',
+    '        return json.dumps({"ok": False, "error": "Action must return a JSON-serializable dict"})',
+    '    return json.dumps({"ok": True, **result}, default=str)',
+    ''
+  ].join('\n');
+
+  /* ── Worker body: boots Pyodide, installs the vendored parser, runs
+        setup/action against the persistent namespace. ── */
+  var WORKER_BODY = [
+    'let py = null;',
+    'async function boot(files) {',
+    '  importScripts(' + JSON.stringify(PYODIDE_BASE + 'pyodide.js') + ');',
+    '  py = await loadPyodide({ indexURL: ' + JSON.stringify(PYODIDE_BASE) + ' });',
+    '  py.FS.mkdirTree("/vendor/pyxle/compiler");',
+    '  for (const path in files) { py.FS.writeFile("/vendor/" + path, files[path]); }',
+    '  py.runPython("import sys\\nif \'/vendor\' not in sys.path:\\n    sys.path.insert(0, \'/vendor\')");',
+    '  py.runPython(BOOTSTRAP);',
+    '}',
+    'self.onmessage = async (e) => {',
+    '  const msg = e.data;',
+    '  try {',
+    '    if (msg.type === "init") {',
+    '      try { await boot(msg.files); self.postMessage({ type: "ready" }); }',
+    '      catch (err) { self.postMessage({ type: "bootfailed", error: String((err && err.message) || err) }); }',
+    '      return;',
+    '    }',
+    '    if (msg.type === "setup") {',
+    '      py.globals.set("_PYXL_SRC", msg.source);',
+    '      const out = await py.runPythonAsync("await pyxle_setup(_PYXL_SRC)");',
+    '      self.postMessage({ id: msg.id, result: JSON.parse(out) });',
+    '      return;',
+    '    }',
+    '    if (msg.type === "action") {',
+    '      py.globals.set("_PYXL_ACTION_NAME", msg.name);',
+    '      py.globals.set("_PYXL_ACTION_PAYLOAD", JSON.stringify(msg.payload == null ? {} : msg.payload));',
+    '      const out = await py.runPythonAsync("await pyxle_action(_PYXL_ACTION_NAME, _PYXL_ACTION_PAYLOAD)");',
+    '      self.postMessage({ id: msg.id, result: JSON.parse(out) });',
+    '      return;',
+    '    }',
+    '  } catch (err) {',
+    '    self.postMessage({ id: msg.id, result: { ok: false, error: String((err && err.message) || err) } });',
+    '  }',
+    '};'
+  ].join('\n');
+
+  var WORKER_CODE = 'const BOOTSTRAP = ' + JSON.stringify(BOOTSTRAP) + ';\n' + WORKER_BODY;
+
+  /* ── Sandbox main-thread state ── */
+  var React = window.React;
+  var ReactDOM = window.ReactDOM;
+  var rootEl = document.getElementById('root');
+
+  // If React/ReactDOM didn't load (e.g. an SRI mismatch blocked them),
+  // fail loudly to the host instead of hanging forever on "booting".
+  if (!React || !ReactDOM || !rootEl) {
+    try { window.parent.postMessage({ type: 'pg-status', status: 'failed' }, '*'); } catch (e) {}
+    try { window.parent.postMessage({ type: 'pg-shown' }, '*'); } catch (e) {}
+    if (rootEl) rootEl.innerHTML = '<div class="pg-error"><div class="pg-kind">sandbox error</div>The preview runtime could not load.</div>';
+    return;
+  }
+  var reactRoot = ReactDOM.createRoot(rootEl);
+
+  var worker = null;
+  var workerState = 'idle';      // idle | booting | ready
+  var nsReady = false;           // a successful setup ran on the CURRENT worker
+  var vendorFiles = null;
+  var pendingSource = null;
+  var sucraseTransform = null;
+  var reqSeq = 0;
+  var reqs = new Map();          // id -> { resolve, timer }
+
+  function toParent(msg) { try { window.parent.postMessage(msg, '*'); } catch (e) {} }
+  function setStatus(s) { toParent({ type: 'pg-status', status: s }); }
+
+  function applyTheme(theme) {
+    document.documentElement.classList.remove('dark', 'light');
+    document.documentElement.classList.add(theme === 'light' ? 'light' : 'dark');
+  }
+
+  function loadSucrase() {
+    if (sucraseTransform) return Promise.resolve(sucraseTransform);
+    // Dynamic import keeps Sucrase out of the initial sandbox load.
+    return import(SUCRASE_URL).then(function (m) {
+      var t = (m && (m.transform || (m.default && m.default.transform)));
+      if (typeof t !== 'function') throw new Error('Could not load the JSX transformer.');
+      sucraseTransform = t;
+      return t;
+    });
+  }
+
+  /* Worker lifecycle ------------------------------------------------- */
+  function spawnWorker() {
+    worker = new Worker(URL.createObjectURL(new Blob([WORKER_CODE], { type: 'text/javascript' })));
+    workerState = 'booting';
+    nsReady = false;
+    setStatus('booting');
+    worker.onmessage = function (e) {
+      var m = e.data;
+      if (m.type === 'ready') {
+        workerState = 'ready';
+        setStatus('ready');
+        if (pendingSource != null) execute(pendingSource);
+        return;
+      }
+      if (m.type === 'bootfailed') {
+        workerState = 'idle';
+        setStatus('failed');
+        renderError(m.error || 'Python runtime failed to load.', 'boot');
+        toParent({ type: 'pg-shown' });
+        return;
+      }
+      if (m.id != null && reqs.has(m.id)) {
+        var entry = reqs.get(m.id);
+        clearTimeout(entry.timer);
+        reqs.delete(m.id);
+        entry.resolve(m.result);
+      }
+    };
+    worker.onerror = function () {
+      // A hard worker error invalidates the namespace; allow a respawn.
+      if (workerState !== 'ready') { workerState = 'idle'; setStatus('failed'); }
+    };
+    worker.postMessage({ type: 'init', files: vendorFiles });
+  }
+
+  function ensureWorker() {
+    if (!worker || workerState === 'idle') spawnWorker();
+  }
+
+  // Send a request to the worker with a timeout. On timeout we KILL the
+  // worker (terminate) so a runaway loop can't hold the runtime hostage,
+  // and resolve with a timeout marker. We do NOT auto-respawn+rerun the
+  // same source — that would loop forever; the next edit respawns lazily.
+  function callWorker(type, extra) {
+    return new Promise(function (resolve) {
+      var id = ++reqSeq;
+      var timer = setTimeout(function () {
+        if (!reqs.has(id)) return;
+        reqs.delete(id);
+        try { worker.terminate(); } catch (e) {}
+        worker = null;
+        workerState = 'idle';
+        nsReady = false;
+        resolve({ ok: false, __timeout: true, error: 'Execution timed out (after ' + (RUN_TIMEOUT_MS / 1000) + 's) — likely an infinite loop. Edit the code to retry.' });
+      }, RUN_TIMEOUT_MS);
+      reqs.set(id, { resolve: resolve, timer: timer });
+      var payload = { id: id, type: type };
+      if (extra) for (var k in extra) payload[k] = extra[k];
+      worker.postMessage(payload);
+    });
+  }
+
+  /* Build the user's component (Sucrase + new Function, in this opaque
+     origin). require() only exposes react + a pyxle/client shim whose
+     useAction is routed to the worker. (Not a security boundary — the
+     opaque origin is.) */
+  function makeClientShim() {
+    return {
+      Link: function (p) { return React.createElement('a', Object.assign({ href: p.href }, p), p.children); },
+      Head: function () { return null; },
+      Image: function (p) { return React.createElement('img', Object.assign({ src: p.src, alt: p.alt || '' }, p)); },
+      ClientOnly: function (p) { return p.children; },
+      Script: function () { return null; },
+      Form: function (p) { return React.createElement('form', p, p.children); },
+      navigate: function () {}, prefetch: function () {}, refresh: function () {}, usePathname: function () { return '/'; },
+      useAction: function (name) { return usePlaygroundAction(name); }
+    };
+  }
+
+  function usePlaygroundAction(actionName) {
+    var s = React.useState(false); var pending = s[0], setPending = s[1];
+    var er = React.useState(null); var error = er[0], setError = er[1];
+    var da = React.useState(null); var data = da[0], setData = da[1];
+    var execFn = React.useCallback(function (payload) {
+      setError(null); setPending(true);
+      var p = Promise.resolve();
+      // After a timeout-kill the namespace is gone; re-establish it first.
+      if (!nsReady || workerState === 'idle') { ensureWorker(); p = whenReady().then(function () { return execute(pendingSource, true); }); }
+      return p.then(function () {
+        if (!nsReady) { var m = 'The Python runtime isn\'t ready yet.'; setError(m); return { ok: false, error: m }; }
+        return callWorker('action', { name: actionName, payload: payload }).then(function (res) {
+          if (res && res.__timeout) { onTimeout(res.error); setError(res.error); return { ok: false, error: res.error }; }
+          if (!res || res.ok === false) { var msg = (res && res.error) || 'Action failed'; setError(msg); return { ok: false, error: msg, data: (res && res.data) || null }; }
+          var rest = {}; for (var k in res) { if (k !== 'ok' && k !== 'error') rest[k] = res[k]; }
+          setData(rest); return Object.assign({ ok: true }, rest);
+        });
+      }).then(function (r) { setPending(false); return r; }, function (e) { setPending(false); var m = (e && e.message) || String(e); setError(m); return { ok: false, error: m }; });
+    }, [actionName]);
+    execFn.pending = pending; execFn.error = error; execFn.data = data;
+    return execFn;
+  }
+
+  function whenReady() {
+    return new Promise(function (resolve) {
+      if (workerState === 'ready') return resolve();
+      var iv = setInterval(function () {
+        if (workerState === 'ready') { clearInterval(iv); resolve(); }
+        if (workerState === 'idle') { clearInterval(iv); resolve(); } // boot failed
+      }, 50);
+    });
+  }
+
+  function buildComponent(jsx) {
+    return loadSucrase().then(function (transform) {
+      var out = transform(jsx, { transforms: ['jsx', 'imports'], production: true });
+      var code = out.code;
+      var moduleObj = { exports: {} };
+      var requireShim = function (name) {
+        if (name === 'react') return React;
+        if (name === 'pyxle/client' || name.indexOf('pyxle/') === 0) return CLIENT_SHIM;
+        throw new Error('Module "' + name + '" isn\'t available in the playground.');
+      };
+      // eslint-disable-next-line no-new-func
+      var fn = new Function('module', 'exports', 'require', code);
+      fn(moduleObj, moduleObj.exports, requireShim);
+      var Comp = moduleObj.exports.default || moduleObj.exports.Page;
+      if (typeof Comp !== 'function') throw new Error('Add an `export default function` component.');
+      return Comp;
+    });
+  }
+
+  /* Error boundary so a throwing render shows a panel, not a blank frame. */
+  function makeBoundary() {
+    function Boundary(props) { React.Component.call(this, props); this.state = { err: null }; }
+    Boundary.prototype = Object.create(React.Component.prototype);
+    Boundary.prototype.constructor = Boundary;
+    Boundary.getDerivedStateFromError = function (err) { return { err: err }; };
+    Boundary.prototype.render = function () {
+      if (this.state.err) return errorEl((this.state.err && this.state.err.message) || String(this.state.err), 'render');
+      return this.props.children;
+    };
+    return Boundary;
+  }
+
+  function errorEl(message, kind) {
+    return React.createElement('div', { className: 'pg-error' },
+      React.createElement('div', { className: 'pg-kind' }, (kind || 'render') + ' error'),
+      message);
+  }
+
+  function renderError(message, kind) {
+    reactRoot.render(errorEl(message, kind));
+  }
+
+  var Boundary = null;
+  var CLIENT_SHIM = null;
+  var renderSeq = 0;
+
+  function renderComponent(Comp, data) {
+    if (!Boundary) Boundary = makeBoundary();
+    renderSeq += 1;
+    reactRoot.render(React.createElement(Boundary, { key: renderSeq },
+      React.createElement(Comp, { data: data })));
+  }
+
+  function onTimeout(message) {
+    setStatus('timeout');
+    renderError(message, 'timeout');
+  }
+
+  /* Run a source string: parse+load in the worker, then build+render. */
+  function execute(src, internal) {
+    pendingSource = src;
+    if (!vendorFiles) return Promise.resolve();
+    ensureWorker();
+    if (workerState !== 'ready') return Promise.resolve(); // will run on 'ready'
+    var t0 = (self.performance ? performance.now() : 0);
+    return callWorker('setup', { source: src }).then(function (res) {
+      if (res && res.__timeout) { onTimeout(res.error); finish(t0, false); return; }
+      if (!res.ok) { nsReady = false; renderError(res.error || 'Could not parse.', 'parse'); finish(t0, false); return; }
+      nsReady = true;
+      if (res.error) { renderError(res.error, 'python'); finish(t0, false); return; }
+      return buildComponent(res.jsx || '').then(function (Comp) {
+        renderComponent(Comp, res.data || {});
+        finish(t0, true);
+      }, function (e) {
+        renderError((e && e.message) || String(e), 'build');
+        finish(t0, false);
+      });
+    });
+  }
+
+  function finish(t0, ok) {
+    var ms = Math.max(1, Math.round((self.performance ? performance.now() : 0) - t0));
+    toParent({ type: 'pg-ran', ms: ms, ok: ok });
+    toParent({ type: 'pg-shown' });
+  }
+
+  /* ── Host protocol ── */
+  CLIENT_SHIM = makeClientShim();
+
+  window.addEventListener('message', function (e) {
+    var m = e.data;
+    if (!m || typeof m !== 'object') return;
+    if (m.type === 'pg-init') {
+      vendorFiles = m.files || {};
+      if (m.theme) applyTheme(m.theme);
+      ensureWorker();
+      if (pendingSource != null && workerState === 'ready') execute(pendingSource);
+      return;
+    }
+    if (m.type === 'pg-run') {
+      pendingSource = m.source;
+      if (vendorFiles) execute(m.source);
+      return;
+    }
+    if (m.type === 'pg-theme') { applyTheme(m.theme); return; }
+  });
+
+  // Tell the host we're ready to receive the vendored files + source.
+  toParent({ type: 'pg-ready' });
+})();
+</script>
+</body>
+</html>
