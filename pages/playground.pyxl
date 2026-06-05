@@ -304,11 +304,79 @@ export default function Signup({ data }) {
     );
 }`;
 
+/* Zero-Pyodide JS mirrors of each example's rendered output — shown until
+   the user edits the code (then the real sandbox boots and takes over).
+   Each mirrors its EX_* component's markup + simulates the @server/@action
+   behavior in plain JS, so switching examples never costs a boot. The
+   Counter reuses live-playground's built-in DefaultPreview (default source). */
+function LoaderPreview() {
+    const stack = ['Python', 'React', 'Starlette', 'Vite'];
+    return (
+        <div className="card">
+            <span className="tag">{stack.length} items · from @server</span>
+            <h1>Loaded by @server</h1>
+            <ul>
+                {stack.map((item, i) => <li key={i}>{item}</li>)}
+            </ul>
+        </div>
+    );
+}
+
+function TodoPreview() {
+    const [todos, setTodos] = useState([
+        { id: 1, text: 'Try the playground', done: true },
+        { id: 2, text: 'Build a real feature', done: false },
+    ]);
+    const [text, setText] = useState('');
+    const [nextId, setNextId] = useState(3);
+    const toggle = (id) => setTodos((ts) => ts.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+    const add = () => {
+        if (!text.trim()) return;
+        setTodos((ts) => [...ts, { id: nextId, text, done: false }]);
+        setNextId((n) => n + 1);
+        setText('');
+    };
+    return (
+        <div className="card">
+            <span className="tag">state on the server</span>
+            <h1>Todos</h1>
+            <ul>
+                {todos.map((t) => (
+                    <li key={t.id} onClick={() => toggle(t.id)} style={{ cursor: 'pointer' }}>
+                        {t.done ? '✓ ' : '○ '}{t.text}
+                    </li>
+                ))}
+            </ul>
+            <input value={text} onChange={(e) => setText(e.target.value)} placeholder="New todo…" />
+            <button type="button" onClick={add}>Add todo</button>
+        </div>
+    );
+}
+
+function FormPreview() {
+    const [email, setEmail] = useState('');
+    const [msg, setMsg] = useState(null);
+    const submit = () => {
+        const e = email.trim();
+        if (!e.includes('@')) setMsg({ ok: false, text: 'Please enter a valid email.' });
+        else setMsg({ ok: true, text: `Welcome aboard, ${e}!` });
+    };
+    return (
+        <div className="card">
+            <span className="tag">validated on the server</span>
+            <h1>Join the list</h1>
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+            <button type="button" onClick={submit}>Sign up</button>
+            {msg && <p style={{ color: msg.ok ? '#059669' : '#dc2626' }}>{msg.text}</p>}
+        </div>
+    );
+}
+
 const EXAMPLES = [
     { id: 'counter', label: 'Counter', file: 'counter.pyxl', blurb: '@action + state', source: EX_COUNTER },
-    { id: 'loader', label: 'Data loader', file: 'greeting.pyxl', blurb: '@server → props', source: EX_LOADER },
-    { id: 'todo', label: 'Todo list', file: 'todo.pyxl', blurb: 'multiple @actions', source: EX_TODO },
-    { id: 'form', label: 'Form', file: 'signup.pyxl', blurb: 'ActionError validation', source: EX_FORM },
+    { id: 'loader', label: 'Data loader', file: 'greeting.pyxl', blurb: '@server → props', source: EX_LOADER, preview: LoaderPreview },
+    { id: 'todo', label: 'Todo list', file: 'todo.pyxl', blurb: 'multiple @actions', source: EX_TODO, preview: TodoPreview },
+    { id: 'form', label: 'Form', file: 'signup.pyxl', blurb: 'ActionError validation', source: EX_FORM, preview: FormPreview },
 ];
 
 
@@ -367,7 +435,7 @@ function Repl() {
                     style={{ background: 'radial-gradient(60% 50% at 50% 0%, rgba(16,185,129,0.24), rgba(59,130,246,0.13) 55%, transparent 78%)' }} />
                 <div className="gradient-edge rounded-2xl p-px shadow-2xl shadow-emerald-500/10 dark:shadow-black/50">
                     <div className="overflow-hidden rounded-2xl bg-[#0b0b0d] dark:bg-[#0c0c0e]">
-                        <LivePlayground initialSource={ex.source} fileLabel={ex.file} paneHeight="h-[440px] sm:h-[520px]" />
+                        <LivePlayground initialSource={ex.source} fileLabel={ex.file} defaultPreview={ex.preview} paneHeight="h-[440px] sm:h-[520px]" />
                     </div>
                 </div>
                 <p className="mt-4 text-center font-mono text-[11px] uppercase tracking-wider text-zinc-500">

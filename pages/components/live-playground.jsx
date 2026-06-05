@@ -31,12 +31,13 @@ const useIsoLayoutEffect = typeof document !== 'undefined' ? useLayoutEffect : u
    below only sends the source string + the vendored parser files in,
    and receives status out, over postMessage.
 
-   Perf / Lighthouse: NOTHING heavy loads on page load OR on hover. The
-   sandbox iframe (and therefore React, Sucrase, and the ~10 MB Pyodide)
-   is mounted only when the user first EDITS the code (or, in the REPL,
-   switches to a non-default example). Until then the right pane is a
-   fully-interactive plain-React counter (DefaultPreview), so the ~80% of
-   visitors who never touch the code never pay the Pyodide cost.
+   Perf / Lighthouse: NOTHING heavy loads on page load, hover, or when
+   switching between examples. The sandbox iframe (and therefore React,
+   Sucrase, and the ~10 MB Pyodide) is mounted only when the user first
+   EDITS the code. Until then the right pane shows a fully-interactive
+   plain-React mirror of the current example (DefaultPreview, or the
+   defaultPreview prop), so the ~80% of visitors who never touch the code
+   never pay the Pyodide cost.
    ───────────────────────────────────────────────────────────── */
 
 /* Vendored Pyxle parser files (served same-origin) — fetched by the host
@@ -254,13 +255,19 @@ export function LivePlayground({
     initialSource = DEFAULT_SOURCE,
     fileLabel = 'counter.pyxl',
     paneHeight = 'h-[300px] sm:h-[380px]',
+    defaultPreview = null,
 } = {}) {
     const [source, setSource] = useState(initialSource);
-    const [engineStarted, setEngineStarted] = useState(false); // sandbox booted (first edit / non-default example)
+    const [engineStarted, setEngineStarted] = useState(false); // sandbox booted (first edit only)
     const [sandboxHtml, setSandboxHtml] = useState(null);       // lazily-loaded srcdoc string
     const [iframeLive, setIframeLive] = useState(false);        // sandbox has rendered ≥1 frame
     const [pyStatus, setPyStatus] = useState('idle');           // idle|booting|ready|failed|timeout
     const [ms, setMs] = useState(null);
+
+    // The zero-Pyodide JS preview for the current example (a component).
+    // Falls back to the built-in counter for the default source; null means
+    // there is no JS mirror for this source, so the engine must boot to show it.
+    const DefaultComp = defaultPreview || (initialSource === DEFAULT_SOURCE ? DefaultPreview : null);
 
     const iframeRef = useRef(null);
     const startedRef = useRef(false);
@@ -337,23 +344,22 @@ export function LivePlayground({
     useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
     // Switching examples (parent changes initialSource): load it into the
-    // editor and run it — booting the sandbox if cold, or re-running in the
-    // already-warm one (no Pyodide reboot).
+    // editor. If the sandbox is already warm, re-run there; if it's cold,
+    // just show the new example's JS preview — switching examples NEVER boots
+    // Pyodide. Only editing the code does.
     useEffect(() => {
         if (initialSource === latestSrc.current) return; // initial mount / no change
         setSource(initialSource);
         latestSrc.current = initialSource;
-        startEngine();
-        if (initSentRef.current) postToIframe({ type: 'pg-run', source: initialSource });
-    }, [initialSource, startEngine, postToIframe]);
+        if (startedRef.current) postToIframe({ type: 'pg-run', source: initialSource });
+    }, [initialSource, postToIframe]);
 
-    // A non-default source (a switched REPL example, or a configured
-    // initialSource) can't be mirrored by the JS DefaultPreview — boot the
-    // real engine for it. The counter default stays Pyodide-free until the
-    // user edits. (startEngine is idempotent.)
+    // Only force a boot for a cold example we can't mirror in JS (no
+    // defaultPreview for a non-default source). With a JS preview present,
+    // stay Pyodide-free until the user edits. (startEngine is idempotent.)
     useEffect(() => {
-        if (initialSource !== DEFAULT_SOURCE) startEngine();
-    }, [initialSource, startEngine]);
+        if (!startedRef.current && DefaultComp == null) startEngine();
+    }, [DefaultComp, startEngine]);
 
     const statusText =
         pyStatus === 'booting' ? 'booting Python (one-time)…'
@@ -362,10 +368,10 @@ export function LivePlayground({
         : ms ? `${ms}ms · real Python, sandboxed`
         : 'sandboxed preview · no install';
 
-    // Preview pane has three states: the instant-on JS counter (default,
-    // zero Pyodide), the one-time "booting Python…" window, then the live
-    // sandbox iframe.
-    const showDefault = !engineStarted && source === DEFAULT_SOURCE;
+    // Preview pane has three states: the instant-on JS mirror of the current
+    // example (zero Pyodide), the one-time "booting Python…" window, then the
+    // live sandbox iframe. Editing the code is what boots Python.
+    const showDefault = !engineStarted && DefaultComp != null;
     const showBooting = !iframeLive && !showDefault;
 
     return (
@@ -425,7 +431,7 @@ export function LivePlayground({
                     )}
                     {showDefault && (
                         <div className="preview-scope absolute inset-0 overflow-auto p-6">
-                            <DefaultPreview />
+                            <DefaultComp />
                         </div>
                     )}
                 </div>
