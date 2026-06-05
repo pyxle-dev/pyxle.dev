@@ -197,7 +197,7 @@ export default function NotFoundContent({ backHref = '/', backLabel = 'Back to h
                             {backLabel}
                         </a>
                         <a
-                            href="https://github.com/pyxle-framework/pyxle"
+                            href="https://github.com/pyxle-dev/pyxle"
                             target="_blank"
                             rel="noreferrer"
                             className={`inline-flex items-center gap-2 rounded-xl border px-6 py-3 text-sm font-semibold transition border-zinc-300 text-zinc-900 hover:bg-zinc-50 dark:border-white/10 dark:text-white dark:hover:bg-white/5`}

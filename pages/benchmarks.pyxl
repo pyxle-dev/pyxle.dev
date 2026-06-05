@@ -4,10 +4,25 @@ async def load_benchmarks(request):
     return {"version": __version__}
 
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from './layout.pyxl';
 import { Link, Head } from 'pyxle/client';
 import { ThemeToggle } from './components/theme-toggle.jsx';
+
+/* Scroll reveal — native IntersectionObserver, no-JS / reduced-motion safe. */
+function useScrollReveal() {
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const els = Array.from(document.querySelectorAll('[data-reveal]'));
+        const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce || !('IntersectionObserver' in window)) { els.forEach((el) => el.classList.add('is-visible')); return; }
+        const io = new IntersectionObserver((entries) => {
+            for (const e of entries) { if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); } }
+        }, { rootMargin: '0px 0px -10% 0px', threshold: 0.12 });
+        els.forEach((el) => io.observe(el));
+        return () => io.disconnect();
+    }, []);
+}
 
 export const slots = {};
 export const createSlots = () => slots;
@@ -214,12 +229,11 @@ function LighthouseScoreCard() {
 }
 
 function SectionHeading({ label, title, subtitle }) {
-    const { theme } = useTheme();
     return (
-        <div className="mb-10">
-            <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">{label}</p>
-            <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>
-            {subtitle && <p className={`mt-3 max-w-3xl text-zinc-600 dark:text-zinc-400`}>{subtitle}</p>}
+        <div data-reveal className="mb-10">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">{label}</p>
+            <h2 className="mt-3 text-balance text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h2>
+            {subtitle && <p className="mt-3 max-w-3xl text-pretty text-zinc-600 dark:text-zinc-400">{subtitle}</p>}
         </div>
     );
 }
@@ -241,10 +255,10 @@ function BenchNav({ version }) {
                 </div>
                 <div className="flex items-center gap-2 sm:gap-4">
                     <Link href="/" className={`hidden sm:block text-sm transition text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white`}>Home</Link>
-                    <a href="https://github.com/pyxle-framework/pyxle" target="_blank" rel="noreferrer"
+                    <a href="https://github.com/pyxle-dev/pyxle" target="_blank" rel="noreferrer"
                        className={`hidden sm:block text-sm transition text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white`}>GitHub</a>
                     <a
-                        href="https://github.com/pyxle-framework/pyxle-dev/blob/main/pages/benchmarks.pyxl"
+                        href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/benchmarks.pyxl"
                         target="_blank"
                         rel="noreferrer"
                         title="View page source"
@@ -267,6 +281,7 @@ export default function BenchmarksPage({ data }) {
     const { version } = data;
     const { theme } = useTheme();
     const [showAllFrameworks, setShowAllFrameworks] = useState(false);
+    useScrollReveal();
 
     const activeFrameworks = showAllFrameworks ? ALL_FRAMEWORKS : PYTHON_FRAMEWORKS;
 
@@ -288,15 +303,19 @@ export default function BenchmarksPage({ data }) {
             <main id="main">
 
             {/* Hero */}
-            <section className="px-6 pt-20 pb-12">
+            <section className="relative isolate overflow-hidden px-6 pt-28 pb-12 sm:pt-32">
+                <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+                    <div className="absolute inset-0 grid-bg opacity-40" />
+                    <div className="aurora aurora-anim parallax-slow absolute -inset-x-10 -top-48 h-[560px] origin-top" />
+                    <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-white dark:to-[#0a0a0b]" />
+                </div>
                 <div className="mx-auto max-w-6xl">
-                    <p className="text-sm font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400 mb-3">Performance</p>
-                    <h1 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
-                        Framework Benchmarks
+                    <p className="reveal text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400 mb-3">Performance</p>
+                    <h1 className="reveal text-balance text-4xl font-semibold leading-[1.02] tracking-[-0.02em] sm:text-5xl md:text-6xl" style={{ animationDelay: '60ms' }}>
+                        Benchmarked <span className="gradient-text">in the open.</span>
                     </h1>
-                    <p className={`mt-4 max-w-2xl text-lg text-zinc-600 dark:text-zinc-400`}>
-                        Transparent, reproducible benchmarks comparing Pyxle against popular web frameworks.
-                        Every framework implements identical endpoints with the same logic.
+                    <p className="reveal mt-5 max-w-2xl text-pretty text-base sm:text-lg text-zinc-600 dark:text-zinc-400" style={{ animationDelay: '120ms' }}>
+                        Reproducible benchmarks comparing Pyxle against popular web frameworks — every framework implements identical endpoints with the same logic. No cherry-picking, every number links to its harness.
                     </p>
                 </div>
             </section>
@@ -323,7 +342,7 @@ export default function BenchmarksPage({ data }) {
                             All Python frameworks use uvicorn (single worker, ASGI) except Flask (gunicorn, 4 WSGI workers).
                             Node.js frameworks use their default server. Pyxle runs in production mode via <code className="font-mono">pyxle serve</code> with full middleware stack.
                             Database: SQLite with WAL mode, 1,000 pre-seeded rows.{' '}
-                            <a href="https://github.com/pyxle-framework/benchmarks" target="_blank" rel="noreferrer" className="text-emerald-700 dark:text-emerald-400 underline underline-offset-2 hover:no-underline">
+                            <a href="https://github.com/pyxle-dev/benchmarks" target="_blank" rel="noreferrer" className="text-emerald-700 dark:text-emerald-400 underline underline-offset-2 hover:no-underline">
                                 Source code (run it yourself)
                             </a>
                         </p>
@@ -470,7 +489,7 @@ export default function BenchmarksPage({ data }) {
                             All benchmark code is open source. Clone the repo, start the servers, and run the suite on your own hardware.
                         </p>
                         <a
-                            href="https://github.com/pyxle-framework/benchmarks"
+                            href="https://github.com/pyxle-dev/benchmarks"
                             target="_blank"
                             rel="noreferrer"
                             className={`inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition bg-zinc-900 text-white hover:bg-zinc-700 dark:bg-white dark:text-black dark:hover:bg-zinc-200`}
@@ -485,22 +504,47 @@ export default function BenchmarksPage({ data }) {
             </section>
 
             </main>
-            {/* Footer */}
-            <footer className={`border-t px-6 py-12 border-zinc-200 dark:border-white/5`}>
-                <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 sm:flex-row">
-                    <div className="flex items-center gap-3">
-                        <img src="/branding/pyxle-mark.svg" alt="Pyxle" className="h-6 w-6 opacity-50" />
-                        <span className={`text-sm text-zinc-600 dark:text-zinc-400`}>Pyxle Framework</span>
-                    </div>
-                    <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2">
-                        <Link href="/" className={`text-sm transition text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white`}>Home</Link>
-                        <Link href="/docs"
-                           className={`text-sm transition text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white`}>Docs</Link>
-                        <a href="https://github.com/pyxle-framework/pyxle" target="_blank" rel="noreferrer"
-                           className={`text-sm transition text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white`}>GitHub</a>
-                    </div>
-                </div>
-            </footer>
+            <BenchFooter />
         </>
+    );
+}
+
+const BENCH_FOOTER_COLS = [
+    { h: 'Product', links: [['Docs', '/docs'], ['Playground', '/playground'], ['Benchmarks', '/benchmarks'], ['FAQ', '/docs/faq']] },
+    { h: 'Learn', links: [['Getting started', '/docs/getting-started/installation'], ['Server actions', '/docs/core-concepts/server-actions'], ['For AI agents', '/docs/guides/for-ai-agents']] },
+    { h: 'Community', links: [['GitHub', 'https://github.com/pyxle-dev/pyxle', true], ['Issues', 'https://github.com/pyxle-dev/pyxle/issues', true], ['Benchmark source', 'https://github.com/pyxle-dev/benchmarks', true]] },
+];
+
+function BenchFooter() {
+    const linkCls = 'text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors';
+    return (
+        <footer className="relative border-t border-zinc-200 dark:border-white/5">
+            <div aria-hidden="true" className="gradient-edge-static absolute inset-x-0 top-0 h-px opacity-80" />
+            <div className="mx-auto max-w-6xl px-5 sm:px-6 py-14">
+                <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="sm:col-span-2 lg:col-span-1">
+                        <Link href="/" aria-label="Pyxle home" className="focus-ring inline-flex items-center gap-2 rounded">
+                            <img src="/branding/pyxle-mark.svg" alt="" width="28" height="28" className="h-7 w-7" />
+                            <span className="text-[15px] font-semibold tracking-tight">Pyxle</span>
+                        </Link>
+                        <p className="mt-3 max-w-xs text-sm text-zinc-500 dark:text-zinc-400">Python and React in one file. The full-stack framework that gets out of your way.</p>
+                    </div>
+                    {BENCH_FOOTER_COLS.map((col) => (
+                        <div key={col.h}>
+                            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-500">{col.h}</h3>
+                            <ul className="mt-4 space-y-2.5">
+                                {col.links.map(([label, href, ext]) => (
+                                    <li key={label}>{ext ? <a href={href} target="_blank" rel="noreferrer" className={linkCls}>{label}</a> : <Link href={href} className={linkCls}>{label}</Link>}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
+                </div>
+                <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-zinc-200 pt-6 dark:border-white/5 sm:flex-row">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-500">Pyxle Framework — MIT licensed · open source.</p>
+                    <p className="inline-flex items-center gap-1.5 font-mono text-[11px] text-zinc-400 dark:text-zinc-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> built with Pyxle</p>
+                </div>
+            </div>
+        </footer>
     );
 }

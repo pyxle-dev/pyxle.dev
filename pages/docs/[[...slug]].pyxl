@@ -519,7 +519,7 @@ function CopyPageDropdown({ page }) {
 
                         <div className={`my-1 border-t border-zinc-100 dark:border-white/5`} />
 
-                        <a href={`https://github.com/pyxle-framework/pyxle-dev/blob/main/public/docs-data/${page.path}.json`} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={`w-full flex items-start gap-3 px-4 py-2.5 text-left transition no-underline hover:bg-zinc-50 dark:hover:bg-white/5`}>
+                        <a href={`https://github.com/pyxle-dev/pyxle.dev/blob/main/public/docs-data/${page.path}.json`} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={`w-full flex items-start gap-3 px-4 py-2.5 text-left transition no-underline hover:bg-zinc-50 dark:hover:bg-white/5`}>
                             <svg className={`h-4 w-4 mt-0.5 shrink-0 text-zinc-600 dark:text-zinc-400`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
@@ -666,13 +666,13 @@ export default function DocsPage({ data }) {
                             <span className="hidden sm:inline">Search docs</span>
                             <kbd className={`hidden sm:inline rounded px-1.5 py-0.5 text-[10px] font-mono bg-zinc-200 text-zinc-600 dark:bg-white/10 dark:text-zinc-300`} aria-hidden="true">/</kbd>
                         </button>
-                        <a href="https://github.com/pyxle-framework/pyxle" target="_blank" rel="noreferrer"
+                        <a href="https://github.com/pyxle-dev/pyxle" target="_blank" rel="noreferrer"
                            className={`hidden sm:flex items-center gap-1.5 text-sm transition text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white`}>
                             <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                             GitHub
                         </a>
                         <a
-                            href="https://github.com/pyxle-framework/pyxle-dev/blob/main/pages/docs/%5B%5B...slug%5D%5D.pyxl"
+                            href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/docs/%5B%5B...slug%5D%5D.pyxl"
                             target="_blank"
                             rel="noreferrer"
                             title="View page source"
@@ -702,7 +702,7 @@ export default function DocsPage({ data }) {
                     <NotFoundContent
                         backHref="/docs"
                         backLabel="Back to docs"
-                        sourceUrl="https://github.com/pyxle-framework/pyxle-dev/blob/main/pages/components/not-found-content.jsx"
+                        sourceUrl="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/components/not-found-content.jsx"
                     />
                 </div>
             ) : (
@@ -734,37 +734,49 @@ export default function DocsPage({ data }) {
             {/* Syntax highlighting + Global background fix + Docs prose styles */}
             <style dangerouslySetInnerHTML={{ __html: `
                 ${HIGHLIGHT_CSS}
-                .heading-anchor { opacity: 0; display: inline-flex; align-items: center; margin-right: 0.4rem; vertical-align: middle; transition: opacity 0.15s, color 0.15s; color: #94a3b8 dark:#52525b; }
+                .heading-anchor { opacity: 0; display: inline-flex; align-items: center; margin-right: 0.4rem; vertical-align: middle; transition: opacity 0.15s, color 0.15s; color: #94a3b8; }
+                html.dark .heading-anchor { color: #52525b; }
                 h2:hover .heading-anchor, h3:hover .heading-anchor, h4:hover .heading-anchor { opacity: 1; }
                 .heading-anchor:hover { color: #34d399 !important; opacity: 1 !important; }
-                .code-lang-badge { position: absolute; top: 0.5rem; left: 0.75rem; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; pointer-events: none; }
-                html, body { background-color: #ffffff dark:#0a0a0b !important; }
+                .code-lang-badge { position: absolute; top: 0.6rem; left: 0.9rem; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: #71717a; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; pointer-events: none; }
 
-                .docs-content h2[id], .docs-content h3[id], .docs-content h4[id] { scroll-margin-top: 70px; }
-                .docs-content h2 { font-size: 1.4rem; font-weight: 700; margin-top: 2.5rem; margin-bottom: 0.75rem; padding-bottom: 0.5rem; color: #18181b dark:#fafafa; border-bottom: 1px solid rgba(0,0,0,0.08) dark:rgba(255,255,255,0.08); }
-                .docs-content h3 { font-size: 1.15rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.5rem; color: #27272a dark:#e4e4e7; }
-                .docs-content h4 { font-size: 1rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; color: #3f3f46 dark:#d4d4d8; }
-                .docs-content p { margin-bottom: 1rem; line-height: 1.75; color: #52525b dark:#a1a1aa; font-size: 0.9375rem; padding-left: 1.4rem; }
-                .docs-content a { color: #047857; text-decoration: underline; text-underline-offset: 2px; }
+                .docs-content { font-size: 0.9375rem; }
+                .docs-content h2[id], .docs-content h3[id], .docs-content h4[id] { scroll-margin-top: 80px; }
+                .docs-content h2 { font-size: 1.45rem; font-weight: 650; letter-spacing: -0.012em; margin-top: 2.75rem; margin-bottom: 0.85rem; padding-bottom: 0.55rem; color: #18181b; border-bottom: 1px solid rgba(0,0,0,0.08); }
+                html.dark .docs-content h2 { color: #fafafa; border-bottom-color: rgba(255,255,255,0.08); }
+                .docs-content h3 { font-size: 1.18rem; font-weight: 600; letter-spacing: -0.01em; margin-top: 2.1rem; margin-bottom: 0.55rem; color: #27272a; }
+                html.dark .docs-content h3 { color: #e4e4e7; }
+                .docs-content h4 { font-size: 1rem; font-weight: 600; margin-top: 1.6rem; margin-bottom: 0.5rem; color: #3f3f46; }
+                html.dark .docs-content h4 { color: #d4d4d8; }
+                .docs-content p { margin-bottom: 1rem; line-height: 1.75; color: #52525b; padding-left: 1.4rem; }
+                html.dark .docs-content p { color: #a1a1aa; }
+                .docs-content a { color: #047857; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
                 html.dark .docs-content a { color: #34d399; }
                 .docs-content a:hover { text-decoration: none; }
                 .docs-content h2 a, .docs-content h3 a, .docs-content h4 a { color: inherit; }
-                .docs-content ul, .docs-content ol { margin-bottom: 1rem; margin-left: 1.4rem; padding-left: 1.5rem; color: #52525b dark:#a1a1aa; }
-                .docs-content li { margin-bottom: 0.35rem; line-height: 1.75; font-size: 0.9375rem; }
+                .docs-content ul, .docs-content ol { margin-bottom: 1rem; margin-left: 1.4rem; padding-left: 1.5rem; color: #52525b; }
+                html.dark .docs-content ul, html.dark .docs-content ol { color: #a1a1aa; }
+                .docs-content li { margin-bottom: 0.35rem; line-height: 1.75; }
+                .docs-content li::marker { color: #10b981; }
                 .docs-content li > ul, .docs-content li > ol { margin-top: 0.35rem; margin-bottom: 0; }
-                .docs-content code:not(pre code) { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.825em; padding: 0.15em 0.4em; border-radius: 4px; background: rgba(0,0,0,0.04) dark:rgba(255,255,255,0.06); color: #059669 dark:#6ee7b7; }
-                .docs-content .code-block { position: relative; margin-bottom: 1.25rem; border-radius: 0.75rem; overflow: hidden; border: 1px solid rgba(0,0,0,0.1) dark:rgba(255,255,255,0.06); background: #1a1a2e dark:#111113; }
+                .docs-content code:not(pre code) { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.82em; padding: 0.15em 0.42em; border-radius: 5px; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.16); color: #047857; }
+                html.dark .docs-content code:not(pre code) { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.2); color: #6ee7b7; }
+                .docs-content .code-block { position: relative; margin-bottom: 1.25rem; border-radius: 0.85rem; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); background: #0b0b0d; }
                 .docs-content .code-block pre { margin: 0; padding: 2rem 1.25rem 1rem; overflow-x: auto; }
-                .docs-content .code-block code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.8rem; line-height: 1.65; color: #d4d4d8; background: none; padding: 0; border-radius: 0; }
-                .docs-content .code-block .copy-btn { position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.25rem 0.65rem; border-radius: 0.375rem; font-size: 0.7rem; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #d4d4d8; cursor: pointer; transition: all 0.15s; }
+                .docs-content .code-block code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.8rem; line-height: 1.7; color: #d4d4d8; background: none; padding: 0; border-radius: 0; }
+                .docs-content .code-block .copy-btn { position: absolute; top: 0.55rem; right: 0.55rem; padding: 0.25rem 0.65rem; border-radius: 0.4rem; font-size: 0.7rem; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #d4d4d8; cursor: pointer; transition: all 0.15s; }
                 .docs-content .code-block .copy-btn:hover { background: rgba(255,255,255,0.1); color: white; }
                 .docs-content table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; width: calc(100% - 1.4rem); margin-bottom: 1.25rem; margin-left: 1.4rem; border-collapse: collapse; font-size: 0.875rem; }
-                .docs-content th { text-align: left; padding: 0.6rem 0.75rem; font-weight: 600; color: #18181b dark:#e4e4e7; border-bottom: 2px solid rgba(0,0,0,0.1) dark:rgba(255,255,255,0.1); }
-                .docs-content td { padding: 0.6rem 0.75rem; border-bottom: 1px solid rgba(0,0,0,0.05) dark:rgba(255,255,255,0.05); color: #52525b dark:#a1a1aa; }
-                .docs-content blockquote { border-left: 3px solid #059669 dark:#34d399; padding: 0.75rem 1rem; margin: 1rem 0 1rem 1.4rem; border-radius: 0 0.5rem 0.5rem 0; background: rgba(5,150,105,0.04) dark:rgba(52,211,153,0.05); }
-                .docs-content blockquote p { color: #52525b dark:#a1a1aa; margin-bottom: 0; }
-                .docs-content strong { color: #18181b dark:#fafafa; }
-                .docs-content hr { border: none; border-top: 1px solid rgba(0,0,0,0.06) dark:rgba(255,255,255,0.06); margin: 2rem 0; }
+                .docs-content th { text-align: left; padding: 0.6rem 0.75rem; font-weight: 600; color: #18181b; border-bottom: 2px solid rgba(0,0,0,0.1); }
+                html.dark .docs-content th { color: #e4e4e7; border-bottom-color: rgba(255,255,255,0.1); }
+                .docs-content td { padding: 0.6rem 0.75rem; border-bottom: 1px solid rgba(0,0,0,0.05); color: #52525b; }
+                html.dark .docs-content td { color: #a1a1aa; border-bottom-color: rgba(255,255,255,0.05); }
+                .docs-content blockquote { border-left: 3px solid #10b981; padding: 0.75rem 1rem; margin: 1rem 0 1rem 1.4rem; border-radius: 0 0.5rem 0.5rem 0; background: rgba(16,185,129,0.05); }
+                .docs-content blockquote p { margin-bottom: 0; }
+                .docs-content strong { color: #18181b; font-weight: 650; }
+                html.dark .docs-content strong { color: #fafafa; }
+                .docs-content hr { border: none; border-top: 1px solid rgba(0,0,0,0.07); margin: 2.25rem 0; }
+                html.dark .docs-content hr { border-top-color: rgba(255,255,255,0.07); }
             `}} />
         </div>
     );

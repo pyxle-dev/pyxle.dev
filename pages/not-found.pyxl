@@ -26,10 +26,10 @@ export default function NotFoundPage() {
                     </Link>
                     <div className="flex items-center gap-2 sm:gap-4">
                         <Link href="/docs" className={`hidden sm:block text-sm transition text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white`}>Docs</Link>
-                        <a href="https://github.com/pyxle-framework/pyxle" target="_blank" rel="noreferrer"
+                        <a href="https://github.com/pyxle-dev/pyxle" target="_blank" rel="noreferrer"
                            className={`hidden sm:block text-sm transition text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white`}>GitHub</a>
                         <a
-                            href="https://github.com/pyxle-framework/pyxle-dev/blob/main/pages/not-found.pyxl"
+                            href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/not-found.pyxl"
                             target="_blank"
                             rel="noreferrer"
                             title="View page source"
@@ -45,7 +45,7 @@ export default function NotFoundPage() {
             </nav>
 
             <NotFoundContent
-                sourceUrl="https://github.com/pyxle-framework/pyxle-dev/blob/main/pages/components/not-found-content.jsx"
+                sourceUrl="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/components/not-found-content.jsx"
             />
         </div>
     );
