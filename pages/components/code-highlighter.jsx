@@ -240,6 +240,12 @@ function tokenizeJSON(line) {
 
 /* ── Dispatch ────────────────────────────────────────── */
 
+/* The Python→JS boundary inside a .pyxl file: the first top-level JS import
+   (`import X from '...'` — note the quoted source, unlike Python's
+   `from x import y`) or `export` statement. Once crossed, the rest of the
+   file is the React/JSX half. */
+const PYXL_JS_BOUNDARY = /^import\b.*\bfrom\s+['"]|^export\s+(default|function|const|class|async|let|var)\b/;
+
 /**
  * Tokenize a line of code for the given language.
  * Returns an array of { text: string, cls: string } objects.
@@ -254,8 +260,8 @@ export function tokenizeLine(line, lang) {
         case 'json': return tokenizeJSON(line);
         case 'html': case 'xml': return tokenizeJS(line); // reuse JSX for HTML tags
         case 'pyxl':
-            // For .pyxl: auto-detect Python vs JSX based on content
-            if (line.match(/^(import React|export |<[\w])/)) return tokenizeJS(line);
+            // Per-line fallback (block-level uses the stateful tokenizeBlock).
+            if (PYXL_JS_BOUNDARY.test(line) || /^\s*<[A-Za-z/]/.test(line)) return tokenizeJS(line);
             return tokenizePython(line);
         default:
             return [{ text: line, cls: C.plain }];
@@ -270,12 +276,19 @@ export function tokenizeBlock(code, lang) {
     const lines = code.split('\n');
     let mode = lang === 'pyxl' ? 'python' : lang;
     return lines.map((line) => {
-        if (lang === 'pyxl' && mode === 'python' && line.match(/^import React/)) {
+        if (lang === 'pyxl' && mode === 'python' && PYXL_JS_BOUNDARY.test(line)) {
             mode = 'jsx';
         }
         const effectiveLang = lang === 'pyxl' ? mode : lang;
         return tokenizeLine(line, effectiveLang);
     });
+}
+
+/* Does this code block contain a .pyxl-style Python→JS boundary? Lets a docs
+   block fenced as ```python but holding a React section upgrade to the dual
+   pyxl tokenizer so the JSX half highlights correctly. */
+export function looksLikePyxl(code) {
+    return code.split('\n').some((line) => PYXL_JS_BOUNDARY.test(line));
 }
 
 /** CSS class definitions for the syntax highlighting token classes. */

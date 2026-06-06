@@ -108,7 +108,7 @@ async def search_docs(request):
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTheme } from '../layout.pyxl';
 import { Link, navigate, useAction, Head } from 'pyxle/client';
-import { tokenizeBlock, HIGHLIGHT_CSS } from '../components/code-highlighter.jsx';
+import { tokenizeBlock, HIGHLIGHT_CSS, looksLikePyxl } from '../components/code-highlighter.jsx';
 import { ThemeToggle } from '../components/theme-toggle.jsx';
 import NotFoundContent from '../components/not-found-content.jsx';
 
@@ -337,6 +337,9 @@ function useDocEnhancements(contentRef) {
             if (lang === 'py') lang = 'python';
             if (lang === 'sh') lang = 'bash';
             if (lang === 'ts') lang = 'typescript';
+            // A .pyxl file is fenced as ```python but has a React/JSX section —
+            // highlight it with the dual Python/JSX tokenizer, not plain Python.
+            if ((lang === 'python' || lang === '') && looksLikePyxl(rawText)) lang = 'pyxl';
 
             // Apply syntax highlighting
             const tokenizedLines = tokenizeBlock(rawText, lang);
