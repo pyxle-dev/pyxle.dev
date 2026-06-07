@@ -57,6 +57,11 @@
       "slug": "guides",
       "items": [
         {
+          "title": "Pyxle vs. other frameworks",
+          "slug": "comparison",
+          "path": "guides/comparison"
+        },
+        {
           "title": "Styling",
           "slug": "styling",
           "path": "guides/styling"
@@ -274,7 +279,7 @@
       "path": "getting-started/quick-start",
       "category": "Getting Started",
       "description": "Create a working Pyxle app in under 5 minutes.",
-      "searchText": "Quick Start Create a working Pyxle app in under 5 minutes. 1. Scaffold a new project This creates a directory with a complete starter project. 2. Install dependencies This runs both and . You can also run them separately: 3. Start the dev server Open http://localhost:8000 in your browser. You should see the Pyxle starter page — a centered card showing the framework version, server time, and a link to edit . Tailwind compiles automatically because the scaffold ships with — PostCSS runs as part of",
+      "searchText": "Quick Start Create a working Pyxle app in under 5 minutes. 1. Scaffold a new project This creates a directory with a complete starter project. 2. Install dependencies This runs both and . You can also run them separately: lists your app's runtime dependencies (Starlette, Uvicorn, HTTPX). Pyxle itself comes from the in step 1. 3. Start the dev server Open http://localhost:8000 in your browser. You should see the Pyxle starter page — a centered card showing the framework version, server time, and ",
       "headings": [
         "1. Scaffold a new project",
         "2. Install dependencies",
@@ -312,7 +317,7 @@
       "path": "core-concepts/pyxl-files",
       "category": "Core Concepts",
       "description": "A `.pyxl` file is the fundamental building block of a Pyxle application. It combines Python server logic with a React component in a single file -- your data fetching and your UI live together.",
-      "searchText": "Files A file is the fundamental building block of a Pyxle application. It combines Python server logic with a React component in a single file your data fetching and your UI live together. Anatomy of a file A file has two sections: The compiler automatically detects which lines are Python and which are JSX. Python code uses / decorators, imports, and standard Python syntax. Everything else is treated as JSX. The Python section The Python section runs entirely on the server. It can: Import module",
+      "searchText": "Files A file is the fundamental building block of a Pyxle application. It combines Python server logic with a React component in a single file your data fetching and your UI live together. Anatomy of a file A file has two sections: The compiler finds the boundary automatically: it grows the largest region that parses as valid Python (using Python's own AST), and treats whatever isn't valid Python as JSX. There are no separator comments or directives to write. The Python section The Python sectio",
       "headings": [
         "Anatomy of a .pyxl file",
         "The Python section",
@@ -397,6 +402,22 @@
       ]
     },
     {
+      "title": "Pyxle vs. other frameworks",
+      "path": "guides/comparison",
+      "category": "Guides",
+      "description": "Pyxle isn't the only way to build a full-stack app in Python, and it isn't the right tool for every job. This page is an honest map of the landscape — what each alternative is genuinely great at, and ",
+      "searchText": "Pyxle vs. other frameworks Pyxle isn't the only way to build a fullstack app in Python, and it isn't the right tool for every job. This page is an honest map of the landscape — what each alternative is genuinely great at, and when you should reach for it instead of Pyxle. The short version: Pyxle's niche is real React UI plus real Python server logic, in one file and one service, with conventions predictable enough that an AI coding agent can ship a whole feature in a single pass. If you never w",
+      "headings": [
+        "At a glance",
+        "Pyxle vs. Next.js + FastAPI",
+        "Pyxle vs. Reflex",
+        "Pyxle vs. Django",
+        "Pyxle vs. NiceGUI",
+        "Pyxle vs. Streamlit",
+        "So which should you choose?"
+      ]
+    },
+    {
       "title": "Styling",
       "path": "guides/styling",
       "category": "Guides",
@@ -445,7 +466,7 @@
       "path": "guides/api-routes",
       "category": "Guides",
       "description": "Files under `pages/api/` are API endpoints. They are plain Python files (not `.pyxl`) that handle HTTP requests and return JSON or other responses.",
-      "searchText": "API Routes Files under are API endpoints. They are plain Python files (not ) that handle HTTP requests and return JSON or other responses. Basic API route Create : This responds to : HTTP methods Define functions named after HTTP methods: Supported methods: , , , , , . Requests to unsupported methods return . Using HTTPEndpoint classes For more structure, use Starlette's : WebSocket endpoints Since 0.3.0, an API module can export to register a WebSocket handler at the same path. The file can exp",
+      "searchText": "API Routes Files under are API endpoints. They are plain Python files (not ) that handle HTTP requests and return JSON or other responses. Basic API route Create . An API module exports an callable that receives the Starlette and returns a response: handles every HTTP method bound to the route. This responds to : HTTP methods receives every method bound to the route. Branch on to handle more than one: For multimethod endpoints with automatic handling, use an class (below) — Starlette dispatches ",
       "headings": [
         "Basic API route",
         "HTTP methods",
@@ -481,7 +502,7 @@
       "path": "guides/plugins",
       "category": "Guides",
       "description": "Pyxle plugins are reusable pieces of functionality — database layers, auth systems, storage adapters — that a host app composes via `pyxle.config.json` rather than hand-wiring in its entry point. The ",
-      "searchText": "Plugins Pyxle plugins are reusable pieces of functionality — database layers, auth systems, storage adapters — that a host app composes via rather than handwiring in its entry point. The design is deliberately Djangoinspired: declare what you want, and the framework handles discovery, startup order, and lifecycle. Status (0.3.0). This guide covers the Phase A plugin surface: lifecycle hooks, named services, and middleware contribution. Page contribution (plugins shipping their own pages that get",
+      "searchText": "Plugins Pyxle plugins are reusable pieces of functionality — database layers, auth systems, storage adapters — that a host app composes via rather than handwiring in its entry point. The design is deliberately Djangoinspired: declare what you want, and the framework handles discovery, startup order, and lifecycle. Status (0.4.0). This guide covers the Phase A plugin surface: lifecycle hooks, named services, and middleware contribution. Page contribution (plugins shipping their own pages that get",
       "headings": [
         "TL;DR",
         "Config schema",
@@ -612,6 +633,7 @@
         "Reverse proxy setup",
         "Nginx example",
         "Caddy example",
+        "CDN and edge caching",
         "Docker",
         "Health checks",
         "SSR workers",
@@ -719,7 +741,7 @@
       "path": "reference/cli",
       "category": "Reference",
       "description": "The `pyxle` CLI manages Pyxle projects from scaffolding to production.",
-      "searchText": "CLI Reference The CLI manages Pyxle projects from scaffolding to production. Global options Flag Description Print Pyxle version and exit Output format (default: ) / Show debuglevel output / Suppress informational output; show only warnings and errors Create a new Pyxle project. Argument / Flag Description Project directory name (required) / Overwrite existing directory / Template name (default: ) / Run and after scaffolding (default: no) Examples: Install Python and Node.js dependencies. Argume",
+      "searchText": "CLI Reference The CLI manages Pyxle projects from scaffolding to production. Global options Flag Description Print Pyxle version and exit Output format (default: ) / Show debuglevel output / Suppress informational output; show only warnings and errors Create a new Pyxle project. Argument / Flag Description Project directory name (required) / Overwrite existing directory / Project template. Only is supported today (other values error). / Run and after scaffolding (default: no) Examples: Install P",
       "headings": [
         "Global options",
         "pyxle init",
@@ -752,6 +774,7 @@
         "styling",
         "CORS",
         "CSRF",
+        "Edge caching",
         "Plugins",
         "plugins",
         "Environment variable overrides",
@@ -1073,8 +1096,8 @@
       "title": "The runtime",
       "path": "architecture/runtime",
       "category": "Architecture",
-      "description": "The \"runtime\" of Pyxle is the **smallest module in the framework**. It contains exactly two decorators (`@server` and `@action`), two exception classes (`LoaderError` and `ActionError`), and nothing e",
-      "searchText": "The runtime The \"runtime\" of Pyxle is the smallest module in the framework. It contains exactly two decorators ( and ), two exception classes ( and ), and nothing else. The whole file is 83 lines long including blank lines and docstrings. This is on purpose. The runtime is what your application code imports — it's the contract between your code and the framework. A small contract means a small surface area for bugs, a small mental model for users, and a small attack surface for prompt injection ",
+      "description": "The \"runtime\" of Pyxle is the **smallest module in the framework**. It contains two decorators (`@server` and `@action`), two exception classes (`LoaderError` and `ActionError`), and one small helper ",
+      "searchText": "The runtime The \"runtime\" of Pyxle is the smallest module in the framework. It contains two decorators ( and ), two exception classes ( and ), and one small helper () — and nothing else. The whole file is about 150 lines including blank lines and docstrings. This is on purpose. The runtime is what your application code imports — it's the contract between your code and the framework. A small contract means a small surface area for bugs, a small mental model for users, and a small attack surface f",
       "headings": [
         "What's in pyxle/runtime.py",
         "Why so small?",
@@ -1095,7 +1118,7 @@
       "path": "architecture/cli",
       "category": "Architecture",
       "description": "`pyxle` is the command-line entry point users actually type. It's a",
-      "searchText": "The CLI is the commandline entry point users actually type. It's a Typer application with five commands: Command Purpose Scaffold a new Pyxle project Run the development server Compile and bundle for production Serve a production build Validate the project without serving This doc explains what each command does, how flags and configuration flow from user input to the rest of the framework, and the design choices behind the CLI surface. Files: (1220 lines) — the Typer commands (115 lines) — scaf",
+      "searchText": "The CLI is the commandline entry point users actually type. It's a Typer application with a small set of singlepurpose commands: Command Purpose Scaffold a new Pyxle project Install Python + Node dependencies Run the development server Compile and bundle for production Serve a production build Validate the project without serving Print the filebased route table TypeScriptcheck compiled JSX This doc explains what each command does, how flags and configuration flow from user input to the rest of t",
       "headings": [
         "Configuration precedence",
         "pyxle init <name>",
@@ -1149,11 +1172,11 @@
       "path": "advanced/compiler-internals",
       "category": "Advanced",
       "description": "The Pyxle compiler transforms `.pyxl` files into separate Python and JSX artifacts. This document explains how the compilation process works.",
-      "searchText": "Compiler Internals The Pyxle compiler transforms files into separate Python and JSX artifacts. This document explains how the compilation process works. Compilation overview When you run or , the compiler: 1. Scans the directory for files 2. Parses each file to separate Python from JSX 3. Writes serverside Python modules to 4. Writes clientside JSX modules to 5. Generates layout composition wrappers in 6. Creates a Vite configuration at The parser The parser () is a statemachine that classifies ",
+      "searchText": "Compiler Internals The Pyxle compiler transforms files into separate Python and JSX artifacts. This document explains how the compilation process works. Compilation overview When you run or , the compiler: 1. Scans the directory for files 2. Parses each file to separate Python from JSX 3. Writes serverside Python modules to 4. Writes clientside JSX modules to 5. Generates layout composition wrappers in 6. Creates a Vite configuration at The parser The parser () is ASTdriven — there are no fence ",
       "headings": [
         "Compilation overview",
         "The parser",
-        "Line classification",
+        "How the split works",
         "What the parser extracts",
         "Validation",
         "Code generation",
@@ -1176,6 +1199,7 @@
         "What is Pyxle?",
         "How is Pyxle different from Next.js?",
         "How is Pyxle different from Django or Flask?",
+        "How does Pyxle compare to Reflex, NiceGUI, or Streamlit?",
         "Is Pyxle production-ready?",
         "What Python version do I need?",
         "What Node.js version do I need?",
@@ -1244,6 +1268,10 @@
     "core-concepts/layouts": {
       "title": "Layouts",
       "category": "Core Concepts"
+    },
+    "guides/comparison": {
+      "title": "Pyxle vs. other frameworks",
+      "category": "Guides"
     },
     "guides/styling": {
       "title": "Styling",

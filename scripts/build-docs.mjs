@@ -46,6 +46,7 @@ const NAV_STRUCTURE = [
     category: "Guides",
     slug: "guides",
     items: [
+      { file: "guides/comparison.md", slug: "comparison" },
       { file: "guides/styling.md", slug: "styling" },
       { file: "guides/head-management.md", slug: "head-management" },
       { file: "guides/api-routes.md", slug: "api-routes" },
