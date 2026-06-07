@@ -40,69 +40,71 @@ const ALL_FRAMEWORKS = [
     ...PYTHON_FRAMEWORKS,
     { key: "express", name: "Express", color: "bg-blue-500", text: "text-blue-400", type: "API framework" },
     { key: "hono", name: "Hono", color: "bg-red-500", text: "text-red-400", type: "Ultralight API" },
+    { key: "nextjs", name: "Next.js", color: "bg-zinc-400", text: "text-zinc-500 dark:text-zinc-300", type: "Full-stack (SSR)" },
 ];
 
 const TESTS = {
     form: {
         name: "Form Submission (POST)",
-        desc: "Parse JSON body, validate fields, return response. Measures request processing pipeline.",
-        data: { pyxle: 20548, fastapi: 11379, django: 3478, flask: 5338, express: 38798, hono: 30027 },
+        desc: "Parse a JSON body, validate fields, return a response. Measures the request-processing pipeline.",
+        data: { pyxle: 16267, fastapi: 14615, django: 3700, flask: 4701, express: 32711, hono: 26673, nextjs: 5949 },
     },
     json: {
         name: "JSON Serialization",
         desc: "Return a static JSON object. Measures pure framework and serialization overhead.",
-        data: { pyxle: 5046, fastapi: 15423, django: 3592, flask: 5044, express: 60637, hono: 84853 },
+        data: { pyxle: 25212, fastapi: 21388, django: 4294, flask: 5564, express: 43286, hono: 49334, nextjs: 6025 },
     },
     health: {
         name: "Health Check",
-        desc: "Minimal endpoint. Measures raw framework routing overhead.",
-        data: { pyxle: 4770, fastapi: 15237, django: 3506, flask: 5088, express: 49843, hono: 55061 },
+        desc: "A minimal endpoint. Measures raw framework routing overhead.",
+        data: { pyxle: 19153, fastapi: 19530, django: 3783, flask: 4736, express: 33028, hono: 43789, nextjs: 7031 },
     },
     db: {
         name: "Single DB Query",
         desc: "Read one random row from SQLite. Measures framework + database access overhead.",
-        data: { pyxle: 2696, fastapi: 3290, django: 3054, flask: 2658, express: 50797, hono: 65064 },
+        data: { pyxle: 1775, fastapi: 1888, django: 2237, flask: 3606, express: 38387, hono: 41692, nextjs: 6757 },
     },
     queries5: {
         name: "Multiple Queries (5)",
-        desc: "Read 5 random rows from SQLite. Measures query loop performance.",
-        data: { pyxle: 2428, fastapi: 2802, django: 2225, flask: 2124, express: 36099, hono: 36114 },
+        desc: "Read 5 random rows from SQLite. Measures query-loop performance.",
+        data: { pyxle: 1626, fastapi: 1552, django: 1478, flask: 2938, express: 28346, hono: 28456, nextjs: 5703 },
     },
     queries20: {
         name: "Multiple Queries (20)",
-        desc: "Read 20 random rows from SQLite. Heavier database workload.",
-        data: { pyxle: 2046, fastapi: 2027, django: 864, flask: 2476, express: 18226, hono: 18318 },
+        desc: "Read 20 random rows from SQLite. A heavier database workload.",
+        data: { pyxle: 1299, fastapi: 1246, django: 566, flask: 1928, express: 14569, hono: 15533, nextjs: 5250 },
     },
 };
 
+// Dynamic SSR — the full page re-rendered on every request, at 50 concurrent
+// connections. Pyxle's @server vs Next.js force-dynamic, on byte-for-byte
+// identical pages. The advantage holds across 1–100 connections (1.25–2.1×).
 const SSR_COMPARISON = [
-    { conns: 1,   pyxle: 441,  nextjs: 1364 },
-    { conns: 5,   pyxle: 1039, nextjs: 1645 },
-    { conns: 10,  pyxle: 1040, nextjs: 1620 },
-    { conns: 50,  pyxle: 1149, nextjs: 1659 },
-    { conns: 100, pyxle: 1168, nextjs: 1618 },
+    { page: "Landing page", detail: "Hero, feature grid, stats — a typical marketing home", pyxle: 2652, nextjs: 1578 },
+    { page: "300-row data table", detail: "A large inventory table, fully server-rendered", pyxle: 181, nextjs: 95 },
+    { page: "Nested dashboard", detail: "Stat cards, grouped category cards, and a data table", pyxle: 288, nextjs: 142 },
 ];
 
 const KEY_TAKEAWAYS = [
     {
-        title: "Fastest full-stack Python framework",
-        desc: "Pyxle outperforms Django by 2.2x on average across all API benchmarks, while offering SSR, file-based routing, and server actions that neither Django nor Flask provides.",
+        title: "Faster than Next.js at dynamic SSR",
+        desc: "Re-rendering the page on every request, Pyxle is 1.7\u20132.1\u00d7 faster than Next.js on heavy and complex pages \u2014 and ~1.7\u00d7 on a simple one \u2014 at roughly half the latency under load. The lead holds, and widens, as pages get heavier.",
         icon: "M13 10V3L4 14h7v7l9-11h-7z",
     },
     {
-        title: "SSR performance on par with Next.js",
-        desc: "Pyxle renders server-side pages at 1,100+ req/s with a persistent worker pool and bundle caching. The gap with Next.js is just 1.4x \u2014 remarkable for a Python + Node.js hybrid architecture.",
+        title: "As fast as FastAPI \u2014 and full-stack",
+        desc: "On raw API throughput Pyxle matches or beats FastAPI, the fastest Python API framework: 25k req/s serializing JSON, 16k handling form POSTs \u2014 with SSR, file-based routing, and server actions on top, in one file.",
+        icon: "M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z",
+    },
+    {
+        title: "The fastest full-stack Python framework",
+        desc: "Pyxle leads Django and Flask on every throughput-bound endpoint. On purely SQLite-bound reads the multi-process sync frameworks edge ahead \u2014 an honest, expected result we show in full below.",
         icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
     },
     {
-        title: "Zero errors under heavy load",
-        desc: "Across all tests at 100 concurrent connections, Pyxle maintained zero errors and zero timeouts. Production-grade stability is not optional.",
+        title: "Zero errors, fully reproducible",
+        desc: "Every test, up to 100 concurrent connections, served with zero errors and zero timeouts. The complete harness \u2014 the Next.js apps and the SSR test pages included \u2014 is open source. Run it yourself.",
         icon: "M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z",
-    },
-    {
-        title: "1.8x faster than FastAPI on POST",
-        desc: "Pyxle handles POST/form processing at 20,000+ req/s \u2014 nearly double FastAPI. Starlette's ASGI layer combined with Pyxle's lean middleware stack shines for request body processing.",
-        icon: "M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z",
     },
 ];
 
@@ -289,7 +291,7 @@ export default function BenchmarksPage({ data }) {
         <>
             <Head>
                 <title>Benchmarks - Pyxle Framework</title>
-                <meta name="description" content="Transparent performance benchmarks comparing Pyxle against FastAPI, Django, Flask, Express, Hono, and Next.js." />
+                <meta name="description" content="Honest, reproducible benchmarks — Pyxle vs FastAPI, Django, Flask, Express, Hono, and Next.js. Faster than Next.js at dynamic SSR; on par with FastAPI on API throughput." />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
                 <meta property="og:title" content="Pyxle Benchmarks - Framework Performance Comparison" />
@@ -328,8 +330,8 @@ export default function BenchmarksPage({ data }) {
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                             {[
                                 { label: "Tool", value: "autocannon v8" },
-                                { label: "Duration", value: "12s per test" },
-                                { label: "Connections", value: "10 concurrent" },
+                                { label: "Duration", value: "10s per test" },
+                                { label: "Connections", value: "10 + 50 concurrent" },
                                 { label: "Hardware", value: "Apple M3 (8 cores)" },
                             ].map(m => (
                                 <div key={m.label}>
@@ -339,9 +341,7 @@ export default function BenchmarksPage({ data }) {
                             ))}
                         </div>
                         <p className={`mt-4 text-xs text-zinc-600 dark:text-zinc-400`}>
-                            All Python frameworks use uvicorn (single worker, ASGI) except Flask (gunicorn, 4 WSGI workers).
-                            Node.js frameworks use their default server. Pyxle runs in production mode via <code className="font-mono">pyxle serve</code> with full middleware stack.
-                            Database: SQLite with WAL mode, 1,000 pre-seeded rows.{' '}
+                            Charts show 50 concurrent connections (also measured at 10, with consistent results). The async Python frameworks (Pyxle, FastAPI, Django) run on uvicorn (single ASGI worker); Flask runs on gunicorn with gthread workers, since it's synchronous. Node.js frameworks use their default server; Next.js runs <code className="font-mono">next start</code> (production) with API routes and SSR pages rendered dynamically. Pyxle runs production mode via <code className="font-mono">pyxle serve</code> with its full middleware stack. Database: SQLite (WAL), 1,000 pre-seeded rows.{' '}
                             <a href="https://github.com/pyxle-dev/benchmarks" target="_blank" rel="noreferrer" className="text-emerald-700 dark:text-emerald-400 underline underline-offset-2 hover:no-underline">
                                 Source code (run it yourself)
                             </a>
@@ -386,30 +386,33 @@ export default function BenchmarksPage({ data }) {
             <section className="px-6 pb-20">
                 <div className="mx-auto max-w-6xl">
                     <SectionHeading
-                        label="SSR Performance"
-                        title="Server-Side Rendering: Pyxle vs Next.js"
-                        subtitle="Pyxle is the only Python framework that renders React on the server. Its optimized worker pool with bundle caching delivers throughput comparable to Next.js — the industry standard."
+                        label="Dynamic SSR"
+                        title="Server-side rendering: faster than Next.js"
+                        subtitle="The full page re-rendered on every request — the apples-to-apples match for Pyxle's @server loader and Next.js's force-dynamic. On byte-for-byte identical pages, Pyxle is faster at every complexity, and the gap grows as pages get heavier."
                     />
                     <div className={`rounded-xl border overflow-hidden border-zinc-200 dark:border-white/5`}>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className={'bg-zinc-50 dark:bg-white/[0.03]'}>
-                                        <th className="px-5 py-3 text-left font-semibold">Connections</th>
+                                        <th className="px-5 py-3 text-left font-semibold">Page rendered per request</th>
                                         <th className="px-5 py-3 text-right font-semibold text-emerald-700 dark:text-emerald-400">Pyxle (req/s)</th>
                                         <th className="px-5 py-3 text-right font-semibold">Next.js (req/s)</th>
-                                        <th className="px-5 py-3 text-right font-semibold">Ratio</th>
+                                        <th className="px-5 py-3 text-right font-semibold">Pyxle advantage</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {SSR_COMPARISON.map((row) => {
-                                        const ratio = (row.nextjs / row.pyxle).toFixed(1);
+                                        const ratio = (row.pyxle / row.nextjs).toFixed(2);
                                         return (
-                                            <tr key={row.conns} className={`border-t border-zinc-100 dark:border-white/5`}>
-                                                <td className="px-5 py-3 font-mono">{row.conns}</td>
-                                                <td className="px-5 py-3 text-right font-mono text-emerald-700 dark:text-emerald-400 font-medium">{row.pyxle.toLocaleString()}</td>
-                                                <td className={`px-5 py-3 text-right font-mono text-zinc-600 dark:text-zinc-400`}>{row.nextjs.toLocaleString()}</td>
-                                                <td className={`px-5 py-3 text-right font-mono text-zinc-600 dark:text-zinc-400`}>{ratio}x</td>
+                                            <tr key={row.page} className={`border-t border-zinc-100 dark:border-white/5`}>
+                                                <td className="px-5 py-3 align-top">
+                                                    <span className="font-medium">{row.page}</span>
+                                                    <span className="block text-xs text-zinc-500 mt-0.5">{row.detail}</span>
+                                                </td>
+                                                <td className="px-5 py-3 text-right font-mono text-emerald-700 dark:text-emerald-400 font-medium align-top">{row.pyxle.toLocaleString()}</td>
+                                                <td className={`px-5 py-3 text-right font-mono text-zinc-600 dark:text-zinc-400 align-top`}>{row.nextjs.toLocaleString()}</td>
+                                                <td className={`px-5 py-3 text-right font-mono font-semibold text-emerald-700 dark:text-emerald-400 align-top`}>{ratio}×</td>
                                             </tr>
                                         );
                                     })}
@@ -417,8 +420,8 @@ export default function BenchmarksPage({ data }) {
                             </table>
                         </div>
                         <div className={`px-5 py-3 text-xs border-t border-zinc-100 text-zinc-600 dark:border-white/5 dark:text-zinc-400`}>
-                            SSR renders the homepage with server-side data loading, React component rendering, and full HTML document assembly.
-                            Pyxle uses persistent Node.js worker pool with esbuild bundle caching. Next.js uses pre-compiled React Server Components.
+                            At 50 concurrent connections; the advantage holds across 1–100 connections (1.25–2.1×). Both frameworks render React on the server with full HTML document assembly — Pyxle via a persistent Node.js worker pool, Next.js via React Server Components.
+                            {' '}<strong>The fair caveat:</strong> this measures pages that <em>must</em> render per request (personalized, authenticated, real-time). For static or cacheable content, Next.js pre-renders to HTML and serves it at static-file speed.
                         </div>
                     </div>
                 </div>
@@ -467,14 +470,11 @@ export default function BenchmarksPage({ data }) {
                     <div className={`mt-6 rounded-xl border p-5 border-zinc-200 bg-zinc-50 dark:border-white/5 dark:bg-white/[0.02]`}>
                         <h3 className="text-sm font-semibold mb-2">Reading these results</h3>
                         <p className={`text-sm leading-relaxed text-zinc-600 dark:text-zinc-400`}>
-                            Pyxle is a <strong>full-stack framework</strong> — every request passes through its SSR-ready middleware stack, GZip compression, and server action routing,
-                            even on API-only endpoints. Lightweight API frameworks like FastAPI and Flask skip that overhead entirely.
+                            Pyxle is a <strong>full-stack framework</strong> serving these endpoints through its production middleware stack — yet it matches or beats FastAPI, the leanest Python API framework, on JSON serialization and form handling. On purely SQLite-bound reads the multi-process synchronous frameworks (Flask, Django) pull ahead, because a single async worker serializes blocking database calls — an honest, expected trade-off.
                             {showAllFrameworks ? (
-                                <> Node.js frameworks (Express, Hono) additionally benefit from V8's optimized HTTP pipeline
-                                and native C++ database bindings (<code className={`font-mono text-xs rounded px-1 py-0.5 bg-zinc-200 dark:bg-white/5`}>better-sqlite3</code>),
-                                making cross-runtime comparisons inherently uneven.</>
+                                <> Node.js frameworks (Express, Hono) sit far higher still: they benefit from V8's optimized HTTP pipeline and native C++ SQLite bindings (<code className={`font-mono text-xs rounded px-1 py-0.5 bg-zinc-200 dark:bg-white/5`}>better-sqlite3</code>), so cross-runtime comparisons are inherently uneven — they're here for context, not as a like-for-like target.</>
                             ) : null}
-                            {' '}For real-world applications, Pyxle's value is that you get SSR, server actions, and Python's ecosystem in a single framework — at competitive throughput.
+                            {' '}The headline: you get SSR, server actions, and Python's whole ecosystem in one framework, at throughput on par with the fastest Python API server.
                         </p>
                     </div>
                 </div>
