@@ -26,6 +26,7 @@ const NAV_STRUCTURE = [
     category: "Getting Started",
     slug: "getting-started",
     items: [
+      { file: "getting-started/introduction.md", slug: "introduction" },
       { file: "getting-started/installation.md", slug: "installation" },
       { file: "getting-started/quick-start.md", slug: "quick-start" },
       { file: "getting-started/project-structure.md", slug: "project-structure" },
@@ -85,6 +86,7 @@ const NAV_STRUCTURE = [
     category: "Architecture",
     slug: "architecture",
     items: [
+      { file: "architecture/README.md", slug: "README" },
       { file: "architecture/overview.md", slug: "overview" },
       { file: "architecture/pyxl-files.md", slug: "pyxl-files" },
       { file: "architecture/parser.md", slug: "parser" },
@@ -108,9 +110,57 @@ const NAV_STRUCTURE = [
   {
     category: "FAQ",
     slug: "faq",
+    flat: true,
     items: [{ file: "faq.md", slug: "faq" }],
   },
+  {
+    category: "Changelog",
+    slug: "changelog",
+    flat: true,
+    items: [{ file: "changelog.md", slug: "changelog" }],
+  },
 ];
+
+// ── Search keyword aliases ──────────────────────────────────────────
+// Curated synonyms/aliases that point a search query at the right page
+// even when the word doesn't appear in the page title or body. Keyed by
+// the built page path. This is where search relevance is tuned — add an
+// entry when a page has an "obvious" search term that isn't in its prose
+// (e.g. the comparison page is titled "Pyxle vs. other frameworks", so
+// someone searching "comparison" needs the alias to find it).
+const SEARCH_KEYWORDS = {
+  "getting-started/introduction": ["intro", "introduction", "what is pyxle", "overview", "getting started"],
+  "getting-started/installation": ["install", "setup", "pip install", "requirements", "node", "prerequisites"],
+  "getting-started/quick-start": ["quickstart", "tutorial", "first app", "hello world", "scaffold", "pyxle init"],
+  "getting-started/project-structure": ["structure", "folders", "directory layout", "pages directory"],
+  "core-concepts/pyxl-files": ["pyxl", "file format", "two languages", "colocate", "split"],
+  "core-concepts/routing": ["routes", "routing", "dynamic routes", "catch-all", "slug", "params"],
+  "core-concepts/data-loading": ["loader", "server loader", "data", "props", "fetch data", "@server"],
+  "core-concepts/server-actions": ["action", "mutation", "form", "useaction", "@action", "post", "submit"],
+  "core-concepts/layouts": ["layout", "template", "shared ui", "nav bar", "wrapper", "slots"],
+  "guides/comparison": ["comparison", "compare", "vs", "versus", "alternatives", "next.js", "nextjs", "fastapi", "flask", "django", "reflex", "streamlit", "nicegui"],
+  "guides/styling": ["css", "tailwind", "styles", "styling", "stylesheet"],
+  "guides/head-management": ["head", "meta tags", "title", "seo", "open graph", "favicon"],
+  "guides/api-routes": ["api", "rest", "json api", "endpoint", "websocket", "starlette"],
+  "guides/middleware": ["middleware", "request hook", "auth guard"],
+  "guides/plugins": ["plugin", "plugins", "installed apps", "extensions", "packages"],
+  "guides/environment-variables": ["env", "environment variables", "secrets", "dotenv", ".env", "config"],
+  "guides/error-handling": ["error", "errors", "404", "not found", "exception", "loadererror", "actionerror"],
+  "guides/client-components": ["client", "image", "link", "script", "clientonly", "hydration"],
+  "guides/security": ["security", "csrf", "cors", "xss", "sanitize"],
+  "guides/deployment": ["deploy", "deployment", "production", "hosting", "serve", "build", "ec2", "docker", "cdn", "edge caching"],
+  "guides/editor-setup": ["editor", "vscode", "vs code", "lsp", "syntax highlighting", "ide"],
+  "guides/for-ai-agents": ["ai", "agents", "claude", "cursor", "copilot", "llm", "coding agent"],
+  "reference/cli": ["cli", "commands", "pyxle dev", "pyxle build", "pyxle serve", "terminal"],
+  "reference/configuration": ["config", "configuration", "pyxle.config.json", "settings", "options"],
+  "reference/runtime-api": ["runtime", "@server", "@action", "loadererror", "actionerror", "decorators"],
+  "reference/client-api": ["client api", "hooks", "useaction", "link", "navigate", "form", "head"],
+  "plugins/pyxle-db": ["database", "db", "sqlite", "orm", "migrations", "models"],
+  "plugins/pyxle-auth": ["auth", "authentication", "login", "sessions", "password", "users"],
+  "architecture/README": ["architecture", "handbook", "internals", "how it works", "design"],
+  "changelog": ["changelog", "release notes", "whats new", "what's new", "updates", "versions", "0.4.0"],
+  "faq": ["faq", "questions", "help", "troubleshooting", "common questions"],
+};
 
 // ── Markdown processing ─────────────────────────────────────────────
 
@@ -189,7 +239,7 @@ function resolveMdLinkAbs(sourceAbsPath, linkHref) {
 }
 
 /** Add IDs to headings, extract TOC entries, and collect outbound .md links. */
-function processMarkdown(md, currentCategory = '') {
+function processMarkdown(md, sourceAbsPath, srcUrlByAbsPath) {
   const toc = [];
   const slugCounts = {};
   const outboundMdLinks = [];
@@ -245,28 +295,26 @@ function processMarkdown(md, currentCategory = '') {
     return `<div class="code-block" data-lang="${lang || ""}"><pre><code${langClass}>${escaped}</code></pre></div>`;
   };
 
-  // Convert internal .md links to /docs/ URLs.
-  // Supports both bare links ("foo.md") and anchor-suffixed links
-  // ("foo.md#section"). Bare anchors ("#section") and directory
-  // references ("../guides/") pass through unchanged.
+  // Convert internal .md links to /docs/ URLs. Links resolve the standard
+  // Markdown way — relative to the SOURCE file — and are then mapped to the
+  // target page's published URL via `srcUrlByAbsPath`. That mapping is what
+  // lets a sub-page link to a flat root page correctly (e.g.
+  // ../changelog.md → /docs/changelog) and lets build() validate that every
+  // link points at a real published page. Bare anchors ("#section") and
+  // directory references ("../guides/") pass through unchanged.
   renderer.link = function ({ href, title, text }) {
     const mdMatch = href && href.match(/^([^#?]+)\.md(#[^?]*)?(\?.*)?$/);
     if (mdMatch) {
-      // Resolve relative .md links to /docs/ paths.
-      // e.g., "head-management.md" → "/docs/guides/head-management"
-      //       "../guides/error-handling.md" → "/docs/guides/error-handling"
-      //       "ssr.md#head-pipeline" → "/docs/architecture/ssr#head-pipeline"
-      let docPath = mdMatch[1];
       const anchor = mdMatch[2] || '';
-      // Remove leading ../ segments and resolve to flat doc path.
-      docPath = docPath.replace(/\.\.\//g, '');
-      // If no directory prefix, it's a same-category reference — prepend current category.
-      if (!docPath.includes('/') && currentCategory) {
-        docPath = `${currentCategory}/${docPath}`;
-      }
-      // Record the link for post-processing validation.
-      outboundMdLinks.push({ href, text, hash: anchor ? anchor.slice(1) : "" });
+      const targetAbs = resolveMdLinkAbs(sourceAbsPath, `${mdMatch[1]}.md`);
+      const publishedUrl = srcUrlByAbsPath.get(targetAbs);
+      // Record the link (with its resolved absolute target) so build() can
+      // validate target existence + anchor correctness and fail loudly.
+      outboundMdLinks.push({ href, text, hash: anchor ? anchor.slice(1) : "", targetAbs });
       const titleAttr = title ? ` title="${title}"` : '';
+      // If the target isn't a published page the build fails in build(); emit a
+      // best-effort href so the (about-to-be-rejected) output is still valid HTML.
+      const docPath = publishedUrl || mdMatch[1].replace(/^(\.\.\/)+/, "");
       return `<a href="/docs/${docPath}${anchor}"${titleAttr}>${text}</a>`;
     }
     // External or anchor links — pass through.
@@ -328,7 +376,12 @@ function extractDescription(md) {
   return desc.slice(0, 200);
 }
 
-/** Build search-friendly text from markdown (strip formatting). */
+/**
+ * Build search-friendly text from markdown (strip formatting). The result is
+ * stored only in the server-side manifest (never shipped to the client), so we
+ * index a generous slice of the body — not just the first paragraph — to make
+ * full-text search actually find content that lives deeper in a page.
+ */
 function extractSearchText(md) {
   return md
     .replace(/```[\s\S]*?```/g, "") // remove code blocks
@@ -338,7 +391,7 @@ function extractSearchText(md) {
     .replace(/[*_~|>-]/g, "") // remove formatting
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 500);
+    .slice(0, 8000);
 }
 
 // ── Build ───────────────────────────────────────────────────────────
@@ -369,6 +422,19 @@ function build() {
   const manifest = { nav: [], searchIndex: [], pages: {} };
   const flatPages = []; // for prev/next linking
 
+  // Map every published page's absolute SOURCE path → its published URL path.
+  // Used to (a) resolve internal .md links to the correct URL — including links
+  // from a sub-page to a flat root page like ../changelog.md → /docs/changelog —
+  // and (b) validate that no rendered link points at an unpublished page.
+  const srcUrlByAbsPath = new Map();
+  for (const section of NAV_STRUCTURE) {
+    for (const item of section.items) {
+      const abs = join(DOCS_SRC, item.file);
+      const url = section.flat ? section.slug : `${section.slug}/${item.slug}`;
+      srcUrlByAbsPath.set(abs, url);
+    }
+  }
+
   for (const section of NAV_STRUCTURE) {
     mkdirSync(join(OUT_DIR, section.slug), { recursive: true });
 
@@ -388,29 +454,31 @@ function build() {
       const md = readFileSync(filePath, "utf-8");
       const title = extractTitle(md);
       const description = extractDescription(md);
-      const { html, toc, outboundMdLinks } = processMarkdown(md, section.slug);
+      const { html, toc, outboundMdLinks } = processMarkdown(md, filePath, srcUrlByAbsPath);
       const searchText = extractSearchText(md);
 
-      // Validate each .md#hash link emitted by this file against the
-      // target file's actual heading slugs.
+      // Validate every internal .md link this file emits: the target must be a
+      // PUBLISHED page (present in NAV_STRUCTURE), and any #anchor must exist on
+      // that page. This is what guarantees no rendered docs link 404s.
       for (const link of outboundMdLinks) {
-        if (!link.hash) continue; // Bare .md links: target existence is
-                                  // validated by the build output layout;
-                                  // we only verify anchor correctness here.
-        const targetAbs = resolveMdLinkAbs(filePath, link.href);
-        const targetSlugs = slugsByAbsPath.get(targetAbs);
-        if (!targetSlugs) {
+        const targetAbs = link.targetAbs;
+        if (!srcUrlByAbsPath.has(targetAbs)) {
+          const fileExists = slugsByAbsPath.has(targetAbs);
           brokenLinks.push({
             source: item.file,
             text: link.text,
             href: link.href,
-            reason: `Target file does not exist: ${relative(DOCS_SRC, targetAbs)}`,
+            reason: fileExists
+              ? `Links to ${relative(DOCS_SRC, targetAbs)}, which exists but is not a published page (add it to NAV_STRUCTURE, or fix the link).`
+              : `Target file does not exist: ${relative(DOCS_SRC, targetAbs)}`,
           });
           continue;
         }
-        if (!targetSlugs.has(link.hash)) {
-          // Offer close matches so a human (or an agent) can fix the link
-          // quickly based on the build error alone.
+        if (!link.hash) continue;
+        // Offer close matches so a human (or an agent) can fix a bad anchor
+        // quickly based on the build error alone.
+        const targetSlugs = slugsByAbsPath.get(targetAbs);
+        if (targetSlugs && !targetSlugs.has(link.hash)) {
           const closest = [...targetSlugs]
             .map((s) => ({ s, d: _levenshtein(s, link.hash) }))
             .sort((a, b) => a.d - b.d)
@@ -426,21 +494,27 @@ function build() {
         }
       }
 
-      const pagePath =
-        section.slug === "faq" ? "faq" : `${section.slug}/${item.slug}`;
+      // "flat" sections (FAQ, Changelog) live at /docs/<slug> with a single
+      // page, rather than /docs/<category>/<slug>.
+      const pagePath = section.flat
+        ? section.slug
+        : `${section.slug}/${item.slug}`;
 
       // Page JSON (include raw markdown for "Copy page" feature)
       const pageData = { title, description, html, toc, path: pagePath, markdown: md };
-      const outPath =
-        section.slug === "faq"
-          ? join(OUT_DIR, "faq.json")
-          : join(OUT_DIR, section.slug, `${item.slug}.json`);
+      const outPath = section.flat
+        ? join(OUT_DIR, `${section.slug}.json`)
+        : join(OUT_DIR, section.slug, `${item.slug}.json`);
       writeFileSync(outPath, JSON.stringify(pageData));
 
       // Nav entry
       navSection.items.push({ title, slug: item.slug, path: pagePath });
 
-      // Search index
+      // Search index. Includes curated keyword aliases so queries that don't
+      // appear in the title/body (e.g. "comparison" for "Pyxle vs. other
+      // frameworks") still resolve. The page `path` is also searched by the
+      // server (its slug words are tokenized), so "comparison" matches
+      // `guides/comparison` directly.
       manifest.searchIndex.push({
         title,
         path: pagePath,
@@ -448,6 +522,7 @@ function build() {
         description,
         searchText,
         headings: toc.map((t) => t.text),
+        keywords: SEARCH_KEYWORDS[pagePath] || [],
       });
 
       // For prev/next
