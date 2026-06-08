@@ -181,13 +181,16 @@ function slugifyHeading(text) {
 }
 
 /**
- * Walk a markdown source and return the SET of heading slugs it would
- * produce when rendered via `processMarkdown`. Uses the same h1-skip and
- * dedup rules. Skips headings inside fenced code blocks. Used by the
- * build-time link validator so we don't have to parse with `marked` twice.
+ * Walk a markdown source and return the SET of every in-page anchor target it
+ * exposes: the slugs `processMarkdown` generates for headings (same h1-skip and
+ * dedup rules) PLUS any explicit `<a id="…">` / `<a name="…">` anchors a doc
+ * author hand-placed. Skips fenced code blocks (so a `<div id="root">` inside an
+ * example isn't mistaken for an anchor). Used by the build-time link validator
+ * to check both cross-page `.md#anchor` and same-page `#anchor` links without
+ * parsing with `marked` twice.
  */
-function collectHeadingSlugs(md) {
-  const slugs = new Set();
+function collectPageAnchors(md) {
+  const anchors = new Set();
   const slugCounts = {};
   let h1Skipped = false;
   let inFence = false;
@@ -198,6 +201,12 @@ function collectHeadingSlugs(md) {
       continue;
     }
     if (inFence) continue;
+
+    // Explicit hand-placed anchors: <a id="…"> / <a name="…">. marked passes a
+    // raw-HTML line straight through, so these become real anchor targets.
+    for (const a of line.matchAll(/<a\s+[^>]*?(?:id|name)=["']([^"']+)["']/gi)) {
+      anchors.add(a[1]);
+    }
 
     const m = line.match(/^(#{1,6})\s+(.+?)\s*$/);
     if (!m) continue;
@@ -218,10 +227,10 @@ function collectHeadingSlugs(md) {
     } else {
       slugCounts[slug] = 1;
     }
-    slugs.add(slug);
+    anchors.add(slug);
   }
 
-  return slugs;
+  return anchors;
 }
 
 /**
@@ -242,7 +251,7 @@ function resolveMdLinkAbs(sourceAbsPath, linkHref) {
 function processMarkdown(md, sourceAbsPath, srcUrlByAbsPath) {
   const toc = [];
   const slugCounts = {};
-  const outboundMdLinks = [];
+  const outboundLinks = [];
 
   const renderer = new marked.Renderer();
 
@@ -295,39 +304,58 @@ function processMarkdown(md, sourceAbsPath, srcUrlByAbsPath) {
     return `<div class="code-block" data-lang="${lang || ""}"><pre><code${langClass}>${escaped}</code></pre></div>`;
   };
 
-  // Convert internal .md links to /docs/ URLs. Links resolve the standard
-  // Markdown way — relative to the SOURCE file — and are then mapped to the
-  // target page's published URL via `srcUrlByAbsPath`. That mapping is what
-  // lets a sub-page link to a flat root page correctly (e.g.
-  // ../changelog.md → /docs/changelog) and lets build() validate that every
-  // link points at a real published page. Bare anchors ("#section") and
-  // directory references ("../guides/") pass through unchanged.
+  // Convert internal links to /docs/ URLs and record EVERY link so build() can
+  // prove it resolves. There are exactly four kinds:
+  //   1. Same-page anchor (`#section`)        → must match a heading here.
+  //   2. External (`https://`, `mailto:`…)    → passed through untouched.
+  //   3. Internal relative `.md` link          → resolved relative to the SOURCE
+  //      file and mapped to the target's published URL via `srcUrlByAbsPath`
+  //      (so `../changelog.md` → `/docs/changelog`); target + anchor validated.
+  //   4. Anything else internal (`../guides/`, `/docs/x`, extensionless)
+  //      → REJECTED. The browser resolves these against the current page URL
+  //      and they land on a category path with no page — a silent 404. This is
+  //      the class the old "only validate `.md`" check let slip through.
   renderer.link = function ({ href, title, text }) {
-    const mdMatch = href && href.match(/^([^#?]+)\.md(#[^?]*)?(\?.*)?$/);
+    const titleAttr = title ? ` title="${title}"` : '';
+    href = href || '';
+
+    // (1) Same-page anchor — validate against THIS page's headings.
+    if (href.startsWith('#')) {
+      outboundLinks.push({ kind: 'self-anchor', href, text, hash: href.slice(1) });
+      return `<a href="${href}"${titleAttr}>${text}</a>`;
+    }
+
+    // (2) External / protocol-relative / mailto / tel — pass through.
+    if (/^(https?:|\/\/|mailto:|tel:)/i.test(href)) {
+      return `<a href="${href}"${titleAttr} target="_blank" rel="noreferrer">${text}</a>`;
+    }
+
+    // (3) Internal relative `.md` link — the doc-to-doc convention.
+    const mdMatch = href.match(/^([^#?]+)\.md(#[^?]*)?(\?.*)?$/);
     if (mdMatch) {
       const anchor = mdMatch[2] || '';
       const targetAbs = resolveMdLinkAbs(sourceAbsPath, `${mdMatch[1]}.md`);
       const publishedUrl = srcUrlByAbsPath.get(targetAbs);
       // Record the link (with its resolved absolute target) so build() can
       // validate target existence + anchor correctness and fail loudly.
-      outboundMdLinks.push({ href, text, hash: anchor ? anchor.slice(1) : "", targetAbs });
-      const titleAttr = title ? ` title="${title}"` : '';
+      outboundLinks.push({ kind: 'md', href, text, hash: anchor ? anchor.slice(1) : "", targetAbs });
       // If the target isn't a published page the build fails in build(); emit a
       // best-effort href so the (about-to-be-rejected) output is still valid HTML.
       const docPath = publishedUrl || mdMatch[1].replace(/^(\.\.\/)+/, "");
       return `<a href="/docs/${docPath}${anchor}"${titleAttr}>${text}</a>`;
     }
-    // External or anchor links — pass through.
-    const titleAttr = title ? ` title="${title}"` : '';
-    const isExternal = href && (href.startsWith('http') || href.startsWith('//'));
-    const targetAttr = isExternal ? ' target="_blank" rel="noreferrer"' : '';
-    return `<a href="${href || '#'}"${titleAttr}${targetAttr}>${text}</a>`;
+
+    // (4) Any other internal link — a directory reference, an absolute
+    // `/docs/...` path, or an extensionless relative link. These 404 on the
+    // site (categories have no index page). Record so build() rejects it.
+    outboundLinks.push({ kind: 'bad-internal', href, text });
+    return `<a href="${href || '#'}"${titleAttr}>${text}</a>`;
   };
 
   marked.setOptions({ renderer, gfm: true, breaks: false });
   const html = marked.parse(md);
 
-  return { html, toc, outboundMdLinks };
+  return { html, toc, outboundLinks };
 }
 
 /**
@@ -406,14 +434,15 @@ function build() {
 
   mkdirSync(OUT_DIR, { recursive: true });
 
-  // Pre-pass: compute the set of heading slugs for every .md file under
-  // DOCS_SRC. This lets us validate every `.md#anchor` link a source file
-  // emits against the actual anchors that will exist on the target page.
-  // We walk the whole source tree (not just NAV_STRUCTURE) so links into
-  // a file that exists but isn't yet wired into the nav still get validated.
+  // Pre-pass: compute the set of in-page anchor targets (heading slugs +
+  // explicit <a id> anchors) for every .md file under DOCS_SRC. This lets us
+  // validate every `#anchor` a source file emits against the anchors that will
+  // actually exist on the target page. We walk the whole source tree (not just
+  // NAV_STRUCTURE) so links into a file that exists but isn't yet wired into
+  // the nav still get validated.
   const slugsByAbsPath = new Map();
   for (const absPath of walkMdFilesRecursive(DOCS_SRC)) {
-    slugsByAbsPath.set(absPath, collectHeadingSlugs(readFileSync(absPath, "utf-8")));
+    slugsByAbsPath.set(absPath, collectPageAnchors(readFileSync(absPath, "utf-8")));
   }
 
   // Collected while rendering each file; validated at the end of build().
@@ -454,13 +483,48 @@ function build() {
       const md = readFileSync(filePath, "utf-8");
       const title = extractTitle(md);
       const description = extractDescription(md);
-      const { html, toc, outboundMdLinks } = processMarkdown(md, filePath, srcUrlByAbsPath);
+      const { html, toc, outboundLinks } = processMarkdown(md, filePath, srcUrlByAbsPath);
       const searchText = extractSearchText(md);
 
-      // Validate every internal .md link this file emits: the target must be a
-      // PUBLISHED page (present in NAV_STRUCTURE), and any #anchor must exist on
-      // that page. This is what guarantees no rendered docs link 404s.
-      for (const link of outboundMdLinks) {
+      // Validate every link this file emits so no rendered docs link 404s:
+      //   • bad-internal — not a relative `.md` link → rejected outright.
+      //   • self-anchor  — must match a heading on THIS page.
+      //   • md           — target must be a PUBLISHED page and any #anchor
+      //                    must exist on that target page.
+      const selfSlugs = slugsByAbsPath.get(filePath);
+      for (const link of outboundLinks) {
+        if (link.kind === "bad-internal") {
+          brokenLinks.push({
+            source: item.file,
+            text: link.text,
+            href: link.href,
+            reason:
+              "Internal link is not a relative `.md` link, so it resolves to a /docs path " +
+              "with no page (404). Link to a specific `.md` file (e.g. `../guides/comparison.md`), " +
+              "or use a full https:// URL for off-site targets.",
+          });
+          continue;
+        }
+
+        if (link.kind === "self-anchor") {
+          if (selfSlugs && !selfSlugs.has(link.hash)) {
+            const closest = [...selfSlugs]
+              .map((s) => ({ s, d: _levenshtein(s, link.hash) }))
+              .sort((a, b) => a.d - b.d)
+              .slice(0, 3)
+              .map((x) => x.s);
+            brokenLinks.push({
+              source: item.file,
+              text: link.text,
+              href: link.href,
+              reason: `Same-page anchor "#${link.hash}" matches no heading on this page`,
+              suggestions: closest,
+            });
+          }
+          continue;
+        }
+
+        // kind === "md": target must be a published page, anchor must exist.
         const targetAbs = link.targetAbs;
         if (!srcUrlByAbsPath.has(targetAbs)) {
           const fileExists = slugsByAbsPath.has(targetAbs);
@@ -553,19 +617,20 @@ function build() {
   writeFileSync(join(OUT_DIR, "manifest.json"), JSON.stringify(manifest, null, 2));
   console.log(`\nDone: ${flatPages.length} pages, manifest written.`);
 
-  // Fail the build if any .md#hash link points at a section that doesn't
-  // exist on the target page. This catches the class of bug where a doc
-  // author writes a plausible-looking anchor that silently lands nowhere,
-  // leaving readers stuck at the top of the page. Each broken entry
-  // includes the source file, the link text, the link href, and the
-  // closest-matching slugs on the target page so the fix is obvious.
+  // Fail the build on any link that won't resolve: a doc-to-doc link pointing
+  // at an unpublished/nonexistent page, an internal link that isn't a relative
+  // `.md` link (directory refs, /docs absolutes — these 404), or an anchor that
+  // matches no heading on the target page. This catches the class of bug where
+  // a plausible-looking link silently lands nowhere. Each entry includes the
+  // source file, link text, href, and (for anchors) closest-matching slugs so
+  // the fix is obvious.
   if (brokenLinks.length) {
     // Group by source file for concise output.
     const bySource = {};
     for (const b of brokenLinks) {
       (bySource[b.source] ||= []).push(b);
     }
-    console.error(`\n❌ ${brokenLinks.length} broken anchor link(s):\n`);
+    console.error(`\n❌ ${brokenLinks.length} broken link(s):\n`);
     for (const [source, entries] of Object.entries(bySource)) {
       console.error(`  ${source} (${entries.length})`);
       for (const e of entries) {
