@@ -175,6 +175,37 @@
 }
 
 /* ════════════════════════════════════════════════════════════════
+   Mobile compositing safety (below the desktop breakpoint).
+
+   On some real mobile devices (notably Samsung Chrome on recent
+   Galaxy hardware) a page that stacks many permanent or perpetually
+   animating composited layers — entrance reveals that settle on a 3D
+   transform, the infinitely-drifting aurora/float/edge layers — can
+   exhaust the compositor's layer budget. Sections then blank out when
+   scrolled out and back into view and only repaint on a tap. It does
+   NOT reproduce in desktop devtools' mobile emulation (different
+   compositor), which is why it slipped through.
+
+   The fix mirrors the parallax gate above: below 768px we drop the
+   decorative motion entirely and show every reveal immediately. No
+   layout or final-state change (reveals already end at opacity:1 /
+   transform:none) — only the transient, layer-promoting motion is
+   removed, so the mobile compositor stays calm. Desktop is untouched.
+   Unlayered + !important so it wins over the @layer rules above.
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+    html.js [data-reveal] {
+        opacity: 1 !important;
+        transform: none !important;
+        transition: none !important;
+    }
+    .reveal { animation: none !important; }
+    .aurora-anim,
+    .float-y,
+    .gradient-edge { animation: none !important; }
+}
+
+/* ════════════════════════════════════════════════════════════════
    Live-playground preview scope — styles the *output* the user's
    snippet renders (raw tags + a few helper classes), so whatever
    they type looks good without relying on Tailwind's purge (which

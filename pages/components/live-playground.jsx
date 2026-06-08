@@ -401,7 +401,7 @@ export function LivePlayground({
             <div className="flex flex-col bg-white dark:bg-[#0a0a0b]">
                 <div className="flex items-center gap-2 border-b border-zinc-200/70 px-4 py-2.5 dark:border-white/5">
                     <span className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400">Preview</span>
-                    <span className="ml-auto inline-flex items-center gap-1.5 font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
+                    <span className="ml-auto inline-flex items-center gap-1.5 font-mono text-[10px] text-zinc-500 dark:text-zinc-400">
                         {pyStatus === 'booting' && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />}
                         {statusText}
                     </span>
