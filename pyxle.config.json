@@ -2,8 +2,8 @@
   "middleware": [],
   "cache": {
     "/": 60,
-    "/benchmarks": 600,
-    "/docs/*": 300
+    "/benchmarks": 3600,
+    "/docs/*": 1800
   },
   "csrf": {
     "exemptPaths": ["/api/__actions/"]
