@@ -3,7 +3,6 @@
   "cache": {
     "/": 60,
     "/benchmarks": 600,
-    "/playground": 600,
     "/docs/*": 300
   },
   "csrf": {
