@@ -404,10 +404,10 @@ function Features() {
 /* ── Numbers strip (perf) ────────────────────────────────────────── */
 
 const STATS = [
-    { value: '1,100+', unit: 'req/s', label: 'SSR throughput' },
-    { value: '20k+',   unit: 'req/s', label: 'POST handling'  },
-    { value: '2ms',    unit: 'p50',   label: 'JSON latency'    },
-    { value: '0',      unit: '',      label: 'Errors at 100c'  },
+    { value: '1.7×',  unit: '',      label: 'Faster SSR vs Next.js' },
+    { value: '16k+',  unit: 'req/s', label: 'POST handling'         },
+    { value: '25k+',  unit: 'req/s', label: 'JSON serialization'    },
+    { value: '0',     unit: '',      label: 'Errors under load'     },
 ];
 
 function Numbers() {
