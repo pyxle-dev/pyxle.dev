@@ -35,11 +35,12 @@ export const slots = {
 export const createSlots = () => slots;
 
 /* ── data ────────────────────────────────────────────────────────
-   req/s at 100 concurrent connections — AWS c7i.4xlarge (16 vCPU),
-   every framework in its native multi-process production mode at
-   16 workers. Measured June 2026; raw runs archived in the
-   benchmarks repo. Numbers cross-checked against the raw autocannon
-   JSON before publishing. ───────────────────────────────────────── */
+   req/s at 100 concurrent connections — two AWS c7i.2xlarge boxes
+   (8 vCPU each): the seven frameworks on one, the load generator
+   (oha) on the other, over the private network. Native multi-process
+   production mode at 8 workers; median of 3 reps. Measured June 2026;
+   numbers cross-checked against the raw oha JSON
+   (ec2-bench-results/offbox-2box) before publishing. ─────────────── */
 
 const PYTHON_FRAMEWORKS = [
     { key: "pyxle", name: "Pyxle", type: "Full-stack (SSR + API)" },
@@ -59,72 +60,79 @@ const TESTS = {
     form: {
         name: "Form Submission (POST)",
         desc: "Parse a JSON body, validate fields, return a response. Measures the request-processing pipeline.",
-        data: { pyxle: 68390, fastapi: 39856, django: 7711, flask: 23344, express: 56368, hono: 60230, nextjs: 9192 },
+        data: { pyxle: 49487, fastapi: 38409, django: 7483, flask: 18350, express: 34676, hono: 40433, nextjs: 4849 },
     },
     json: {
         name: "JSON Serialization",
         desc: "Return a static JSON object. Measures pure framework and serialization overhead.",
-        data: { pyxle: 81388, fastapi: 64746, django: 8785, flask: 21911, express: 60544, hono: 80710, nextjs: 10893 },
+        data: { pyxle: 56545, fastapi: 48827, django: 7717, flask: 21473, express: 44466, hono: 224530, nextjs: 5510 },
     },
     health: {
         name: "Health Check",
         desc: "A minimal endpoint. Measures raw framework routing overhead.",
-        data: { pyxle: 80986, fastapi: 55312, django: 7914, flask: 20087, express: 60070, hono: 85489, nextjs: 11041 },
+        data: { pyxle: 57030, fastapi: 50293, django: 7742, flask: 21422, express: 45444, hono: 179984, nextjs: 5679 },
     },
     db: {
         name: "Single DB Query",
         desc: "Read one random row from SQLite with a persistent per-worker connection. The driver dominates here, not the framework.",
-        data: { pyxle: 27497, fastapi: 21602, django: 5028, flask: 20095, express: 58736, hono: 78010, nextjs: 10173 },
+        data: { pyxle: 27932, fastapi: 28491, django: 5979, flask: 18876, express: 40780, hono: 169874, nextjs: 5436 },
     },
     queries5: {
         name: "Multiple Queries (5)",
         desc: "Read 5 random rows from SQLite. Measures query-loop performance.",
-        data: { pyxle: 13192, fastapi: 12229, django: 5413, flask: 11879, express: 55750, hono: 73395, nextjs: 9609 },
+        data: { pyxle: 21566, fastapi: 18434, django: 5511, flask: 15957, express: 33662, hono: 95730, nextjs: 5344 },
     },
     queries20: {
         name: "Multiple Queries (20)",
         desc: "Read 20 random rows from SQLite. A heavier database workload where Node's native driver pulls ahead.",
-        data: { pyxle: 6549, fastapi: 5907, django: 3600, flask: 12189, express: 23973, hono: 19414, nextjs: 8990 },
+        data: { pyxle: 13039, fastapi: 9867, django: 4688, flask: 11721, express: 21978, hono: 31690, nextjs: 4960 },
     },
 };
 
 // Dynamic SSR — the full page re-rendered on every request, at 100
-// concurrent connections, both frameworks clustered to 16 workers.
-// Pyxle's @server vs Next.js force-dynamic, byte-for-byte identical pages.
+// concurrent connections, both frameworks clustered to 8 workers.
+// Pyxle's @server vs Next.js force-dynamic, on equivalent pages
+// (same data, same DOM — parity-verified; see the payload note below).
 const SSR_COMPARISON = [
-    { page: "Landing page", detail: "Hero, feature grid, stats — a typical marketing home", pyxle: 7574, nextjs: 2833, pyxleP50: 3, nextjsP50: 35 },
-    { page: "300-row data table", detail: "A large inventory table, fully server-rendered", pyxle: 640, nextjs: 395, pyxleP50: 13, nextjsP50: 247 },
-    { page: "Nested dashboard", detail: "Stat cards, grouped category cards, and a data table", pyxle: 828, nextjs: 556, pyxleP50: 10, nextjsP50: 117 },
+    { page: "Landing page", detail: "Hero, feature grid, stats — a typical marketing home", pyxle: 4584, nextjs: 1076, pyxleP50: 21, nextjsP50: 89 },
+    { page: "300-row data table", detail: "A large inventory table, fully server-rendered", pyxle: 373, nextjs: 165, pyxleP50: 259, nextjsP50: 604 },
+    { page: "Nested dashboard", detail: "Stat cards, grouped category cards, and a data table", pyxle: 533, nextjs: 228, pyxleP50: 135, nextjsP50: 437 },
+    { page: "API route, same app", detail: "A JSON endpoint served through each full SSR app", pyxle: 54965, nextjs: 6238, pyxleP50: 2, nextjsP50: 14 },
 ];
 
 // Static file serving — a prebuilt asset straight off disk/cache;
-// Pyxle caches small assets in memory in production. Both at 16 workers.
-const STATIC_SERVING = { pyxle: 80893, nextjs: 45427 };
+// Pyxle caches small assets in memory in production. Both at 8 workers.
+const STATIC_SERVING = { pyxle: 81816, nextjs: 25396 };
 
-// Same app, same box — the only change is `pyxle serve --workers 16`.
-// req/s at 100 connections, 1 worker vs 16 workers.
+// Same app, same box — the only change is `pyxle serve --workers 8`.
+// req/s at 100 connections, 1 worker vs 8 workers.
 const SCALING = [
-    { test: "JSON serialization", one: 14484, sixteen: 81388 },
-    { test: "Form POST", one: 12653, sixteen: 68390 },
-    { test: "Single DB query", one: 4465, sixteen: 27497 },
+    { test: "JSON serialization", one: 11190, eight: 56545 },
+    { test: "Form POST", one: 9993, eight: 49487 },
+    { test: "Single DB query", one: 3622, eight: 27932 },
+    { test: "Five-query page", one: 1868, eight: 21566 },
 ];
 
 const KEY_TAKEAWAYS = [
     {
-        title: "Up to 3.4× faster than Next.js at dynamic SSR",
-        desc: "Re-rendering the page on every request — both frameworks clustered across all 16 cores — Pyxle serves 2.7× the throughput of Next.js on a typical landing page (3.4× at lighter load), at 3 ms median latency against 35 ms. On heavy pages Next.js degrades to 247 ms while Pyxle holds 13 ms.",
+        title: "The fastest Python framework on the board",
+        desc: "Pyxle leads FastAPI, Flask, and Django on JSON, health checks, and form POST — 56,545 req/s on JSON to FastAPI's 48,827 — while running a full middleware stack (SSR, server actions, GZip). And the tails are tight: p99 under 3 ms on JSON and POST, where Express and Flask sit between 15 and 26 ms.",
     },
     {
-        title: "Top of the table on JSON and POST",
-        desc: "At 81,388 req/s Pyxle is neck-and-neck with Hono — the fastest framework we tested — on JSON serialization, and at 68,390 req/s it handles form POSTs faster than everything, Node included. A full-stack Python framework, level with an ultralight Node one.",
+        title: "Fastest of all seven on form POST",
+        desc: "Parse a JSON body, validate it, respond: Pyxle's 49,487 req/s beats every framework tested, Node included — Hono 40,433, FastAPI 38,409, Express 34,676. The moment a request does real work, the gap to the ultralight Node runtimes closes — and flips.",
     },
     {
-        title: "5.5× more throughput with one flag",
-        desc: "pyxle serve --workers 16 runs an independent server process on every core — no load balancer, no shared state to configure. Throughput scales 5.4–7.6× over a single worker across every endpoint, and median latency drops to 0–2 ms.",
+        title: "2.3–4.3× Next.js at dynamic SSR",
+        desc: "Re-rendering the full page on every request, Pyxle serves 4.3× Next.js's throughput on a landing page at a quarter of the median latency, and 2.3× on heavy pages — shipping the same DOM in 2–3× fewer bytes. Static assets: 3.2× faster. An API route through the same app: 8.8× faster.",
     },
     {
-        title: "Zero errors, losses shown in full",
-        desc: "Every result on this page was served with zero errors, zero timeouts, and zero non-2xx responses — and the two workloads Pyxle still loses are printed at the same size as the wins. The complete harness is open source. Run it yourself.",
+        title: "Near-linear scaling with one flag",
+        desc: "pyxle serve --workers 8 takes Pyxle to a mean 8.5× its single-worker throughput across the suite — near-ideal use of all eight cores, where Hono and Express plateau at 3.4–3.7×. No load balancer, no shared state to configure.",
+    },
+    {
+        title: "Zero errors, and the losses in full",
+        desc: "The load generator runs on a separate box, so the harness can never cap the results — a same-box generator competes for the server's cores and compresses the field toward its own ceiling. Every cell was served with zero errors, zero timeouts, zero non-2xx — and the workloads Pyxle loses are printed at the same size as the wins.",
     },
 ];
 
@@ -144,11 +152,12 @@ const LH_SCORES = [
 /* ── shared page furniture ───────────────────────────────────── */
 
 const METHOD_ROWS = [
-    ["Tool", "autocannon v8"],
-    ["Duration", "10s per test, 3s warmup"],
-    ["Connections", "50 + 100 concurrent"],
-    ["Hardware", "AWS c7i.4xlarge (16 vCPU)"],
-    ["Workers", "16 per framework (native multi-process)"],
+    ["Generator", "oha v1.14 — on a separate box"],
+    ["Hardware", "2× AWS c7i.2xlarge (8 vCPU each)"],
+    ["Protocol", "100 connections · median of 3 reps"],
+    ["Duration", "10s per test, 5s warmup"],
+    ["Workers", "8 per framework (native multi-process)"],
+    ["Correctness", "0 errors · 0 non-2xx · 0 timeouts"],
 ];
 
 const noteLinkCls = 'focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2';
@@ -172,9 +181,11 @@ function Hero() {
                 <p className="mt-7 max-w-[58ch] text-pretty text-lg leading-[1.7] text-ink2">
                     Reproducible benchmarks comparing Pyxle against popular web frameworks —
                     every framework implements{' '}
-                    <span className="text-ink">identical endpoints</span> and runs its native
-                    multi-process production mode on the same 16-core machine. No cherry-picking,
-                    and the tests Pyxle loses are shown too.
+                    <span className="text-ink">identical endpoints</span> in its native
+                    multi-process production mode, measured from a{' '}
+                    <span className="text-ink">separate load-generator box</span> so the harness
+                    is never the ceiling. No cherry-picking, and the tests Pyxle loses are
+                    shown too.
                 </p>
             </div>
         </section>
@@ -201,15 +212,25 @@ function Method() {
                     ))}
                 </dl>
                 <p data-reveal className="mt-8 max-w-[68ch] text-pretty text-base leading-[1.7] text-ink2">
-                    Measured June 2026 on a dedicated EC2 instance (also measured at 50 connections,
-                    with consistent results). Every framework runs its native multi-process
-                    production mode at 16 workers: Pyxle via{' '}
-                    <code className="text-[0.9em] text-acct">pyxle serve --workers 16</code> with its
-                    full middleware stack, FastAPI and Django on uvicorn with 16 workers, Flask on
-                    gunicorn (16 gthread workers), Express and Hono on Node's cluster module, and
-                    Next.js as 16 clustered <code className="text-[0.9em] text-acct">next start</code>{' '}
-                    processes. Two full passes on the same box, plus a single-worker baseline pass.
-                    Database: SQLite (WAL), 1,000 pre-seeded rows.
+                    Measured June 2026 on two dedicated EC2 instances in the same subnet: all
+                    seven frameworks on one box, the load generator on the other, over the
+                    private network. Off-box generation is the point — a generator sharing the
+                    server's cores becomes the bottleneck and clips the fastest frameworks
+                    toward each other, so the chart ends up measuring the harness instead of
+                    the server. Keeping the generator on its own hardware is what makes the
+                    spread between frameworks real.
+                </p>
+                <p data-reveal className="mt-5 max-w-[68ch] text-pretty text-base leading-[1.7] text-ink2">
+                    Every framework runs its native multi-process production mode at 8 workers:
+                    Pyxle via <code className="text-[0.9em] text-acct">pyxle serve --workers 8</code>{' '}
+                    with its full middleware stack, FastAPI and Django on uvicorn (uvloop), Flask
+                    on gunicorn, Express and Hono on Node's cluster module, and Next.js as 8
+                    clustered <code className="text-[0.9em] text-acct">next start</code> processes.
+                    Endpoint parity is verified before every run — each framework must return an
+                    identical JSON shape (and equivalent SSR DOM) or the run aborts. A separate
+                    single-worker pass measures per-core throughput. Database: SQLite (WAL),
+                    1,000 pre-seeded rows. Versions: Pyxle 0.4.3, Hono 4.12, Express 5.2,
+                    Next.js 16.2 (React 19.2), FastAPI 0.136, Django 5.2, Flask 3.1, Node 20.20.
                 </p>
                 <p data-reveal className="mt-5 font-mono text-xs text-ink2">
                     Harness:{' '}
@@ -256,7 +277,7 @@ function SsrLedger() {
                 n="03"
                 eyebrow="Dynamic SSR"
                 title="Server-side rendering: faster than Next.js."
-                lead="The full page re-rendered on every request — the apples-to-apples match for Pyxle's @server loader and Next.js's force-dynamic. On byte-for-byte identical pages, both clustered to 16 workers, Pyxle is faster at every complexity — and an order of magnitude lower latency on heavy pages."
+                lead="The full page re-rendered on every request — the apples-to-apples match for Pyxle's @server loader and Next.js's force-dynamic. On equivalent pages (same data, same DOM, parity-verified), both clustered to 8 workers, Pyxle is 2.3–4.3× faster at every complexity — with lower median latency everywhere."
             />
             <div data-reveal className="mt-12 max-w-4xl overflow-x-auto">
                 <table className="w-full min-w-[40rem] border-collapse">
@@ -291,10 +312,13 @@ function SsrLedger() {
                 </table>
             </div>
             <p data-reveal className="mt-6 max-w-[78ch] font-mono text-xs leading-relaxed text-ink2">
-                At 100 concurrent connections; the advantage holds at 50 connections too (up to
-                3.4× on the landing page). Both frameworks render React on the server with full
-                HTML document assembly — Pyxle via a persistent Node.js worker pool, Next.js via
-                React Server Components. <strong className="font-semibold text-ink">The fair
+                At 100 concurrent connections. Both frameworks render React on the server with
+                full HTML document assembly — Pyxle via a persistent Node.js worker pool,
+                Next.js via React Server Components. The pages are equivalent, not
+                byte-identical: Next.js serializes the component tree into every response as
+                RSC hydration data, shipping 2–3× more bytes for the same DOM (landing page
+                4.7 KB vs 13.7 KB; 300-row table 144.5 KB vs 331.8 KB).{' '}
+                <strong className="font-semibold text-ink">The fair
                 caveat:</strong> this measures pages that <em>must</em> render per request
                 (personalized, authenticated, real-time). For genuinely static content both
                 frameworks serve from cache — and there Pyxle is faster too: prebuilt assets at{' '}
@@ -407,16 +431,15 @@ function ApiThroughput() {
                     <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">Reading these results</p>
                     <p className="mt-4 max-w-[68ch] text-pretty text-sm leading-[1.8] text-ink2">
                         Pyxle is a <strong className="font-semibold text-ink">full-stack framework</strong> serving
-                        these endpoints through its production middleware stack — yet it tops the
-                        table on JSON, POST, and every Python comparison. On the 20-query SQLite
-                        loop the synchronous multi-process frameworks pull ahead, because a tight
-                        loop of tiny blocking reads measures the database driver more than the
-                        framework — an honest, expected trade-off shown in full below.
+                        these endpoints through its production middleware stack — and it leads
+                        every Python framework on every test above except the single-row read,
+                        where FastAPI edges it by 2%. Its tails are the standout: p99 under 3 ms
+                        on JSON and POST, 6.5 ms with a single-row DB read.
                         {showAllFrameworks ? (
-                            <> Node.js frameworks (Express, Hono) benefit from V8's optimized HTTP pipeline and native C++ SQLite bindings (<code className="text-[0.9em] text-acct">better-sqlite3</code>) on the database tests, so cross-runtime comparisons there are inherently uneven — they're here for context, not as a like-for-like target.</>
+                            <> Across runtimes the picture is honest, not flattering: Hono's raw JSON and DB throughput is far ahead — per core, V8's optimized HTTP pipeline and native C++ SQLite bindings (<code className="text-[0.9em] text-acct">better-sqlite3</code>) lead — while Pyxle takes the POST test outright and holds far tighter tails on JSON, POST, and DB (p99 2.3–6.5 ms to Express's 15–17 ms). The DB rows measure the driver more than the framework; cross-runtime, they're context, not a like-for-like target.</>
                         ) : null}
                         {' '}The headline: you get SSR, server actions, and Python's whole ecosystem
-                        in one framework, <span className="text-ink">at the front of the pack on raw throughput</span>.
+                        in one framework, <span className="text-ink">at the front of the Python pack on raw throughput</span>.
                     </p>
                 </div>
                 <span className="gp-rule-x block h-px bg-rule" style={{ ['--rule-delay']: '120ms' }} aria-hidden="true" />
@@ -434,23 +457,23 @@ function Scaling() {
                 n="05"
                 eyebrow="Scaling"
                 title="One flag, every core."
-                lead="The same app on the same 16-core machine — the only change is the --workers flag. Pyxle runs an independent server process per core, with no load balancer and no shared state to configure."
+                lead="The same app on the same 8-core box — the only change is the --workers flag. Pyxle runs an independent server process per core, with no load balancer and no shared state to configure."
             />
             <div className="mt-12 max-w-3xl">
                 <p data-reveal className="flex items-center gap-3 border-t border-rule py-4 font-mono text-[13px] text-ink sm:text-sm">
                     <span className="select-none text-acct">$</span>
-                    <span>pyxle serve <span className="font-semibold text-acct">--workers 16</span></span>
-                    <span className="ml-auto"><CopyButton text="pyxle serve --workers 16" /></span>
+                    <span>pyxle serve <span className="font-semibold text-acct">--workers 8</span></span>
+                    <span className="ml-auto"><CopyButton text="pyxle serve --workers 8" /></span>
                 </p>
                 <dl>
                     {SCALING.map((row, i) => {
-                        const ratio = (row.sixteen / row.one).toFixed(1);
+                        const ratio = (row.eight / row.one).toFixed(1);
                         return (
                             <div key={row.test} data-reveal className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-t border-rule py-5" style={{ ['--reveal-delay']: `${i * 80}ms` }}>
                                 <dt className="text-sm text-ink2 sm:text-base">{row.test}</dt>
                                 <dd className="font-mono text-sm tabular-nums text-ink2">
                                     {row.one.toLocaleString()} <span aria-hidden="true">→</span>{' '}
-                                    <span className="text-acct">{row.sixteen.toLocaleString()}</span> req/s
+                                    <span className="text-acct">{row.eight.toLocaleString()}</span> req/s
                                     {' '}<span className="font-semibold text-ink">· {ratio}×</span>
                                 </dd>
                             </div>
@@ -458,8 +481,12 @@ function Scaling() {
                     })}
                 </dl>
                 <p data-reveal className="border-t border-rule pt-5 font-mono text-xs leading-relaxed text-ink2">
-                    1 worker → 16 workers, 100 concurrent connections. Median latency drops to
-                    0–2 ms across every endpoint. Requires Pyxle 0.4.3+.
+                    1 worker → 8 workers, 100 concurrent connections — a mean 8.5× across all six
+                    endpoint tests (FastAPI 7.3×, Flask 8.8×, Hono 3.7×, Express 3.4× on the same
+                    move). The multi-query tests scale past 8× because a single worker serializes
+                    its blocking SQLite reads; eight workers overlap them. Per core, the optimized Node
+                    runtimes still lead — scaling is how Pyxle puts whole machines to work, not a
+                    claim to the per-core crown. Requires Pyxle 0.4.3+.
                 </p>
             </div>
         </GpSection>
@@ -470,14 +497,14 @@ function Scaling() {
 
 const LOSSES = [
     {
-        title: "Heavy SQLite read loops",
-        numbers: <><span className="text-ink2">Express 23,973 · Hono 19,414 · Flask 12,189</span>{' '}<span className="text-ink2 opacity-70">vs</span>{' '}<span className="text-acct">Pyxle 6,549</span>{' '}<span className="text-[11px] text-ink2">req/s, 20 queries</span></>,
-        desc: "On a request that fires 20 SQLite reads in a loop, Node's synchronous C++ driver pulls ahead — and on this single test Flask and Next.js edge past Pyxle too. This measures the database driver more than the framework: a tight loop of tiny synchronous reads is where native bindings shine. On single reads and five-read pages, Pyxle already beats every other Python framework and Next.js.",
+        title: "Raw JSON and health-check throughput",
+        numbers: <><span className="text-ink2">Hono 224,530</span>{' '}<span className="text-ink2 opacity-70">vs</span>{' '}<span className="text-acct">Pyxle 56,545</span>{' '}<span className="text-[11px] text-ink2">req/s, JSON</span></>,
+        desc: "On endpoints that do almost no work, Hono — an ultralight Node framework with no SSR — is about 4× faster, and 3.2× on the bare health ping. Per core, V8's optimized HTTP pipeline simply leads — and an off-box harness is what keeps a gap like this visible instead of letting the generator's own ceiling flatten it. Pyxle's answer is the POST win, the 2–3 ms tails, and near-linear scaling, not a claim to the raw-JSON crown.",
     },
     {
-        title: "The bare health-check ping",
-        numbers: <><span className="text-ink2">Hono 85,489</span>{' '}<span className="text-ink2 opacity-70">vs</span>{' '}<span className="text-acct">Pyxle 80,986</span>{' '}<span className="text-[11px] text-ink2">req/s</span></>,
-        desc: "On the absolute-minimum endpoint — return a static status object with no work — Hono, an ultralight Node framework with no SSR, edges Pyxle by ~5%. It's the closest race on the board, and the moment the endpoint does anything real (JSON, a POST, a render) Pyxle is level or ahead. We print it because it's a loss, however small.",
+        title: "Raw database reads",
+        numbers: <><span className="text-ink2">Hono 169,874 · Express 40,780 · FastAPI 28,491</span>{' '}<span className="text-ink2 opacity-70">vs</span>{' '}<span className="text-acct">Pyxle 27,932</span>{' '}<span className="text-[11px] text-ink2">req/s, single row</span></>,
+        desc: "Node's native better-sqlite3 bindings dominate single-row SQLite reads — and FastAPI edges Pyxle by 2% there too. Add real work and Pyxle moves back ahead of every Python framework (21,566 req/s on the five-query page to FastAPI's 18,434), but the single-read crown belongs to the native drivers.",
     },
 ];
 
@@ -488,7 +515,7 @@ function Disclosure() {
                 n="06"
                 eyebrow="Full disclosure"
                 title="Where Pyxle loses."
-                lead="A benchmark page that only shows wins is an ad. Same machine, same run — these are the two workloads where Pyxle is still not the fastest choice today."
+                lead="A benchmark page that only shows wins is an ad. Same boxes, same run — these are the workloads where Pyxle is not the fastest choice today."
             />
             <div className="mt-12 max-w-3xl">
                 {LOSSES.map((l, i) => (
@@ -578,7 +605,7 @@ function Reproduce() {
                 n="08"
                 eyebrow="Reproduce"
                 title="Run them yourself."
-                lead="All benchmark code is open source — the endpoint implementations, the Next.js apps, and the SSR test pages included. Two commands reproduce everything on your own hardware."
+                lead="All benchmark code is open source — the endpoint implementations, the Next.js apps, the parity checks, and the SSR test pages. Two commands give you the quick run on your own hardware."
             />
             <div className="mt-10 max-w-3xl">
                 <ol className="border-t border-rule">
@@ -590,6 +617,15 @@ function Reproduce() {
                         </li>
                     ))}
                 </ol>
+                <p data-reveal className="mt-6 font-mono text-xs leading-relaxed text-ink2">
+                    The quick run keeps the generator on your own machine — fine for relative
+                    standings, but absolute numbers read low because the generator shares the
+                    CPU. The published numbers use the two-box flow:{' '}
+                    <code className="text-ink">./bench.sh --serve-only --workers=auto</code> on the
+                    server box, <code className="text-ink">./bench.sh --generate-only
+                    --target=&lt;server-ip&gt; --suite=all</code> on the client box. The README
+                    documents it step by step.
+                </p>
             </div>
             <div data-reveal className="mt-10 flex flex-wrap items-center gap-5">
                 <InkButton href="https://github.com/pyxle-dev/benchmarks" external>View benchmark source ↗</InkButton>
@@ -609,7 +645,7 @@ export default function BenchmarksPage({ data }) {
         <>
             <Head>
                 <title>Benchmarks - Pyxle Framework</title>
-                <meta name="description" content="Honest, reproducible benchmarks on a 16-core EC2 box — Pyxle vs FastAPI, Django, Flask, Express, Hono, and Next.js. 2.7× Next.js at dynamic SSR; fastest of all 7 on form POSTs." />
+                <meta name="description" content="Honest, reproducible benchmarks with off-box load generation — Pyxle vs FastAPI, Django, Flask, Express, Hono, and Next.js. Fastest Python framework tested, #1 of 7 on form POST, 2.3–4.3× Next.js at dynamic SSR." />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <meta name="theme-color" content="#101411" />
                 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
