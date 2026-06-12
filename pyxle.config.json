@@ -12,7 +12,9 @@
   "cache": {
     "/": 60,
     "/benchmarks": 3600,
-    "/docs/*": 1800
+    "/docs/*": 1800,
+    "/plugins": 1800,
+    "/roadmap": 1800
   },
   "csrf": {
     "exemptPaths": [

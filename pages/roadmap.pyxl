@@ -1,0 +1,259 @@
+@server
+async def load_roadmap(request):
+    from pyxle import __version__
+    return {"version": __version__}
+
+
+import React, { useEffect, useRef } from 'react';
+import { Head } from 'pyxle/client';
+import {
+    useScrollReveal, EditorialLink, InkButton,
+    GpSection, GpHead, GalleyFooter,
+} from './components/galley.jsx';
+
+/* ════════════════════════════════════════════════════════════════
+   GALLEY PROOF — /roadmap, set as a print run in progress. One ink
+   line draws itself down the page as you scroll: solid through what
+   shipped, pulsing where the press is running, hollow into what's
+   ahead. Every shipped entry cites a real release.
+   ════════════════════════════════════════════════════════════════ */
+
+export const slots = {
+    'nav-extra': () => (
+        <a
+            href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/roadmap.pyxl"
+            target="_blank"
+            rel="noreferrer"
+            title="View this page's source"
+            className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
+        >
+            source ↗
+        </a>
+    ),
+};
+export const createSlots = () => slots;
+
+/* ── content ─────────────────────────────────────────────────── */
+
+const ERAS = [
+    {
+        n: '01',
+        id: 'shipped',
+        eyebrow: 'Printed',
+        title: 'What already shipped.',
+        lead: 'Every entry below is released, documented, and running in production — most of it on this very site.',
+        status: 'shipped',
+        items: [
+            ['The one-file core', 'The .pyxl format: async loader, server actions, and the React component in a single file — server-rendered, hydrated, hot-reloading, file-based routing.', 'v0.1 → 0.2'],
+            ['A Django-style plugin system', 'Declare plugins in pyxle.config.json; they wire services, middleware, and their own schema at startup. WebSocket endpoints and the client navigation cache landed in the same release.', 'v0.3'],
+            ['The production story', 'Edge caching with per-route TTLs, sanitized production errors, layout loaders, and a faster static path.', 'v0.4.0'],
+            ['A dev server that keeps up', 'Route-shape changes — new pages, renamed loaders, layout moves — apply live, without restarts or cache-clearing rituals.', 'v0.4.2'],
+            ['Benchmarks in the open', 'Reproducible two-box benchmarks against six frameworks, load generator on its own hardware, losses shown alongside wins.', 'site'],
+            ['A security wave', 'HEAD output rebuilt through a sanitising allowlist, CSRF exemptions matched on path boundaries, oversized form posts failing loud.', 'v0.4.3'],
+            ['Multi-core serving', 'pyxle serve --workers N: independent server processes per core, sync endpoints threadpooled, small assets served from memory. This site runs it.', 'v0.4.3'],
+            ['Official plugins on PyPI', 'pyxle-db (SQLite, PostgreSQL, MySQL behind one explicit-SQL API) and pyxle-auth (argon2id sessions, RBAC, API tokens) — every claim enforced against live database servers in CI.', 'plugins 0.2'],
+        ],
+    },
+    {
+        n: '02',
+        id: 'in-motion',
+        eyebrow: 'On the press',
+        title: 'In motion right now.',
+        lead: 'Started, public, and moving — these have pages you can act on today.',
+        status: 'now',
+        items: [
+            ['The Founding Plugin Program', 'Five permanent slots in the plugin directory, reserved for the first community plugins that meet the published standards. The bar is public; the race is to the bar, not to the submit button.', '/plugins', 'Claim a slot'],
+            ['RFC: plugin routes & pages', 'The Phase B design discussion is open — how plugins will ship their own API endpoints, then whole pages. Founding authors co-design it.', '/docs/plugins/rfc-plugin-pages', 'Read the RFC'],
+        ],
+    },
+    {
+        n: '03',
+        id: 'ahead',
+        eyebrow: 'The next pull',
+        title: 'Where this is going.',
+        lead: 'Planned and intended, in rough order — undated on purpose. When something here starts moving, it moves up a section.',
+        status: 'planned',
+        items: [
+            ['Plugins ship API routes (Phase B1)', 'pyxle-auth providing its own sign-in endpoints out of the box; webhook plugins owning their URLs with the right CSRF posture.'],
+            ['Plugins ship pages (Phase B2)', 'Sign-in screens, dashboards — and the admin-panel moment this framework should eventually have.'],
+            ['The ecosystem quests', 'Mail, storage, jobs, observability — the plugins the ideas page calls for, built by the community or by us.', '/docs/plugins/ideas', 'Browse the ideas'],
+            ['TypeScript across the boundary', 'Write .tsx in your .pyxl, and get loader-data types generated from the Python side — the request that comes up most, answered end to end.'],
+            ['Validated actions', 'Type-hint a Pydantic model on an @action and get parsing, validation, and clean 422s for free — Python-native, FastAPI-familiar.'],
+            ['Streaming SSR', 'renderToPipeableStream under the hood: Suspense boundaries in .pyxl, a loading.pyxl convention, first paint before the slowest loader finishes.'],
+            ['Static generation & ISR', 'pyxle build --static for pages that never change, per-route revalidation for the ones that rarely do — serve stale, re-render in the background.'],
+            ['The debugger — pyxle studio', 'A local dashboard that shows the app the way the framework sees it: every route with its loaders and actions, fire test requests at them, watch cache state, and an overlay that maps any element on screen back to the .pyxl that rendered it.'],
+            ['Deeper editor tooling', 'Diagnostics, completions, and go-to-definition that cross the Python↔JSX boundary; pyxle check growing into a real linter.'],
+            ['The Pyxle blog', 'Engineering notes and honest write-ups — how the SSR pool works, what the benchmarks taught us, what broke.'],
+            ['1.0 — the stability line', 'The release where minor versions stop being allowed to break you. It lands when the plugin API has proven itself, not on a date.'],
+            ['Pyxle Cloud', 'Managed hosting from the people who write the framework: push a Pyxle app and skip the server story entirely — with AI scaffolding in the mix. In development; the newsletter hears it first.', '/#start', 'Be first to know'],
+        ],
+    },
+];
+
+/* ── timeline machinery ──────────────────────────────────────── */
+
+function useInkLine(wrapRef, inkRef) {
+    useEffect(() => {
+        const wrap = wrapRef.current;
+        const ink = inkRef.current;
+        if (!wrap || !ink) return;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            ink.style.transform = 'scaleY(1)';
+            return;
+        }
+        let raf = 0;
+        const update = () => {
+            raf = 0;
+            const r = wrap.getBoundingClientRect();
+            // The ink front sits ~70% down the viewport, like a reader's eye.
+            const p = Math.min(1, Math.max(0, (window.innerHeight * 0.7 - r.top) / r.height));
+            ink.style.transform = `scaleY(${p})`;
+        };
+        const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+        update();
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onScroll, { passive: true });
+        return () => {
+            window.removeEventListener('scroll', onScroll);
+            window.removeEventListener('resize', onScroll);
+            if (raf) cancelAnimationFrame(raf);
+        };
+    }, [wrapRef, inkRef]);
+}
+
+function Dot({ status }) {
+    const base = 'rm-dot absolute -left-[5px] top-[0.45em] h-[11px] w-[11px] rounded-full border-2';
+    if (status === 'shipped') return <span aria-hidden="true" className={`${base} rm-dot--shipped border-rule bg-paper`} />;
+    if (status === 'now') return <span aria-hidden="true" className={`${base} rm-dot--now border-rule bg-paper`} />;
+    return <span aria-hidden="true" className={`${base} border-dashed border-rule bg-paper`} />;
+}
+
+function Milestone({ item, status, index }) {
+    const [title, body, tagOrHref, linkLabel] = item;
+    const isLink = typeof tagOrHref === 'string' && tagOrHref.startsWith('/');
+    return (
+        <li data-reveal className="relative pb-10 pl-9 last:pb-2 sm:pl-12" style={{ ['--reveal-delay']: `${Math.min(index, 4) * 70}ms` }}>
+            <Dot status={status} />
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                <h3 className="font-display text-[1.35rem] font-[540] leading-snug text-ink">{title}</h3>
+                {!isLink && tagOrHref && (
+                    <span className="rounded-full border border-rule px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink2">{tagOrHref}</span>
+                )}
+                {status === 'now' && (
+                    <span className="rounded-full border border-accent px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-acct">live</span>
+                )}
+            </div>
+            <p className="mt-2 max-w-[58ch] text-pretty text-[15px] leading-[1.7] text-ink2">{body}</p>
+            {isLink && (
+                <div className="mt-3">
+                    <EditorialLink href={tagOrHref}>{linkLabel} →</EditorialLink>
+                </div>
+            )}
+        </li>
+    );
+}
+
+function Timeline() {
+    const wrapRef = useRef(null);
+    const inkRef = useRef(null);
+    useInkLine(wrapRef, inkRef);
+
+    return (
+        <div ref={wrapRef} className="relative mx-auto max-w-[76rem] px-5 sm:px-8">
+            <div className="relative lg:ml-16">
+                {/* the rule the run is printed on, and the ink that fills it */}
+                <span aria-hidden="true" className="absolute bottom-0 left-0 top-0 w-px bg-rule" />
+                <span ref={inkRef} aria-hidden="true" className="rm-ink absolute bottom-0 left-0 top-0 w-px bg-accent" />
+                {ERAS.map((era) => (
+                    <section key={era.id} id={era.id} className="gp-cv relative pb-16 pt-16 first:pt-20 sm:pb-20">
+                        <div className="pl-9 sm:pl-12">
+                            <GpHead n={era.n} eyebrow={era.eyebrow} title={era.title} lead={era.lead} />
+                        </div>
+                        <ol className="mt-12">
+                            {era.items.map((item, i) => (
+                                <Milestone key={item[0]} item={item} status={era.status} index={i} />
+                            ))}
+                        </ol>
+                    </section>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/* ── Hero ────────────────────────────────────────────────────── */
+
+function Hero() {
+    return (
+        <section className="relative">
+            <div className="mx-auto max-w-[76rem] px-5 pb-10 pt-28 sm:px-8 sm:pb-14 sm:pt-36">
+                <p className="font-mono text-xs uppercase tracking-[0.14em] text-ink2">
+                    The print run
+                </p>
+                <h1 className="mt-5 font-display text-[2.9rem] font-[560] leading-[1.04] tracking-[-0.015em] text-ink sm:text-[4.2rem] lg:text-[5.2rem]">
+                    Proofed, pressed,
+                    <br />
+                    and&nbsp;ahead<span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
+                    <span className="sr-only">.</span>
+                </h1>
+                <p className="mt-7 max-w-[58ch] text-pretty text-lg leading-[1.7] text-ink2">
+                    What shipped, what's on the press, and what's queued for the next
+                    pull — every finished line cites its release, and nothing ahead
+                    carries a date it can't keep.
+                </p>
+            </div>
+        </section>
+    );
+}
+
+function Closing() {
+    return (
+        <GpSection n="04" id="join" wide>
+            <div className="mx-auto max-w-2xl text-center">
+                <h2 className="font-display text-[2rem] font-[540] leading-[1.1] text-ink sm:text-[2.4rem]">
+                    <span className="gp-lm"><span>The fastest way to move this page.</span></span>
+                </h2>
+                <p className="mx-auto mt-5 max-w-[52ch] text-base leading-[1.7] text-ink2">
+                    The items in motion are community-shaped: a founding plugin slot,
+                    or a comment on the Phase B RFC, moves the roadmap more than
+                    anything else you could do today.
+                </p>
+                <div className="mt-9 flex flex-wrap items-center justify-center gap-5">
+                    <InkButton href="/plugins">Claim a founding slot</InkButton>
+                    <EditorialLink href="/docs/plugins/rfc-plugin-pages">Comment on the RFC</EditorialLink>
+                </div>
+            </div>
+        </GpSection>
+    );
+}
+
+/* ── Page ────────────────────────────────────────────────────── */
+
+export default function RoadmapPage({ data }) {
+    const { version } = data;
+    useScrollReveal();
+
+    return (
+        <>
+            <Head>
+                <title>Roadmap - Pyxle Framework</title>
+                <meta name="description" content="The Pyxle roadmap, typeset as a print run: what shipped (with releases cited), what's in motion — the Founding Plugin Program and the Phase B RFC — and what's queued, undated on purpose." />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <meta name="theme-color" content="#101411" />
+                <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+                <meta property="og:title" content="Pyxle Roadmap - proofed, pressed, and ahead" />
+                <meta property="og:description" content="What shipped, what's on the press, and what's next for Pyxle." />
+                <meta property="og:image" content="https://pyxle.dev/branding/og-default.png" />
+                <meta property="og:type" content="website" />
+                <meta name="twitter:card" content="summary_large_image" />
+                <meta name="twitter:image" content="https://pyxle.dev/branding/og-default.png" />
+            </Head>
+            <main id="main">
+                <Hero />
+                <Timeline />
+                <Closing />
+            </main>
+            <GalleyFooter version={version} />
+        </>
+    );
+}

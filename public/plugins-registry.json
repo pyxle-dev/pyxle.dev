@@ -1,0 +1,22 @@
+{
+  "founding_slots_total": 5,
+  "official": [
+    {
+      "name": "pyxle-db",
+      "description": "One explicit-SQL API over SQLite, PostgreSQL, and MySQL — portable placeholders, a uniform Row, checksum-tracked migrations, and the DatabaseLike contract other plugins build on.",
+      "pypi": "https://pypi.org/project/pyxle-db/",
+      "docs": "/docs/plugins/pyxle-db",
+      "repo": "https://github.com/pyxle-dev/pyxle-plugins",
+      "tags": ["database", "sqlite", "postgresql", "mysql"]
+    },
+    {
+      "name": "pyxle-auth",
+      "description": "Email + password accounts on argon2id — sliding sessions, password-reset and verification flows, wildcard RBAC, scoped API tokens, and request guards. Fail-secure by default.",
+      "pypi": "https://pypi.org/project/pyxle-auth/",
+      "docs": "/docs/plugins/pyxle-auth",
+      "repo": "https://github.com/pyxle-dev/pyxle-plugins",
+      "tags": ["auth", "sessions", "rbac", "tokens"]
+    }
+  ],
+  "community": []
+}

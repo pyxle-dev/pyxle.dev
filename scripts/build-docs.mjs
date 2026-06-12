@@ -80,6 +80,9 @@ const NAV_STRUCTURE = [
     items: [
       { file: "plugins/pyxle-db.md", slug: "pyxle-db" },
       { file: "plugins/pyxle-auth.md", slug: "pyxle-auth" },
+      { file: "plugins/standards.md", slug: "standards" },
+      { file: "plugins/ideas.md", slug: "ideas" },
+      { file: "plugins/rfc-plugin-pages.md", slug: "rfc-plugin-pages" },
     ],
   },
   {
@@ -157,10 +160,26 @@ const SEARCH_KEYWORDS = {
   "reference/client-api": ["client api", "hooks", "useaction", "link", "navigate", "form", "head"],
   "plugins/pyxle-db": ["database", "db", "sqlite", "postgres", "postgresql", "mysql", "sql", "orm", "migrations", "transactions", "rows", "placeholders", "pool"],
   "plugins/pyxle-auth": ["auth", "authentication", "login", "sign in", "sessions", "password", "users", "rbac", "permissions", "roles", "api tokens", "bearer", "argon2", "password reset", "email verification", "rate limit", "guards"],
+  "plugins/standards": ["plugin standards", "directory", "submit plugin", "community plugin", "review", "founding", "quality bar", "naming"],
+  "plugins/ideas": ["plugin ideas", "build a plugin", "mail", "email", "storage", "s3", "cache", "redis", "sentry", "stripe", "payments", "jobs", "queue", "feature flags", "oauth", "search"],
+  "plugins/rfc-plugin-pages": ["rfc", "phase b", "plugin pages", "plugin routes", "admin", "roadmap", "contribute routes"],
   "architecture/README": ["architecture", "handbook", "internals", "how it works", "design"],
   "changelog": ["changelog", "release notes", "whats new", "what's new", "updates", "versions", "0.4.0"],
   "faq": ["faq", "questions", "help", "troubleshooting", "common questions"],
 };
+
+// Site pages (non-docs routes) that docs prose may link to with a
+// root-relative href. The renderer validates against this list — a typo'd
+// site link fails the build like a broken .md link — and the sitemap is
+// generated from the same array, so it can't drift either.
+const SITE_PAGES = [
+  { path: "/", priority: "1.0" },
+  { path: "/docs", priority: "0.9" },
+  { path: "/playground", priority: "0.8" },
+  { path: "/plugins", priority: "0.8" },
+  { path: "/roadmap", priority: "0.8" },
+  { path: "/benchmarks", priority: "0.7" },
+];
 
 // ── Markdown processing ─────────────────────────────────────────────
 
@@ -345,7 +364,15 @@ function processMarkdown(md, sourceAbsPath, srcUrlByAbsPath) {
       return `<a href="/docs/${docPath}${anchor}"${titleAttr}>${text}</a>`;
     }
 
-    // (4) Any other internal link — a directory reference, an absolute
+    // (4) Root-relative link to a known SITE page (/plugins, /benchmarks…).
+    // Rendered as-is: same tab, client-router handled. Unknown root paths
+    // fall through to (5) and fail the build.
+    const sitePath = (href.split('#')[0] || '').replace(/\/$/, '') || '/';
+    if (href.startsWith('/') && SITE_PAGES.some((p) => p.path === sitePath)) {
+      return `<a href="${href}"${titleAttr}>${text}</a>`;
+    }
+
+    // (5) Any other internal link — a directory reference, an absolute
     // `/docs/...` path, or an extensionless relative link. These 404 on the
     // site (categories have no index page). Record so build() rejects it.
     outboundLinks.push({ kind: 'bad-internal', href, text });
@@ -622,12 +649,7 @@ function build() {
   // the sitemap can never drift from the site again. Hand-edits to
   // public/sitemap.xml will be overwritten by the next docs build.
   const SITE_URL = "https://pyxle.dev";
-  const STATIC_PAGES = [
-    { path: "/", priority: "1.0" },
-    { path: "/docs", priority: "0.9" },
-    { path: "/playground", priority: "0.8" },
-    { path: "/benchmarks", priority: "0.7" },
-  ];
+  const STATIC_PAGES = SITE_PAGES;
   const CATEGORY_PRIORITY = {
     "getting-started": "0.9",
     "core-concepts": "0.8",

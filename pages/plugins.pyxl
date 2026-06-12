@@ -1,0 +1,265 @@
+@server
+async def load_plugins_page(request):
+    import json
+    import os
+    from pathlib import Path
+
+    from pyxle import __version__
+
+    registry_path = Path(os.getcwd()) / "public" / "plugins-registry.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    return {"version": __version__, "registry": registry}
+
+
+import React from 'react';
+import { Head } from 'pyxle/client';
+import {
+    useScrollReveal, CopyButton, InkButton, EditorialLink,
+    GpSection, GpHead, GalleyFooter,
+} from './components/galley.jsx';
+
+/* ════════════════════════════════════════════════════════════════
+   GALLEY PROOF — /plugins, set as a printer's specimen book: the
+   official plates first, then five reserved pages for the founding
+   authors. The empty slots ARE the page — scarcity, typeset.
+   ════════════════════════════════════════════════════════════════ */
+
+export const slots = {
+    'nav-extra': () => (
+        <a
+            href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/plugins.pyxl"
+            target="_blank"
+            rel="noreferrer"
+            title="View this page's source"
+            className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
+        >
+            source ↗
+        </a>
+    ),
+};
+export const createSlots = () => slots;
+
+const SUBMIT_URL = 'https://github.com/pyxle-dev/pyxle-plugins/issues/new?template=submit-plugin.yml';
+
+/* ── Hero ────────────────────────────────────────────────────── */
+
+function Hero() {
+    return (
+        <section className="relative">
+            <div className="mx-auto max-w-[76rem] px-5 pb-14 pt-28 sm:px-8 sm:pb-20 sm:pt-36">
+                <p className="font-mono text-xs uppercase tracking-[0.14em] text-ink2">
+                    The ecosystem
+                </p>
+                <h1 className="mt-5 font-display text-[2.9rem] font-[560] leading-[1.04] tracking-[-0.015em] text-ink sm:text-[4.2rem] lg:text-[5.2rem]">
+                    Built to be
+                    <br />
+                    built&nbsp;on<span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
+                    <span className="sr-only">.</span>
+                </h1>
+                <p className="mt-7 max-w-[58ch] text-pretty text-lg leading-[1.7] text-ink2">
+                    Pyxle plugins are one config line: declare them in{' '}
+                    <span className="font-mono text-[0.92em] text-ink">pyxle.config.json</span>{' '}
+                    and they wire themselves at startup. Two official plugins ship today —
+                    and <span className="text-ink">five founding slots</span> in this
+                    directory are reserved for the community.
+                </p>
+            </div>
+        </section>
+    );
+}
+
+/* ── 01 · Official plugins ───────────────────────────────────── */
+
+function PluginCard({ plugin, badge, delay }) {
+    return (
+        <div
+            data-reveal
+            style={{ ['--reveal-delay']: `${delay}ms` }}
+            className="flex h-full flex-col rounded-[10px] border border-rule bg-paper p-6"
+        >
+            <div className="flex items-baseline justify-between gap-4">
+                <h3 className="font-mono text-[15px] font-semibold text-ink">{plugin.name}</h3>
+                <span className="rounded-full border border-rule px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink2">{badge}</span>
+            </div>
+            <p className="mt-3 flex-1 text-pretty text-[15px] leading-[1.65] text-ink2">{plugin.description}</p>
+            <div className="mt-5 flex items-center justify-between gap-3 rounded-[6px] bg-plate px-3.5 py-2.5">
+                <code className="truncate font-mono text-[12.5px] text-[#D7DCD4]">pip install {plugin.name}</code>
+                <CopyButton text={`pip install ${plugin.name}`} />
+            </div>
+            <div className="mt-4 flex gap-5">
+                <EditorialLink href={plugin.docs}>Docs</EditorialLink>
+                <EditorialLink href={plugin.pypi} external>PyPI</EditorialLink>
+                <EditorialLink href={plugin.repo} external>Source</EditorialLink>
+            </div>
+        </div>
+    );
+}
+
+function Official({ registry }) {
+    return (
+        <GpSection n="01" id="official">
+            <GpHead
+                n="01"
+                eyebrow="Official"
+                title="The plugins Pyxle ships."
+                lead="Built and maintained by the core team, held to the same standards we ask of everyone — tested against real PostgreSQL and MySQL servers in CI, fail-secure by default, honest about scope."
+            />
+            <div className="mt-12 grid gap-6 md:grid-cols-2">
+                {registry.official.map((p, i) => (
+                    <PluginCard key={p.name} plugin={p} badge="official" delay={i * 80} />
+                ))}
+            </div>
+        </GpSection>
+    );
+}
+
+/* ── 02 · The Founding Five ──────────────────────────────────── */
+
+const OFFER_ROWS = [
+    ['The badge', 'A permanent Founding Plugin mark in this directory — it never expires'],
+    ['The spotlight', 'A featured slot on this page and a launch write-up from the official account'],
+    ['The review', 'Direct code review and pairing from the core team while you build'],
+    ['The seat', 'Co-design input on Phase B — the plugin pages & routes API — before it ships'],
+];
+
+function FoundingSlot({ entry, index }) {
+    if (entry) {
+        return (
+            <div data-reveal className="rounded-[10px] border border-rule bg-paper p-6" style={{ ['--reveal-delay']: `${index * 60}ms` }}>
+                <div className="flex items-baseline justify-between gap-4">
+                    <h3 className="font-mono text-[15px] font-semibold text-ink">{entry.name}</h3>
+                    <span className="rounded-full border border-accent px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-acct">founding</span>
+                </div>
+                <p className="mt-3 text-[15px] leading-[1.65] text-ink2">{entry.description}</p>
+                <div className="mt-4 flex gap-5">
+                    {entry.docs && <EditorialLink href={entry.docs} external={entry.docs.startsWith('http')}>Docs</EditorialLink>}
+                    {entry.pypi && <EditorialLink href={entry.pypi} external>PyPI</EditorialLink>}
+                    {entry.repo && <EditorialLink href={entry.repo} external>Source</EditorialLink>}
+                </div>
+            </div>
+        );
+    }
+    return (
+        <div
+            data-reveal
+            style={{ ['--reveal-delay']: `${index * 60}ms` }}
+            className="flex min-h-[150px] flex-col justify-between rounded-[10px] border border-dashed border-rule p-6"
+        >
+            <span className="font-mono text-xs uppercase tracking-[0.14em] text-press">
+                Founding slot {String(index + 1).padStart(2, '0')}
+            </span>
+            <p className="font-mono text-[13px] text-ink2">
+                Reserved<span className="text-acct">.</span> Could be yours.
+            </p>
+        </div>
+    );
+}
+
+function Founding({ registry }) {
+    const total = registry.founding_slots_total ?? 5;
+    const slotEntries = Array.from({ length: total }, (_, i) => registry.community[i] ?? null);
+    const taken = registry.community.length;
+
+    return (
+        <GpSection n="02" id="founding">
+            <GpHead
+                n="02"
+                eyebrow="The Founding Five"
+                title="Five slots. First to the bar, not first to submit."
+                lead={`The first ${total} community plugins that meet the published standards join this directory as Founding Plugins — permanently. ${taken === 0 ? 'All five slots are open.' : `${total - taken} of ${total} slots remain.`}`}
+            />
+            <div className="mt-12 max-w-3xl">
+                <dl className="border-t border-rule">
+                    {OFFER_ROWS.map(([k, v], i) => (
+                        <div key={k} data-reveal className="flex flex-col gap-1 border-b border-rule py-3.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6" style={{ ['--reveal-delay']: `${i * 60}ms` }}>
+                            <dt className="shrink-0 font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">{k}</dt>
+                            <dd className="text-[14px] leading-relaxed text-ink sm:text-right">{v}</dd>
+                        </div>
+                    ))}
+                </dl>
+            </div>
+            <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {slotEntries.map((entry, i) => (
+                    <FoundingSlot key={i} entry={entry} index={i} />
+                ))}
+            </div>
+            <p className="mt-6 max-w-[60ch] font-mono text-xs leading-relaxed text-ink2">
+                Community plugins are listed under their author's name and are not
+                security-audited by the Pyxle team. The bar is public; reviews are honest.
+            </p>
+        </GpSection>
+    );
+}
+
+/* ── 03 · Build one ──────────────────────────────────────────── */
+
+const STEPS = [
+    ['Pick a quest', 'The ideas page lists plugins the ecosystem needs, scoped to what the plugin API supports today — each with the contract it builds against and an honest size estimate.', '/docs/plugins/ideas', 'Browse plugin ideas'],
+    ['Clear the bar', 'The standards are published and finite: packaging, behaviour, testing, security, maintenance. The official plugins are the reference implementation of every rule.', '/docs/plugins/standards', 'Read the standards'],
+    ['Submit it', 'Open a submission issue — early is better, so the slot is visibly claimed and review can happen while you build instead of after.', SUBMIT_URL, 'Open a submission'],
+];
+
+function BuildOne() {
+    return (
+        <GpSection n="03" id="build">
+            <GpHead
+                n="03"
+                eyebrow="Build one"
+                title="Three steps to a founding slot."
+                lead="Today plugins contribute services and middleware — database layers, mailers, storage, observability. Pages and routes are next: the Phase B RFC is open, and founding authors help design it."
+            />
+            <ol className="mt-12 max-w-3xl space-y-0 border-t border-rule">
+                {STEPS.map(([title, body, href, label], i) => (
+                    <li key={title} data-reveal className="border-b border-rule py-7" style={{ ['--reveal-delay']: `${i * 70}ms` }}>
+                        <div className="flex items-baseline gap-5">
+                            <span className="font-mono text-sm text-press">{String(i + 1).padStart(2, '0')}</span>
+                            <div>
+                                <h3 className="font-display text-xl font-[540] text-ink">{title}</h3>
+                                <p className="mt-2 max-w-[56ch] text-[15px] leading-[1.7] text-ink2">{body}</p>
+                                <div className="mt-3">
+                                    <EditorialLink href={href} external={href.startsWith('http')}>{label} →</EditorialLink>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                ))}
+            </ol>
+            <div className="mt-12 flex flex-wrap items-center gap-5">
+                <InkButton href={SUBMIT_URL} external>Claim a founding slot</InkButton>
+                <EditorialLink href="/docs/plugins/rfc-plugin-pages">Read the Phase B RFC</EditorialLink>
+            </div>
+        </GpSection>
+    );
+}
+
+/* ── Page ────────────────────────────────────────────────────── */
+
+export default function PluginsPage({ data }) {
+    const { version, registry } = data;
+    useScrollReveal();
+
+    return (
+        <>
+            <Head>
+                <title>Plugins - Pyxle Framework</title>
+                <meta name="description" content="The Pyxle plugin directory: official plugins (pyxle-db, pyxle-auth) and five reserved founding slots for the community. Build a plugin that meets the published standards and claim one — permanently." />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <meta name="theme-color" content="#101411" />
+                <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+                <meta property="og:title" content="Pyxle Plugins - The Founding Five" />
+                <meta property="og:description" content="Five founding slots in the official plugin directory, reserved for the first community plugins that meet the bar." />
+                <meta property="og:image" content="https://pyxle.dev/branding/og-default.png" />
+                <meta property="og:type" content="website" />
+                <meta name="twitter:card" content="summary_large_image" />
+                <meta name="twitter:image" content="https://pyxle.dev/branding/og-default.png" />
+            </Head>
+            <main id="main">
+                <Hero />
+                <Official registry={registry} />
+                <Founding registry={registry} />
+                <BuildOne />
+            </main>
+            <GalleyFooter version={version} />
+        </>
+    );
+}

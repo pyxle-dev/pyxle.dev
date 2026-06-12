@@ -217,9 +217,9 @@ export function GpHead({ n, eyebrow, title, lead }) {
    link columns and the typeset credit line. One per page. ──────── */
 
 const FOOTER_COLS = [
-    { h: 'Framework', links: [['Docs', '/docs'], ['Playground', '/playground'], ['Benchmarks', '/benchmarks'], ['FAQ', '/docs/faq']] },
+    { h: 'Framework', links: [['Docs', '/docs'], ['Playground', '/playground'], ['Plugins', '/plugins'], ['Benchmarks', '/benchmarks'], ['FAQ', '/docs/faq']] },
     { h: 'Learn', links: [['Getting started', '/docs/getting-started/installation'], ['Server actions', '/docs/core-concepts/server-actions'], ['For AI agents', '/docs/guides/for-ai-agents']] },
-    { h: 'Project', links: [['GitHub', 'https://github.com/pyxle-dev/pyxle', true], ['Releases', 'https://github.com/pyxle-dev/pyxle/releases', true], ['Issues', 'https://github.com/pyxle-dev/pyxle/issues', true]] },
+    { h: 'Project', links: [['Roadmap', '/roadmap'], ['GitHub', 'https://github.com/pyxle-dev/pyxle', true], ['Releases', 'https://github.com/pyxle-dev/pyxle/releases', true], ['Issues', 'https://github.com/pyxle-dev/pyxle/issues', true]] },
 ];
 
 export function GalleyFooter({ version }) {
