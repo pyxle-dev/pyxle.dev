@@ -9,8 +9,52 @@
         text-rendering: optimizeLegibility;
     }
 
+    /* Metric-compatible local fallbacks so the webfont swap causes no CLS. */
+    @font-face {
+        font-family: 'FrauncesFallback';
+        src: local('Georgia');
+        size-adjust: 102%;
+        ascent-override: 96%;
+    }
+    @font-face {
+        font-family: 'SchibstedFallback';
+        src: local('Helvetica Neue'), local('Arial');
+        size-adjust: 100.5%;
+    }
+
+    /* ── Galley Proof theme tokens ─────────────────────────────────
+       Light = "Paper" (warm paper + ink), dark = "Ink" (the same page
+       printed on green-cast near-black stock). Emerald is punctuation,
+       never wallpaper; ochre is the proofreader's second ink. */
+    :root {
+        --c-paper:        #FAF9F4;
+        --c-ink:          #151915;
+        --c-ink2:         #565D54;
+        --c-rule:         #E3E1D6;
+        --c-accent:       #059669;  /* drawn strokes, marks            */
+        --c-accent-text:  #047857;  /* emerald at text sizes (AA)      */
+        --c-press:        #8A5A24;  /* ochre press ink                 */
+        --c-plate:        #101411;  /* code plates stay dark on paper  */
+        --c-plate-border: #E3E1D6;
+        --c-wash:         #D9F0E3;  /* selection                       */
+        --c-wash-text:    #14532D;
+    }
+    html.dark {
+        --c-paper:        #101411;
+        --c-ink:          #F1EFE6;
+        --c-ink2:         #A3A99D;
+        --c-rule:         #2B302B;
+        --c-accent:       #34D399;
+        --c-accent-text:  #34D399;
+        --c-press:        #C98C49;
+        --c-plate:        #171C18;
+        --c-plate-border: #2B302B;
+        --c-wash:         #064E3B;
+        --c-wash-text:    #D1FAE5;
+    }
+
     body {
-        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        font-family: 'Schibsted Grotesk Variable', 'SchibstedFallback', -apple-system, 'Helvetica Neue', Arial, sans-serif;
     }
 
     code, pre, kbd, samp {
@@ -18,8 +62,8 @@
     }
 
     ::selection {
-        background: rgba(52, 211, 153, 0.3);
-        color: inherit;
+        background: var(--c-wash);
+        color: var(--c-wash-text);
     }
 }
 
@@ -60,9 +104,10 @@
             radial-gradient(circle at 1px 1px, rgba(15,23,42,0.08) 1px, transparent 0);
     }
 
-    /* Focus ring — visible on keyboard nav, hidden on mouse click. */
+    /* Focus ring — visible on keyboard nav, hidden on mouse click.
+       Token-driven: #059669 on paper (3.6:1), #34D399 on ink (9.7:1). */
     .focus-ring:focus-visible {
-        outline: 2px solid #34d399;
+        outline: 2px solid var(--c-accent, #34d399);
         outline-offset: 2px;
     }
 }
@@ -213,7 +258,7 @@
    ════════════════════════════════════════════════════════════════ */
 .preview-scope { color: #18181b; }
 html.dark .preview-scope { color: #fafafa; }
-.preview-scope h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; }
+.preview-scope h1, .preview-scope .preview-h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; }
 .preview-scope h2 { font-size: 1.25rem; font-weight: 650; letter-spacing: -0.01em; }
 .preview-scope h3 { font-size: 1.05rem; font-weight: 650; }
 .preview-scope p  { margin-top: 0.5rem; color: #52525b; line-height: 1.6; }
@@ -289,3 +334,193 @@ html.dark .preview-scope input { border-color: rgba(255,255,255,0.12); }
 .sh-cmd  { color: #4ade80; }
 .sh-flg  { color: #22d3ee; }
 .sh-pl   { color: #d4d4d8; }
+
+/* ════════════════════════════════════════════════════════════════
+   GALLEY PROOF — homepage redesign 4.
+   The page is typeset like a printed argument: flat paper/ink
+   surfaces, hairline rules, hanging numerals, and a motion language
+   made entirely of the logo's own gesture — a 6px round-cap stroke
+   that draws itself, and a dot that lands like a period.
+
+   Invariants (same contract as the layers above):
+     • Every animation is ONE-SHOT opacity/transform/stroke-dashoffset.
+       There are zero infinite decorative loops on the page.
+     • Hidden-until-animated states are gated on html.js, so no-JS
+       visitors (and crawlers) see the finished page.
+     • Below 768px and under prefers-reduced-motion, marks render in
+       their final state instantly (the known mobile-compositor gate).
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Self-drawing stroke (logo P, ticks, rules, circled zero) ─────
+   Any <path pathLength="1"> with .gp-draw inside a [data-reveal]
+   container draws itself when the container becomes .is-visible.
+   .gp-draw-load variants play on page load instead (hero logo). */
+@layer utilities {
+    html.js .gp-draw {
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+        transition: stroke-dashoffset var(--draw-dur, 0.9s) cubic-bezier(0.65, 0, 0.35, 1);
+        transition-delay: var(--draw-delay, 0ms);
+    }
+    html.js [data-reveal].is-visible .gp-draw { stroke-dashoffset: 0; }
+
+    @keyframes gp-draw-in { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+    html.js .gp-draw-load {
+        stroke-dasharray: 1;
+        animation: gp-draw-in var(--draw-dur, 0.9s) cubic-bezier(0.65, 0, 0.35, 1) var(--draw-delay, 0ms) both;
+    }
+
+    /* Pure trigger — an IO target whose children draw/slide, while the
+       element itself never fades or moves. Declared after the base
+       [data-reveal] rules so it wins at equal specificity. */
+    html.js [data-reveal="none"] {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+
+    /* The period lands: a dot pops in with slight overshoot. */
+    @keyframes gp-dot-pop {
+        from { transform: scale(0); }
+        60%  { transform: scale(1.25); }
+        to   { transform: scale(1); }
+    }
+    /* SVG dots scale from their own center, not the viewport origin. */
+    svg .gp-dot, svg .gp-dot-load {
+        transform-box: fill-box;
+        transform-origin: center;
+    }
+    html.js .gp-dot {
+        transform: scale(0);
+        transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+        transition-delay: var(--dot-delay, 0ms);
+    }
+    html.js [data-reveal].is-visible .gp-dot { transform: scale(1); }
+    html.js .gp-dot-load {
+        animation: gp-dot-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) var(--dot-delay, 0ms) both;
+    }
+}
+
+/* ── The Deletion ─────────────────────────────────────────────────
+   Eight filenames struck out by a hand-drawn pen stroke, top to
+   bottom, then the ninth row underlined with a period that pops.
+   Rows carry --i (index); the container carries data-reveal. */
+@layer utilities {
+    html.js .gp-strike path {
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+        transition: stroke-dashoffset 0.24s ease-out;
+        transition-delay: calc(var(--i, 0) * 110ms);
+    }
+    html.js [data-reveal].is-visible .gp-strike path { stroke-dashoffset: 0; }
+
+    html.js .gp-struck-text {
+        transition: opacity 0.2s ease-out;
+        transition-delay: calc(var(--i, 0) * 110ms);
+    }
+    html.js [data-reveal].is-visible .gp-struck-text { opacity: 0.85; }
+}
+
+/* ── Line-mask headline reveal (section h2s only — never the h1) ── */
+@layer utilities {
+    .gp-lm { display: block; overflow: hidden; }
+    html.js .gp-lm > span {
+        display: block;
+        transform: translateY(110%);
+        transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+        transition-delay: var(--lm-delay, 0ms);
+    }
+    html.js [data-reveal].is-visible .gp-lm > span { transform: translateY(0); }
+}
+
+/* ── Hairline rules that draw themselves (pull-quote, running head) ── */
+@layer utilities {
+    html.js .gp-rule-x {
+        transform: scaleX(0);
+        transform-origin: center;
+        transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+        transition-delay: var(--rule-delay, 0ms);
+    }
+    html.js .gp-rule-x.gp-from-left { transform-origin: left; }
+    html.js [data-reveal].is-visible .gp-rule-x { transform: scaleX(1); }
+}
+
+/* ── Typesetting furniture ────────────────────────────────────────
+   Dot leaders for the index section; a baseline-rule input for the
+   newsletter coda; masthead hide/reveal-on-scroll-up. */
+@layer utilities {
+    .gp-leader {
+        flex: 1 1 auto;
+        min-width: 2rem;
+        border-bottom: 2px dotted var(--c-rule);
+        margin-bottom: 0.45em;
+        transition: border-color 0.15s ease;
+    }
+
+    .gp-baseline-input {
+        background: transparent;
+        border: 0;
+        border-bottom: 1px solid var(--c-ink2);
+        border-radius: 0;
+        padding: 0.5rem 0;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .gp-baseline-input:focus {
+        outline: none;
+        border-color: var(--c-accent);
+        box-shadow: 0 1px 0 0 var(--c-accent);
+    }
+
+    .gp-masthead {
+        transition: transform 0.22s ease, background-color 0.2s ease, visibility 0s linear 0s;
+    }
+    /* visibility removes the off-screen controls from the tab order; the
+       0.22s delay lets the slide-out finish before they vanish. */
+    .gp-masthead.gp-hidden {
+        transform: translateY(-100%);
+        visibility: hidden;
+        transition: transform 0.22s ease, background-color 0.2s ease, visibility 0s linear 0.22s;
+    }
+    /* If focus does land inside (e.g. via a skip link), slide back in. */
+    .gp-masthead.gp-hidden:focus-within {
+        transform: none;
+        visibility: visible;
+    }
+}
+
+/* ── Duotone-plus code plates ─────────────────────────────────────
+   Two inks on dark stock, like a letterpress duotone: emerald for
+   structure (decorators brightest — they are the anatomy of a
+   .pyxl), ochre press-ink for literals, bright ink for names, and
+   punctuation recedes. Four voices, no rainbow. Plates are dark in
+   BOTH themes — code is a photographic plate on the page. */
+.duotone code, .duotone .sh-pl,
+.duotone .sh-attr, .duotone .sh-prop { color: #C6CCC2; }
+.duotone .sh-kw, .duotone .sh-cmd { color: #34D399; }
+.duotone .sh-dec  { color: #6EE7B7; }
+.duotone .sh-cmt  { color: #8A9086; font-style: italic; }
+.duotone .sh-str, .duotone .sh-num, .duotone .sh-flg { color: #CFA265; }
+.duotone .sh-fn, .duotone .sh-comp, .duotone .sh-elem { color: #F1EFE6; }
+.duotone .sh-brc, .duotone .sh-tag { color: #878D83; }
+
+/* ── Performance: skip offscreen rendering for below-fold sections ── */
+.gp-cv {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 720px;
+}
+
+/* ── Gates: reduced motion + mobile compositors ───────────────────
+   All Galley Proof motion collapses to final-state-instantly. The
+   .is-visible class still arrives via IntersectionObserver, so
+   nothing is ever lost — it just doesn't perform. */
+@media (prefers-reduced-motion: reduce), (max-width: 767px) {
+    html.js .gp-draw,
+    html.js .gp-strike path { stroke-dashoffset: 0 !important; transition: none !important; }
+    html.js .gp-draw-load   { animation: none !important; stroke-dasharray: none !important; }
+    html.js .gp-dot         { transform: scale(1) !important; transition: none !important; }
+    html.js .gp-dot-load    { animation: none !important; }
+    html.js .gp-lm > span   { transform: none !important; transition: none !important; }
+    html.js .gp-rule-x      { transform: none !important; transition: none !important; }
+    html.js .gp-struck-text { transition: none !important; }
+    .gp-masthead            { transition: background-color 0.2s ease; }
+}

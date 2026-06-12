@@ -272,10 +272,8 @@ async def search_docs(request):
 
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useTheme } from '../layout.pyxl';
 import { Link, navigate, useAction, Head } from 'pyxle/client';
 import { tokenizeBlock, HIGHLIGHT_CSS, looksLikePyxl } from '../components/code-highlighter.jsx';
-import { ThemeToggle } from '../components/theme-toggle.jsx';
 import NotFoundContent from '../components/not-found-content.jsx';
 
 // Docs-specific controls injected into the shared navbar (right side). The
@@ -291,29 +289,32 @@ export const slots = {
                 onClick={() => window.dispatchEvent(new CustomEvent('pyxle:docs-sidebar'))}
                 aria-label="Browse documentation sections"
                 title="Browse sections"
-                className="lg:hidden focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10 transition-colors"
+                className="focus-ring rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:hidden"
             >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h9.75M3.75 17.25h16.5" />
-                </svg>
+                Sections
             </button>
             <button
                 type="button"
                 onClick={() => window.dispatchEvent(new CustomEvent('pyxle:docs-search'))}
                 aria-label="Search docs"
                 title="Search docs"
-                className="focus-ring inline-flex h-9 items-center gap-2 rounded-lg border px-2.5 sm:px-3 text-sm transition border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:border-white/10 dark:bg-white/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
+                className="focus-ring inline-flex h-8 items-center gap-2 rounded-[3px] border border-rule bg-transparent px-3 font-mono text-[12px] text-ink2 transition-colors hover:border-accent hover:text-ink"
             >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" aria-hidden="true">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                 </svg>
                 <span className="hidden lg:inline">Search</span>
-                <kbd className="hidden lg:inline rounded px-1.5 py-0.5 text-[10px] font-mono bg-zinc-100 text-zinc-500 dark:bg-white/10 dark:text-zinc-400" aria-hidden="true">/</kbd>
+                <kbd className="font-mono text-[10px] text-ink2" aria-hidden="true">/</kbd>
             </button>
-            <a href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/docs/%5B%5B...slug%5D%5D.pyxl" target="_blank" rel="noreferrer" aria-label="View page source" title="View page source" className="focus-ring hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10 transition-colors">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
-                </svg>
+            <a
+                href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/docs/%5B%5B...slug%5D%5D.pyxl"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="View page source"
+                title="View this page's source"
+                className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
+            >
+                source ↗
             </a>
         </>
     ),
@@ -331,7 +332,6 @@ function DocLink(props) {
 /* ── Search Modal ─────────────────────────────────────────── */
 
 function SearchModal({ onClose }) {
-    const { theme } = useTheme();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [selectedIdx, setSelectedIdx] = useState(0);
@@ -384,13 +384,13 @@ function SearchModal({ onClose }) {
 
     return (
         <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <div className="absolute inset-0 bg-black/60" />
             <div
-                className={`relative w-full max-w-xl rounded-xl border shadow-2xl overflow-hidden bg-white border-zinc-200 dark:bg-[#18181b] dark:border-white/10`}
+                className="relative w-full max-w-xl overflow-hidden rounded-[6px] border border-rule bg-paper shadow-[0_2px_8px_rgba(20,25,21,0.08)]"
                 onClick={e => e.stopPropagation()}
             >
-                <div className={`flex items-center gap-3 px-4 py-3 border-b border-zinc-100 dark:border-white/5`}>
-                    <svg className={`h-5 w-5 shrink-0 text-zinc-600 dark:text-zinc-400`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <div className="flex items-center gap-3 border-b border-rule px-4 py-3">
+                    <svg className="h-4 w-4 shrink-0 text-ink2" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                     </svg>
                     <input
@@ -399,9 +399,9 @@ function SearchModal({ onClose }) {
                         onChange={e => setQuery(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder="Search documentation..."
-                        className={`flex-1 bg-transparent text-sm outline-none placeholder:text-zinc-500 text-zinc-900 dark:text-white`}
+                        className="flex-1 bg-transparent font-mono text-sm text-ink outline-none placeholder:text-ink2 placeholder:opacity-60"
                     />
-                    <kbd className={`rounded px-1.5 py-0.5 text-[10px] font-mono bg-zinc-100 text-zinc-500 dark:bg-white/10 dark:text-zinc-400`}>Esc</kbd>
+                    <kbd className="rounded-[3px] border border-rule px-1.5 py-0.5 font-mono text-[10px] text-ink2">Esc</kbd>
                 </div>
                 {results.length > 0 && (
                     <div className="max-h-80 overflow-y-auto py-2">
@@ -410,18 +410,18 @@ function SearchModal({ onClose }) {
                                 key={r.path}
                                 href={`/docs/${r.path}`}
                                 onClick={() => onClose()}
-                                className={`w-full flex items-start gap-3 px-4 py-2.5 text-left transition ${
+                                className={`flex w-full items-start gap-3 border-l-2 px-4 py-2.5 text-left transition-colors ${
                                     i === selectedIdx
-                                        ? 'bg-zinc-50 dark:bg-white/5'
-                                        : ''
+                                        ? 'border-accent'
+                                        : 'border-transparent'
                                 }`}
                             >
-                                <svg className={`h-4 w-4 mt-0.5 shrink-0 text-zinc-600 dark:text-zinc-400`} fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                                <svg className="mt-0.5 h-4 w-4 shrink-0 text-ink2" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                                 </svg>
                                 <div className="min-w-0">
-                                    <p className="text-sm font-medium truncate">{r.title}</p>
-                                    <p className={`text-xs truncate text-zinc-600 dark:text-zinc-400`}>
+                                    <p className="truncate text-sm text-ink">{r.title}</p>
+                                    <p className="truncate font-mono text-[11px] text-ink2">
                                         {r.category}{r.matchingHeading ? ` > ${r.matchingHeading}` : ''}
                                     </p>
                                 </div>
@@ -430,7 +430,7 @@ function SearchModal({ onClose }) {
                     </div>
                 )}
                 {query && results.length === 0 && searching && (
-                    <div className={`px-4 py-8 flex items-center justify-center gap-2 text-sm text-zinc-600 dark:text-zinc-400`}>
+                    <div className="flex items-center justify-center gap-2 px-4 py-8 font-mono text-sm text-ink2">
                         <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -439,22 +439,22 @@ function SearchModal({ onClose }) {
                     </div>
                 )}
                 {query && results.length === 0 && !searching && errorMsg && (
-                    <div className="px-4 py-6 flex items-start gap-3">
-                        <svg className="h-5 w-5 shrink-0 text-amber-400 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                    <div className="flex items-start gap-3 px-4 py-6">
+                        <svg className="mt-0.5 h-5 w-5 shrink-0 text-press" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                         </svg>
                         <div className="min-w-0">
-                            <p className={`text-sm font-medium text-amber-700 dark:text-amber-300`}>
+                            <p className="text-sm font-medium text-ink">
                                 {errorMsg}
                             </p>
-                            <p className={`text-xs mt-1 text-zinc-500 dark:text-zinc-400`}>
+                            <p className="mt-1 text-xs text-ink2">
                                 You can still browse the sidebar on the left.
                             </p>
                         </div>
                     </div>
                 )}
                 {query && results.length === 0 && !searching && !errorMsg && (
-                    <div className={`px-4 py-8 text-center text-sm text-zinc-600 dark:text-zinc-400`}>
+                    <div className="px-4 py-8 text-center font-mono text-sm text-ink2">
                         No results for &ldquo;{query}&rdquo;
                     </div>
                 )}
@@ -466,25 +466,26 @@ function SearchModal({ onClose }) {
 /* ── Sidebar ──────────────────────────────────────────────── */
 
 function Sidebar({ nav, currentPath }) {
-    const { theme } = useTheme();
     if (!nav) return null;
 
     return (
-        <nav className="space-y-6">
+        <nav className="space-y-7">
             {nav.map(section => (
                 <div key={section.slug}>
-                    <h3 className={`px-3 text-xs font-semibold uppercase tracking-widest mb-2 text-zinc-600 dark:text-zinc-400`}>{section.category}</h3>
-                    <ul className="space-y-0.5">
+                    <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">{section.category}</h3>
+                    {/* The items hang on a hairline rail; the active page is a
+                        2px accent rule set ON the rail — manuscript style. */}
+                    <ul className="mt-2.5 border-l border-rule">
                         {section.items.map(item => {
                             const isActive = currentPath === item.path;
                             return (
                                 <li key={item.path}>
                                     <DocLink
                                         href={`/docs/${item.path}`}
-                                        className={`block rounded-lg px-3 py-1.5 text-sm transition ${
+                                        className={`block py-1.5 text-[13.5px] transition-colors ${
                                             isActive
-                                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-medium'
-                                                : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/5'
+                                                ? '-ml-px border-l-2 border-accent pl-3 font-medium text-ink'
+                                                : 'pl-3 text-ink2 hover:text-ink'
                                         }`}
                                     >{item.title}</DocLink>
                                 </li>
@@ -500,21 +501,22 @@ function Sidebar({ nav, currentPath }) {
 /* ── Table of Contents ────────────────────────────────────── */
 
 function TableOfContents({ toc }) {
-    const { theme } = useTheme();
     if (!toc || toc.length === 0) return null;
 
     return (
-        <nav className="space-y-1">
-            <h4 className={`text-xs font-semibold uppercase tracking-widest mb-3 text-zinc-600 dark:text-zinc-400`}>On this page</h4>
-            {toc.map((item, i) => (
-                <a
-                    key={i}
-                    href={`#${item.slug}`}
-                    className={`block text-[13px] leading-snug py-0.5 transition ${
-                        item.depth === 3 ? 'pl-4' : ''
-                    } text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white`}
-                >{item.text}</a>
-            ))}
+        <nav>
+            <h4 className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">On this page</h4>
+            <div className="mt-3 border-l border-rule">
+                {toc.map((item, i) => (
+                    <a
+                        key={i}
+                        href={`#${item.slug}`}
+                        className={`block py-1 text-[13px] leading-snug text-ink2 transition-colors hover:text-ink ${
+                            item.depth === 3 ? 'pl-7' : 'pl-3'
+                        }`}
+                    >{item.text}</a>
+                ))}
+            </div>
         </nav>
     );
 }
@@ -615,7 +617,6 @@ function useDocEnhancements(contentRef) {
 /* ── Copy Page Dropdown ──────────────────────────────────── */
 
 function CopyPageDropdown({ page }) {
-    const { theme } = useTheme();
     const [open, setOpen] = useState(false);
     const [copied, setCopied] = useState(false);
     const dropdownRef = useRef(null);
@@ -657,14 +658,15 @@ function CopyPageDropdown({ page }) {
         setOpen(false);
     }, [page]);
 
-    const btnBase = `inline-flex items-center gap-1.5 text-xs font-medium transition border-zinc-200 text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 dark:border-white/10 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-white`;
+    const btnBase = 'inline-flex items-center gap-1.5 font-mono text-[12px] text-ink2 transition-colors hover:text-ink';
+    const itemBase = 'flex w-full items-start gap-3 border-l-2 border-transparent px-4 py-2.5 text-left transition-colors hover:border-accent';
 
     return (
         <div className="relative" ref={dropdownRef}>
-            <div className={`inline-flex items-center rounded-lg border border-zinc-200 dark:border-white/10`}>
-                <button onClick={copyMarkdown} className={`${btnBase} px-3 py-1.5 rounded-l-lg`} title="Copy page as Markdown">
+            <div className="inline-flex items-center rounded-[3px] border border-rule">
+                <button onClick={copyMarkdown} className={`${btnBase} px-3 py-1.5`} title="Copy page as Markdown">
                     {copied ? (
-                        <svg className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                        <svg className="h-3.5 w-3.5 text-acct" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                     ) : (
                         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" /></svg>
                     )}
@@ -672,7 +674,7 @@ function CopyPageDropdown({ page }) {
                 </button>
                 <button
                     onClick={() => setOpen(!open)}
-                    className={`${btnBase} px-1.5 py-1.5 rounded-r-lg border-l border-zinc-200 dark:border-white/10`}
+                    className={`${btnBase} border-l border-rule px-1.5 py-1.5`}
                     title="More options"
                 >
                     <svg className={`h-3.5 w-3.5 transition ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
@@ -680,61 +682,61 @@ function CopyPageDropdown({ page }) {
             </div>
 
             {open && (
-                <div className={`absolute right-0 top-full mt-1.5 w-64 rounded-xl border shadow-xl overflow-hidden z-50 bg-white border-zinc-200 dark:bg-[#18181b] dark:border-white/10`}>
+                <div className="absolute right-0 top-full z-50 mt-1.5 w-64 overflow-hidden rounded-[6px] border border-rule bg-paper shadow-[0_2px_8px_rgba(20,25,21,0.08)]">
                     <div className="py-1.5">
-                        <button onClick={copyMarkdown} className={`w-full flex items-start gap-3 px-4 py-2.5 text-left transition hover:bg-zinc-50 dark:hover:bg-white/5`}>
-                            <svg className={`h-4 w-4 mt-0.5 shrink-0 text-zinc-600 dark:text-zinc-400`} fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" /></svg>
+                        <button onClick={copyMarkdown} className={itemBase}>
+                            <svg className="mt-0.5 h-4 w-4 shrink-0 text-ink2" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" /></svg>
                             <div className="min-w-0">
-                                <p className={`text-sm font-medium text-zinc-700 dark:text-zinc-200`}>Copy page</p>
-                                <p className={`text-xs text-zinc-600 dark:text-zinc-400`}>Copy this page as Markdown for LLMs</p>
+                                <p className="text-sm font-medium text-ink">Copy page</p>
+                                <p className="text-xs text-ink2">Copy this page as Markdown for LLMs</p>
                             </div>
                         </button>
 
-                        <button onClick={viewMarkdown} className={`w-full flex items-start gap-3 px-4 py-2.5 text-left transition hover:bg-zinc-50 dark:hover:bg-white/5`}>
-                            <svg className={`h-4 w-4 mt-0.5 shrink-0 text-zinc-600 dark:text-zinc-400`} viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v18H3V3zm2 4v10h2.5l3-3.75L13.5 17H16V7h-3v5.6L10.5 9 8 12.6V7H5z"/></svg>
+                        <button onClick={viewMarkdown} className={itemBase}>
+                            <svg className="mt-0.5 h-4 w-4 shrink-0 text-ink2" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v18H3V3zm2 4v10h2.5l3-3.75L13.5 17H16V7h-3v5.6L10.5 9 8 12.6V7H5z"/></svg>
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
-                                    <p className={`text-sm font-medium text-zinc-700 dark:text-zinc-200`}>View as Markdown</p>
-                                    <svg className={`h-3 w-3 text-zinc-300 dark:text-zinc-400`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                                    <p className="text-sm font-medium text-ink">View as Markdown</p>
+                                    <svg className="h-3 w-3 text-ink2 opacity-60" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
                                 </div>
-                                <p className={`text-xs text-zinc-600 dark:text-zinc-400`}>View this page as plain text</p>
+                                <p className="text-xs text-ink2">View this page as plain text</p>
                             </div>
                         </button>
 
-                        <div className={`my-1 border-t border-zinc-100 dark:border-white/5`} />
+                        <div className="my-1 border-t border-rule" />
 
-                        <a href={`https://claude.ai/new?q=${aiPrompt}`} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={`w-full flex items-start gap-3 px-4 py-2.5 text-left transition no-underline hover:bg-zinc-50 dark:hover:bg-white/5`}>
-                            <svg className={`h-4 w-4 mt-0.5 shrink-0 text-zinc-600 dark:text-zinc-400`} viewBox="0 0 24 24" fill="currentColor"><path d="M4.709 15.955l4.71-10.96a1.257 1.257 0 012.326 0l4.696 10.96c.092.212.15.436.15.672 0 .942-.764 1.706-1.706 1.706a1.71 1.71 0 01-1.573-1.04L12 13.467l-1.312 3.826a1.71 1.71 0 01-1.573 1.04 1.706 1.706 0 01-1.556-2.378zm7.998-4.498L12 9.726l-.707 1.731L12 13.188l.707-1.731z"/></svg>
+                        <a href={`https://claude.ai/new?q=${aiPrompt}`} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={`${itemBase} no-underline`}>
+                            <svg className="mt-0.5 h-4 w-4 shrink-0 text-ink2" viewBox="0 0 24 24" fill="currentColor"><path d="M4.709 15.955l4.71-10.96a1.257 1.257 0 012.326 0l4.696 10.96c.092.212.15.436.15.672 0 .942-.764 1.706-1.706 1.706a1.71 1.71 0 01-1.573-1.04L12 13.467l-1.312 3.826a1.71 1.71 0 01-1.573 1.04 1.706 1.706 0 01-1.556-2.378zm7.998-4.498L12 9.726l-.707 1.731L12 13.188l.707-1.731z"/></svg>
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
-                                    <p className={`text-sm font-medium text-zinc-700 dark:text-zinc-200`}>Open in Claude</p>
-                                    <svg className={`h-3 w-3 text-zinc-300 dark:text-zinc-400`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                                    <p className="text-sm font-medium text-ink">Open in Claude</p>
+                                    <svg className="h-3 w-3 text-ink2 opacity-60" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
                                 </div>
-                                <p className={`text-xs text-zinc-600 dark:text-zinc-400`}>Ask questions about this page</p>
+                                <p className="text-xs text-ink2">Ask questions about this page</p>
                             </div>
                         </a>
 
-                        <a href={`https://chatgpt.com/?q=${aiPrompt}`} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={`w-full flex items-start gap-3 px-4 py-2.5 text-left transition no-underline hover:bg-zinc-50 dark:hover:bg-white/5`}>
-                            <svg className={`h-4 w-4 mt-0.5 shrink-0 text-zinc-600 dark:text-zinc-400`} viewBox="0 0 24 24" fill="currentColor"><path d="M22.282 9.821a5.985 5.985 0 00-.516-4.91 6.046 6.046 0 00-6.51-2.9A6.065 6.065 0 0011.052.5a6.046 6.046 0 00-5.788 4.22 6.046 6.046 0 00-4.033 2.929 6.046 6.046 0 00.748 7.101 5.98 5.98 0 00.51 4.911 6.051 6.051 0 006.515 2.9A5.985 5.985 0 0013.2 23.5a6.046 6.046 0 005.787-4.22 6.046 6.046 0 004.033-2.93 6.046 6.046 0 00-.738-6.529zM13.2 21.784a4.5 4.5 0 01-2.895-1.05l.144-.082 4.81-2.78a.78.78 0 00.395-.678v-6.79l2.033 1.174a.072.072 0 01.04.055v5.625a4.52 4.52 0 01-4.527 4.526zm-9.72-4.153a4.495 4.495 0 01-.54-3.025l.144.084 4.81 2.78a.78.78 0 00.79 0l5.87-3.39v2.348a.072.072 0 01-.03.062l-4.86 2.806a4.52 4.52 0 01-6.184-1.665zM2.34 7.896a4.485 4.485 0 012.36-1.974v5.73a.78.78 0 00.39.678l5.87 3.39-2.034 1.174a.072.072 0 01-.068.005L3.998 14.1a4.52 4.52 0 01-1.658-6.204zm16.776 3.905l-5.87-3.39 2.034-1.174a.072.072 0 01.068-.005l4.86 2.806a4.514 4.514 0 01-.7 8.143v-5.702a.78.78 0 00-.392-.678zm2.022-3.04l-.144-.085-4.81-2.78a.78.78 0 00-.79 0l-5.87 3.39V6.94a.072.072 0 01.03-.062l4.86-2.806a4.52 4.52 0 016.724 4.69zm-12.72 4.18L6.385 11.77a.072.072 0 01-.04-.056V6.09a4.52 4.52 0 017.42-3.47l-.143.082-4.81 2.78a.78.78 0 00-.395.678zm1.1-2.38l2.614-1.51 2.614 1.51v3.018l-2.614 1.51-2.614-1.51z"/></svg>
+                        <a href={`https://chatgpt.com/?q=${aiPrompt}`} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={`${itemBase} no-underline`}>
+                            <svg className="mt-0.5 h-4 w-4 shrink-0 text-ink2" viewBox="0 0 24 24" fill="currentColor"><path d="M22.282 9.821a5.985 5.985 0 00-.516-4.91 6.046 6.046 0 00-6.51-2.9A6.065 6.065 0 0011.052.5a6.046 6.046 0 00-5.788 4.22 6.046 6.046 0 00-4.033 2.929 6.046 6.046 0 00.748 7.101 5.98 5.98 0 00.51 4.911 6.051 6.051 0 006.515 2.9A5.985 5.985 0 0013.2 23.5a6.046 6.046 0 005.787-4.22 6.046 6.046 0 004.033-2.93 6.046 6.046 0 00-.738-6.529zM13.2 21.784a4.5 4.5 0 01-2.895-1.05l.144-.082 4.81-2.78a.78.78 0 00.395-.678v-6.79l2.033 1.174a.072.072 0 01.04.055v5.625a4.52 4.52 0 01-4.527 4.526zm-9.72-4.153a4.495 4.495 0 01-.54-3.025l.144.084 4.81 2.78a.78.78 0 00.79 0l5.87-3.39v2.348a.072.072 0 01-.03.062l-4.86 2.806a4.52 4.52 0 01-6.184-1.665zM2.34 7.896a4.485 4.485 0 012.36-1.974v5.73a.78.78 0 00.39.678l5.87 3.39-2.034 1.174a.072.072 0 01-.068.005L3.998 14.1a4.52 4.52 0 01-1.658-6.204zm16.776 3.905l-5.87-3.39 2.034-1.174a.072.072 0 01.068-.005l4.86 2.806a4.514 4.514 0 01-.7 8.143v-5.702a.78.78 0 00-.392-.678zm2.022-3.04l-.144-.085-4.81-2.78a.78.78 0 00-.79 0l-5.87 3.39V6.94a.072.072 0 01.03-.062l4.86-2.806a4.52 4.52 0 016.724 4.69zm-12.72 4.18L6.385 11.77a.072.072 0 01-.04-.056V6.09a4.52 4.52 0 017.42-3.47l-.143.082-4.81 2.78a.78.78 0 00-.395.678zm1.1-2.38l2.614-1.51 2.614 1.51v3.018l-2.614 1.51-2.614-1.51z"/></svg>
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
-                                    <p className={`text-sm font-medium text-zinc-700 dark:text-zinc-200`}>Open in ChatGPT</p>
-                                    <svg className={`h-3 w-3 text-zinc-300 dark:text-zinc-400`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                                    <p className="text-sm font-medium text-ink">Open in ChatGPT</p>
+                                    <svg className="h-3 w-3 text-ink2 opacity-60" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
                                 </div>
-                                <p className={`text-xs text-zinc-600 dark:text-zinc-400`}>Ask questions about this page</p>
+                                <p className="text-xs text-ink2">Ask questions about this page</p>
                             </div>
                         </a>
 
-                        <div className={`my-1 border-t border-zinc-100 dark:border-white/5`} />
+                        <div className="my-1 border-t border-rule" />
 
-                        <a href={`https://github.com/pyxle-dev/pyxle.dev/blob/main/public/docs-data/${page.path}.json`} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={`w-full flex items-start gap-3 px-4 py-2.5 text-left transition no-underline hover:bg-zinc-50 dark:hover:bg-white/5`}>
-                            <svg className={`h-4 w-4 mt-0.5 shrink-0 text-zinc-600 dark:text-zinc-400`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                        <a href={`https://github.com/pyxle-dev/pyxle.dev/blob/main/public/docs-data/${page.path}.json`} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={`${itemBase} no-underline`}>
+                            <svg className="mt-0.5 h-4 w-4 shrink-0 text-ink2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
-                                    <p className={`text-sm font-medium text-zinc-700 dark:text-zinc-200`}>View source on GitHub</p>
-                                    <svg className={`h-3 w-3 text-zinc-300 dark:text-zinc-400`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                                    <p className="text-sm font-medium text-ink">View source on GitHub</p>
+                                    <svg className="h-3 w-3 text-ink2 opacity-60" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
                                 </div>
-                                <p className={`text-xs text-zinc-600 dark:text-zinc-400`}>See this page's data on GitHub</p>
+                                <p className="text-xs text-ink2">See this page's data on GitHub</p>
                             </div>
                         </a>
                     </div>
@@ -747,7 +749,6 @@ function CopyPageDropdown({ page }) {
 /* ── Doc Content ──────────────────────────────────────────── */
 
 function DocContent({ page }) {
-    const { theme } = useTheme();
     const contentRef = useRef(null);
     useDocEnhancements(contentRef);
 
@@ -756,9 +757,9 @@ function DocContent({ page }) {
     return (
         <div>
             {/* Header */}
-            <div className="mb-8 flex items-start justify-between gap-4">
-                <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{page.title}</h1>
-                <div className="shrink-0 mt-1">
+            <div className="mb-10 flex items-start justify-between gap-4">
+                <h1 className="font-display text-[2.2rem] font-[550] leading-[1.1] tracking-[-0.01em] text-ink sm:text-[2.6rem]">{page.title}</h1>
+                <div className="mt-2 shrink-0">
                     <CopyPageDropdown page={page} />
                 </div>
             </div>
@@ -772,22 +773,22 @@ function DocContent({ page }) {
 
             {/* Prev / Next */}
             {(page.prev || page.next) && (
-                <div className={`mt-16 flex justify-between gap-4 border-t pt-8 border-zinc-200 dark:border-white/5`}>
+                <div className="mt-16 flex justify-between gap-4 border-t border-rule pt-8">
                     {page.prev ? (
-                        <DocLink href={`/docs/${page.prev.path}`} className={`group text-left text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white`}>
-                            <span className={`text-xs text-zinc-600 dark:text-zinc-400`}>Previous</span>
-                            <span className="text-sm font-medium flex items-center gap-1">
-                                <svg className="h-3.5 w-3.5 transition group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" /></svg>
+                        <DocLink href={`/docs/${page.prev.path}`} className="focus-ring group rounded text-left">
+                            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">Previous</span>
+                            <span className="mt-1 flex items-center gap-1.5 text-sm font-medium text-ink">
+                                <svg className="h-3.5 w-3.5 text-ink2 transition group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" /></svg>
                                 {page.prev.title}
                             </span>
                         </DocLink>
                     ) : <div />}
                     {page.next ? (
-                        <DocLink href={`/docs/${page.next.path}`} className={`group text-right text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white`}>
-                            <span className={`text-xs text-zinc-600 dark:text-zinc-400`}>Next</span>
-                            <span className="text-sm font-medium flex items-center gap-1">
+                        <DocLink href={`/docs/${page.next.path}`} className="focus-ring group rounded text-right">
+                            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">Next</span>
+                            <span className="mt-1 flex items-center justify-end gap-1.5 text-sm font-medium text-ink">
                                 {page.next.title}
-                                <svg className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                                <svg className="h-3.5 w-3.5 text-ink2 transition group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                             </span>
                         </DocLink>
                     ) : <div />}
@@ -800,8 +801,7 @@ function DocContent({ page }) {
 /* ── Main Page ────────────────────────────────────────────── */
 
 export default function DocsPage({ data }) {
-    const { version, slug, page, nav, notFound } = data;
-    const { theme } = useTheme();
+    const { slug, page, nav, notFound } = data;
     const [searchOpen, setSearchOpen] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -841,11 +841,12 @@ export default function DocsPage({ data }) {
     }, []);
 
     return (
-        <div className="min-h-screen pt-14">
+        <div className="min-h-screen pt-16">
             <Head>
                 <title>{pageTitle}</title>
                 <meta name="description" content="Pyxle framework documentation. Learn to build full-stack Python + React apps." />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <meta name="theme-color" content="#101411" />
                 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
                 <meta property="og:title" content="Documentation - Pyxle Framework" />
                 <meta property="og:description" content="Pyxle framework documentation. Learn to build full-stack Python + React apps." />
@@ -858,14 +859,14 @@ export default function DocsPage({ data }) {
             {sidebarOpen && (
                 <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setSidebarOpen(false)}>
                     <div className="absolute inset-0 bg-black/40" />
-                    <div className={`absolute left-0 top-0 bottom-0 w-72 overflow-y-auto p-6 pt-20 bg-white dark:bg-[#0a0a0b]`} onClick={e => e.stopPropagation()}>
+                    <div className="absolute bottom-0 left-0 top-0 w-72 overflow-y-auto border-r border-rule bg-paper p-6 pt-20" onClick={e => e.stopPropagation()}>
                         <Sidebar nav={nav} currentPath={slug} />
                     </div>
                 </div>
             )}
 
             {notFound ? (
-                <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 56px)' }}>
+                <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 64px)' }}>
                     <NotFoundContent
                         backHref="/docs"
                         backLabel="Back to docs"
@@ -875,18 +876,21 @@ export default function DocsPage({ data }) {
             ) : (
                 <>
                     {/* Desktop sidebar — fixed position */}
-                    <aside className={`hidden lg:block fixed left-0 top-14 bottom-0 w-64 z-30 overflow-y-auto border-r p-5 pb-12 border-zinc-200 bg-white dark:border-white/5 dark:bg-[#0a0a0b]`}>
+                    <aside className="fixed bottom-0 left-0 top-16 z-30 hidden w-64 overflow-y-auto border-r border-rule bg-paper p-5 pb-12 lg:block">
                         <Sidebar nav={nav} currentPath={slug} />
                     </aside>
 
                     {/* TOC — fixed position */}
-                    <aside className={`hidden xl:block fixed right-0 top-14 bottom-0 w-56 z-30 overflow-y-auto border-l p-5 pb-12 border-zinc-200 bg-white dark:border-white/5 dark:bg-[#0a0a0b]`}>
+                    <aside className="fixed bottom-0 right-0 top-16 z-30 hidden w-56 overflow-y-auto border-l border-rule bg-paper p-5 pb-12 xl:block">
                         <TableOfContents toc={page?.toc} />
                     </aside>
 
                     {/* Main content — offset by sidebar widths */}
+                    {/* mx-auto centers the article between the fixed rails —
+                       on wide monitors the dead space splits evenly instead of
+                       pooling on the right. */}
                     <main className="lg:ml-64 xl:mr-56 py-10 px-6 sm:px-8 lg:px-14 pb-32">
-                        <div className="max-w-4xl">
+                        <div className="mx-auto max-w-4xl">
                             <DocContent page={page} />
                         </div>
                     </main>
@@ -898,52 +902,58 @@ export default function DocsPage({ data }) {
                 <SearchModal onClose={() => setSearchOpen(false)} />
             )}
 
-            {/* Syntax highlighting + Global background fix + Docs prose styles */}
+            {/* Syntax highlighting + docs prose styles. Everything reads from
+                the --c-* theme tokens, so the prose follows both themes with no
+                html.dark overrides. Code blocks are dark plates in both themes
+                (fixed plate-chrome colors mirroring .duotone in tailwind.css). */}
             <style dangerouslySetInnerHTML={{ __html: `
                 ${HIGHLIGHT_CSS}
-                .heading-anchor { opacity: 0; display: inline-flex; align-items: center; margin-right: 0.4rem; vertical-align: middle; transition: opacity 0.15s, color 0.15s; color: #94a3b8; }
-                html.dark .heading-anchor { color: #52525b; }
+                .heading-anchor { opacity: 0; display: inline-flex; align-items: center; margin-right: 0.4rem; vertical-align: middle; transition: opacity 0.15s, color 0.15s; color: var(--c-ink2); }
                 h2:hover .heading-anchor, h3:hover .heading-anchor, h4:hover .heading-anchor { opacity: 1; }
-                .heading-anchor:hover { color: #34d399 !important; opacity: 1 !important; }
-                .code-lang-badge { position: absolute; top: 0.6rem; left: 0.9rem; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: #a1a1aa; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; pointer-events: none; }
+                .heading-anchor:hover { color: var(--c-accent) !important; opacity: 1 !important; }
+                .code-lang-badge { position: absolute; top: 0.6rem; left: 0.9rem; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8A9086; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; pointer-events: none; }
 
                 .docs-content { font-size: 0.9375rem; }
-                .docs-content h2[id], .docs-content h3[id], .docs-content h4[id] { scroll-margin-top: 80px; }
-                .docs-content h2 { font-size: 1.45rem; font-weight: 650; letter-spacing: -0.012em; margin-top: 2.75rem; margin-bottom: 0.85rem; padding-bottom: 0.55rem; color: #18181b; border-bottom: 1px solid rgba(0,0,0,0.08); }
-                html.dark .docs-content h2 { color: #fafafa; border-bottom-color: rgba(255,255,255,0.08); }
-                .docs-content h3 { font-size: 1.18rem; font-weight: 600; letter-spacing: -0.01em; margin-top: 2.1rem; margin-bottom: 0.55rem; color: #27272a; }
-                html.dark .docs-content h3 { color: #e4e4e7; }
-                .docs-content h4 { font-size: 1rem; font-weight: 600; margin-top: 1.6rem; margin-bottom: 0.5rem; color: #3f3f46; }
-                html.dark .docs-content h4 { color: #d4d4d8; }
-                .docs-content p { margin-bottom: 1rem; line-height: 1.75; color: #52525b; }
-                html.dark .docs-content p { color: #a1a1aa; }
-                .docs-content a { color: #047857; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
-                html.dark .docs-content a { color: #34d399; }
-                .docs-content a:hover { text-decoration: none; }
+                .docs-content h2[id], .docs-content h3[id], .docs-content h4[id] { scroll-margin-top: 88px; }
+                .docs-content h2 { font-family: 'Fraunces Variable', FrauncesFallback, Georgia, serif; font-size: 1.55rem; font-weight: 540; letter-spacing: -0.01em; margin-top: 2.75rem; margin-bottom: 0.85rem; padding-bottom: 0.55rem; color: var(--c-ink); border-bottom: 1px solid var(--c-rule); }
+                .docs-content h3 { font-size: 1.18rem; font-weight: 600; letter-spacing: -0.01em; margin-top: 2.1rem; margin-bottom: 0.55rem; color: var(--c-ink); }
+                .docs-content h4 { font-size: 1rem; font-weight: 600; margin-top: 1.6rem; margin-bottom: 0.5rem; color: var(--c-ink); }
+                .docs-content p { margin-bottom: 1rem; line-height: 1.75; color: var(--c-ink2); }
+                .docs-content a { color: var(--c-accent-text); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+                .docs-content a:hover { text-decoration-thickness: 2px; }
                 .docs-content h2 a, .docs-content h3 a, .docs-content h4 a { color: inherit; }
-                .docs-content ul, .docs-content ol { margin-bottom: 1rem; margin-left: 0; padding-left: 1.4rem; color: #52525b; }
-                html.dark .docs-content ul, html.dark .docs-content ol { color: #a1a1aa; }
+                .docs-content ul, .docs-content ol { margin-bottom: 1rem; margin-left: 0; padding-left: 1.4rem; color: var(--c-ink2); }
                 .docs-content li { margin-bottom: 0.35rem; line-height: 1.75; }
-                .docs-content li::marker { color: #10b981; }
+                .docs-content li::marker { color: var(--c-accent); }
                 .docs-content li > ul, .docs-content li > ol { margin-top: 0.35rem; margin-bottom: 0; }
-                .docs-content code:not(pre code) { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.82em; padding: 0.15em 0.42em; border-radius: 5px; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.16); color: #047857; }
-                html.dark .docs-content code:not(pre code) { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.2); color: #6ee7b7; }
-                .docs-content .code-block { position: relative; margin-bottom: 1.25rem; border-radius: 0.85rem; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); background: #0b0b0d; }
+                .docs-content code:not(pre code) { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.82em; padding: 0.15em 0.42em; border-radius: 4px; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.18); color: var(--c-accent-text); }
+                .docs-content code::before, .docs-content code::after { content: none; }  /* kill prose's literal backticks */
+                .docs-content .code-block { position: relative; margin-bottom: 1.25rem; border-radius: 10px; overflow: hidden; border: 1px solid var(--c-plate-border); background: #0b0b0d; }
                 .docs-content .code-block pre { margin: 0; padding: 2rem 1.25rem 1rem; overflow-x: auto; }
-                .docs-content .code-block code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.8rem; line-height: 1.7; color: #d4d4d8; background: none; padding: 0; border-radius: 0; }
-                .docs-content .code-block .copy-btn { position: absolute; top: 0.55rem; right: 0.55rem; padding: 0.25rem 0.65rem; border-radius: 0.4rem; font-size: 0.7rem; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #d4d4d8; cursor: pointer; transition: all 0.15s; }
-                .docs-content .code-block .copy-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+                .docs-content .code-block code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.8rem; line-height: 1.7; color: #CDD3C9; background: none; border: none; padding: 0; border-radius: 0; }
+                .docs-content .code-block .copy-btn { position: absolute; top: 0.55rem; right: 0.7rem; padding: 0.25rem 0.4rem; border: none; background: transparent; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8A9086; cursor: pointer; transition: color 0.15s; }
+                .docs-content .code-block .copy-btn:hover { color: #EDEFE8; }
+
+                /* Doc code blocks print duotone-plus — emerald structure,
+                   ochre literals, bright names, receding punctuation
+                   (mirrors .duotone in tailwind.css; the plate is dark in
+                   both themes). */
+                .docs-content .code-block code, .docs-content .code-block .sh-pl,
+                .docs-content .code-block .sh-attr, .docs-content .code-block .sh-prop { color: #C6CCC2; }
+                .docs-content .code-block .sh-kw, .docs-content .code-block .sh-cmd { color: #34D399; }
+                .docs-content .code-block .sh-dec { color: #6EE7B7; }
+                .docs-content .code-block .sh-cmt { color: #8A9086; font-style: italic; }
+                .docs-content .code-block .sh-str, .docs-content .code-block .sh-num, .docs-content .code-block .sh-flg { color: #CFA265; }
+                .docs-content .code-block .sh-fn, .docs-content .code-block .sh-comp, .docs-content .code-block .sh-elem { color: #F1EFE6; }
+                .docs-content .code-block .sh-brc, .docs-content .code-block .sh-tag { color: #878D83; }
+
                 .docs-content table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; margin-bottom: 1.25rem; border-collapse: collapse; font-size: 0.875rem; }
-                .docs-content th { text-align: left; padding: 0.6rem 0.75rem; font-weight: 600; color: #18181b; border-bottom: 2px solid rgba(0,0,0,0.1); }
-                html.dark .docs-content th { color: #e4e4e7; border-bottom-color: rgba(255,255,255,0.1); }
-                .docs-content td { padding: 0.6rem 0.75rem; border-bottom: 1px solid rgba(0,0,0,0.05); color: #52525b; }
-                html.dark .docs-content td { color: #a1a1aa; border-bottom-color: rgba(255,255,255,0.05); }
-                .docs-content blockquote { border-left: 3px solid #10b981; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 0.5rem 0.5rem 0; background: rgba(16,185,129,0.05); }
+                .docs-content th { text-align: left; padding: 0.6rem 0.75rem; font-weight: 600; color: var(--c-ink); border-bottom: 2px solid var(--c-rule); }
+                .docs-content td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--c-rule); color: var(--c-ink2); }
+                .docs-content blockquote { border-left: 2px solid var(--c-accent); padding: 0.75rem 1rem; margin: 1rem 0; background: rgba(16,185,129,0.05); }
                 .docs-content blockquote p { margin-bottom: 0; }
-                .docs-content strong { color: #18181b; font-weight: 650; }
-                html.dark .docs-content strong { color: #fafafa; }
-                .docs-content hr { border: none; border-top: 1px solid rgba(0,0,0,0.07); margin: 2.25rem 0; }
-                html.dark .docs-content hr { border-top-color: rgba(255,255,255,0.07); }
+                .docs-content strong { color: var(--c-ink); font-weight: 650; }
+                .docs-content hr { border: none; border-top: 1px solid var(--c-rule); margin: 2.25rem 0; }
             `}} />
         </div>
     );

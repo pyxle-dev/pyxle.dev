@@ -105,7 +105,10 @@ function DefaultPreview() {
     return (
         <div className="card">
             <span className="tag">state lives in Python</span>
-            <h1>{count}</h1>
+            {/* Deliberately NOT a heading: this widget embeds mid-page on
+               both / and /playground, and a navigable heading named "0"
+               only damages the outline wherever it lands. */}
+            <div className="preview-h1">{count}</div>
             <p>Edit the code → real Python boots.</p>
             <button type="button" onClick={() => setCount((c) => c + 1)}>
                 Increment +

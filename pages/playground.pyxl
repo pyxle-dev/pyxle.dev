@@ -39,73 +39,28 @@ async def react_emoji(request):
     return {"ok": True, "emoji": emoji, "count": new_count}
 
 
-import React, { useState, useEffect } from 'react';
-import { useAction, Link, Head } from 'pyxle/client';
+import React, { useState } from 'react';
+import { useAction, Head } from 'pyxle/client';
 import { LivePlayground, DEFAULT_SOURCE } from './components/live-playground.jsx';
-import { tokenizeBlock } from './components/code-highlighter.jsx';
+import {
+    useScrollReveal, CopyButton, CodeBlock,
+    InkButton, EditorialLink, Plate, GpSection, GpHead, GalleyFooter,
+} from './components/galley.jsx';
 
 export const slots = {
     'nav-extra': () => (
-        <a href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/playground.pyxl" target="_blank" rel="noreferrer" aria-label="View page source" title="View page source" className="focus-ring hidden sm:inline-flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10 transition-colors">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
-            </svg>
+        <a
+            href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/playground.pyxl"
+            target="_blank"
+            rel="noreferrer"
+            title="View this page's source"
+            className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
+        >
+            source ↗
         </a>
     ),
 };
 export const createSlots = () => slots;
-
-
-/* ── Scroll reveal (native IntersectionObserver, no-JS safe) ──────── */
-function useScrollReveal() {
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        const els = Array.from(document.querySelectorAll('[data-reveal]'));
-        const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (reduce || !('IntersectionObserver' in window)) {
-            els.forEach((el) => el.classList.add('is-visible'));
-            return;
-        }
-        const io = new IntersectionObserver((entries) => {
-            for (const e of entries) {
-                if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
-            }
-        }, { rootMargin: '0px 0px -10% 0px', threshold: 0.12 });
-        els.forEach((el) => io.observe(el));
-        return () => io.disconnect();
-    }, []);
-}
-
-function CopyButton({ text, label = 'Copy' }) {
-    const [copied, setCopied] = useState(false);
-    const copy = () => {
-        if (typeof navigator !== 'undefined' && navigator.clipboard) {
-            navigator.clipboard.writeText(text);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1600);
-        }
-    };
-    return (
-        <button type="button" onClick={copy} aria-label={`${label} to clipboard`}
-            className="focus-ring inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium transition border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 dark:border-white/10 dark:bg-white/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white">
-            {copied ? 'Copied' : label}
-        </button>
-    );
-}
-
-function CodeBlock({ code, lang = 'pyxl', className = '' }) {
-    return (
-        <pre className={`overflow-x-auto font-mono leading-[1.7] ${className}`}>
-            <code>
-                {tokenizeBlock(code, lang).map((tokens, i) => (
-                    <React.Fragment key={i}>
-                        {tokens.length === 0 ? '\n' : (<>{tokens.map((t, j) => <span key={j} className={t.cls}>{t.text}</span>)}{'\n'}</>)}
-                    </React.Fragment>
-                ))}
-            </code>
-        </pre>
-    );
-}
 
 
 /* ── Runnable examples (each runs in the isolated in-browser sandbox) ─ */
@@ -333,74 +288,78 @@ const EXAMPLES = [
 ];
 
 
-/* ── The REPL ─────────────────────────────────────────────────────── */
-function Repl() {
+/* ── The working bench: hero, example tabs, the editor plate ──────── */
+
+function Bench() {
     const [i, setI] = useState(0);
     const ex = EXAMPLES[i];
     return (
-        <section className="relative isolate overflow-hidden px-5 sm:px-6 pt-28 pb-16 sm:pt-32 sm:pb-20">
-            <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-                <div className="absolute inset-0 grid-bg opacity-50" />
-                <div className="aurora aurora-anim parallax-slow absolute -inset-x-10 -top-48 h-[720px] origin-top" />
-                <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-white dark:to-[#0a0a0b]" />
-            </div>
-
-            <div className="relative mx-auto max-w-3xl text-center">
-                <span className="reveal inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium border-zinc-200 bg-white/60 text-zinc-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300 backdrop-blur">
-                    <span className="relative flex h-1.5 w-1.5">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
-                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    </span>
-                    Live · zero install
-                </span>
-                <h1 className="reveal mt-6 text-balance text-4xl font-semibold leading-[1.0] tracking-[-0.03em] sm:text-6xl" style={{ animationDelay: '60ms' }}>
-                    Pyxle, live. <span className="gradient-text">No install.</span>
-                </h1>
-                <p className="reveal mx-auto mt-6 max-w-xl text-pretty text-base sm:text-lg text-zinc-600 dark:text-zinc-400" style={{ animationDelay: '120ms' }}>
-                    Write a real <code className="rounded px-1.5 py-0.5 text-[0.85em] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10">.pyxl</code> and run it instantly — the actual Pyxle parser plus your <code className="rounded px-1.5 py-0.5 text-[0.85em] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10">@server</code> and <code className="rounded px-1.5 py-0.5 text-[0.85em] text-emerald-700 dark:text-emerald-400 bg-emerald-500/10">@action</code> code, in an isolated sandbox. Zero install, nothing leaves your machine. In a real app this Python runs server-side on Starlette — the playground just simulates that here.
-                </p>
-            </div>
-
-            {/* Example switcher */}
-            <div className="reveal relative mx-auto mt-10 flex max-w-5xl flex-wrap items-center justify-center gap-2" style={{ animationDelay: '180ms' }} role="tablist" aria-label="Examples">
-                {EXAMPLES.map((e, idx) => (
-                    <button
-                        key={e.id}
-                        type="button"
-                        role="tab"
-                        aria-selected={idx === i}
-                        onClick={() => setI(idx)}
-                        className={`focus-ring inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
-                            idx === i
-                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                                : 'border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50 dark:border-white/10 dark:bg-white/5 dark:text-zinc-400 dark:hover:bg-white/10'
-                        }`}
-                    >
-                        <span className="font-medium">{e.label}</span>
-                        <span className="hidden font-mono text-[10px] opacity-60 sm:inline">{e.blurb}</span>
-                    </button>
-                ))}
-            </div>
-
-            {/* The editor */}
-            <div className="reveal relative mx-auto mt-6 max-w-5xl" style={{ animationDelay: '240ms' }}>
-                <div aria-hidden="true" className="pointer-events-none absolute -inset-x-8 -top-10 bottom-0 -z-10 opacity-70 blur-2xl"
-                    style={{ background: 'radial-gradient(60% 50% at 50% 0%, rgba(16,185,129,0.24), rgba(59,130,246,0.13) 55%, transparent 78%)' }} />
-                <div className="gradient-edge rounded-2xl p-px shadow-2xl shadow-emerald-500/10 dark:shadow-black/50">
-                    <div className="overflow-hidden rounded-2xl bg-[#0b0b0d] dark:bg-[#0c0c0e]">
-                        <LivePlayground initialSource={ex.source} fileLabel={ex.file} defaultPreview={ex.preview} paneHeight="h-[440px] sm:h-[520px]" />
-                    </div>
+        <section className="relative">
+            <div className="mx-auto max-w-[76rem] px-5 pb-16 pt-28 sm:px-8 sm:pb-20 sm:pt-36">
+                {/* Compact hero — the h1 paints immediately; only its period performs. */}
+                <div className="max-w-3xl">
+                    <p className="font-mono text-xs uppercase tracking-[0.14em] text-press">Interactive</p>
+                    <h1 className="mt-5 font-display text-[2.9rem] font-[560] leading-[1.04] tracking-[-0.015em] text-ink sm:text-[4.2rem]">
+                        Pyxle, live. No install<span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
+                        <span className="sr-only">.</span>
+                    </h1>
+                    <p className="mt-7 max-w-[58ch] text-pretty text-lg leading-[1.7] text-ink2">
+                        Write a real <code className="text-[0.9em] text-acct">.pyxl</code> and run it
+                        instantly — the actual Pyxle parser plus your{' '}
+                        <code className="text-[0.9em] text-acct">@server</code> and{' '}
+                        <code className="text-[0.9em] text-acct">@action</code> code, in an isolated
+                        sandbox. <span className="text-ink">Zero install, nothing leaves your machine.</span>{' '}
+                        In a real app this Python runs server-side on Starlette — the playground
+                        just simulates that here.
+                    </p>
                 </div>
-                <p className="mt-4 text-center font-mono text-[11px] uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                    <span className="text-emerald-600 dark:text-emerald-400">↑</span> edit freely · switch examples above · sandboxed · zero install
-                </p>
+
+                {/* Running head — the bench opens like a magazine spread. */}
+                <div className="mt-14 flex items-center gap-4">
+                    <span className="font-mono text-xs uppercase tracking-[0.14em] text-press">01 — The bench</span>
+                    <span className="h-px flex-1 bg-rule" aria-hidden="true" />
+                    <span className="hidden font-mono text-xs uppercase tracking-[0.14em] text-ink2 sm:block">edit freely · sandboxed · zero install</span>
+                </div>
+
+                {/* Example switcher — mono text tabs on the rule. */}
+                <div
+                    className="mt-6 flex flex-wrap items-center gap-x-7 gap-y-3"
+                   
+                    role="tablist"
+                    aria-label="Examples"
+                >
+                    {EXAMPLES.map((e, idx) => (
+                        <button
+                            key={e.id}
+                            type="button"
+                            role="tab"
+                            aria-selected={idx === i}
+                            onClick={() => setI(idx)}
+                            className={`focus-ring rounded font-mono text-[13px] transition-colors ${
+                                idx === i ? 'text-ink' : 'text-ink2 hover:text-ink'
+                            }`}
+                        >
+                            <span className={idx === i ? 'underline decoration-accent decoration-2 underline-offset-[6px]' : ''}>{e.label}</span>
+                            <span className="ml-2 hidden text-[10px] sm:inline">{e.blurb}</span>
+                        </button>
+                    ))}
+                </div>
+
+                {/* The editor */}
+                <div className="mt-7">
+                    <Plate caption={<>Fig. 1 — sandboxed CPython in your browser; nothing leaves your machine.</>}>
+                        <div className="duotone bg-[#0b0b0d]">
+                            <LivePlayground initialSource={ex.source} fileLabel={ex.file} defaultPreview={ex.preview} paneHeight="h-[440px] sm:h-[520px]" />
+                        </div>
+                    </Plate>
+                </div>
             </div>
         </section>
     );
 }
 
 
-/* ── Real-server proof: @action → SQLite (live, shared) ───────────── */
+/* ── 02 · Real-server proof: @action → SQLite (live, shared) ──────── */
 
 const EMOJI_MAP = {
     heart: { icon: '❤️', label: 'Love' },
@@ -446,146 +405,101 @@ function ReactionBoard({ data }) {
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
     return (
-        <section className="relative px-5 sm:px-6 py-16 sm:py-20">
-            <div className="mx-auto max-w-6xl">
-                <div data-reveal className="mb-10 text-center">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">And on a real server</p>
-                    <h2 className="mt-3 text-balance text-3xl sm:text-4xl font-semibold tracking-tight mx-auto max-w-2xl">The same <span className="gradient-text">@action</span>, hitting a real database.</h2>
-                    <p className="mx-auto mt-4 max-w-xl text-pretty text-sm sm:text-base text-zinc-600 dark:text-zinc-400">
-                        The editor above runs client-side. This board is the real deploy — every click is a POST to Python, writing to SQLite. The counts are live and shared by everyone on this page right now.
+        <GpSection n="02" id="real-server">
+            <GpHead
+                n="02"
+                eyebrow="And on a real server"
+                title={<>The same <code className="text-[0.85em] text-acct">@action</code>, hitting a real database.</>}
+                lead="The editor above runs client-side. This board is the real deploy — every click is a POST to Python, writing to SQLite. The counts are live and shared by everyone on this page right now."
+            />
+
+            <div className="mt-12 grid items-start gap-12 lg:grid-cols-12">
+                {/* The board */}
+                <div data-reveal className="min-w-0 lg:col-span-6">
+                    <div className="flex items-baseline justify-between gap-4 border-t border-rule pt-5">
+                        <h3 className="font-display text-[1.5rem] font-[540] tracking-[-0.01em] text-ink">React to this page</h3>
+                        <span className="font-mono text-sm tabular-nums text-ink2">{total} total</span>
+                    </div>
+                    <div className="mt-6 grid grid-cols-3 gap-3">
+                        {Object.entries(EMOJI_MAP).map(([key, { icon, label }]) => (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => handleClick(key)}
+                                className="focus-ring relative flex flex-col items-center gap-1.5 rounded-[6px] border border-rule bg-transparent p-3.5 transition-colors hover:border-accent"
+                            >
+                                <span className="select-none text-2xl">{icon}</span>
+                                <span className="font-mono text-[11px] text-ink2">{label}</span>
+                                <span className="font-mono text-sm tabular-nums text-ink">{counts[key] || 0}</span>
+                                {latency[key] != null && (
+                                    <span className="absolute right-1.5 top-1.5 font-mono text-[10px] text-acct">{latency[key]}ms</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="min-h-[1.5rem] pt-4" aria-live="polite">
+                        {error && <p className="font-mono text-xs text-red-600 dark:text-red-400" role="alert">error: {error}</p>}
+                    </div>
+                    <p className="mt-2 font-mono text-[11px] leading-relaxed text-ink2">
+                        Every click is a POST to Python — no API route, no glue.
                     </p>
                 </div>
 
-                <div className="grid items-stretch gap-5 lg:grid-cols-2 lg:gap-6">
-                    <div data-reveal="left" className="flex min-w-0">
-                        <div className="flex min-w-0 flex-1 flex-col rounded-2xl border p-6 sm:p-7 border-zinc-200 bg-white dark:border-white/10 dark:bg-white/[0.02]">
-                            <div className="mb-5 flex items-center justify-between">
-                                <h3 className="text-base font-semibold">React to this page</h3>
-                                <span className="font-mono text-sm tabular-nums text-zinc-500 dark:text-zinc-400">{total} total</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-3">
-                                {Object.entries(EMOJI_MAP).map(([key, { icon, label }]) => (
-                                    <button key={key} onClick={() => handleClick(key)}
-                                        className="focus-ring relative flex flex-col items-center gap-1.5 rounded-xl border p-3.5 transition-all hover:-translate-y-0.5 border-zinc-200 bg-white hover:border-emerald-500/30 hover:bg-emerald-50/50 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-emerald-500/30 dark:hover:bg-emerald-500/[0.05]">
-                                        <span className="text-2xl select-none">{icon}</span>
-                                        <span className="text-[11px] text-zinc-500 dark:text-zinc-400">{label}</span>
-                                        <span className="font-mono text-sm font-semibold tabular-nums text-zinc-700 dark:text-zinc-300">{counts[key] || 0}</span>
-                                        {latency[key] != null && (
-                                            <span className="absolute -right-2 -top-2 rounded-full bg-emerald-500 px-1.5 py-0.5 font-mono text-[10px] text-zinc-950">{latency[key]}ms</span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                            {error && <p className="mt-4 text-sm font-medium text-red-500" role="alert">{error}</p>}
-                            <p className="mt-auto pt-6 text-xs text-zinc-500 dark:text-zinc-400">Every click is a POST to Python — no API route, no glue.</p>
+                {/* The handler, printed as a plate */}
+                <div data-reveal className="min-w-0 lg:col-span-6" style={{ ['--reveal-delay']: '120ms' }}>
+                    <Plate
+                        label="pages/playground.pyxl"
+                        caption={<>Fig. 2 — the live handler. Every click on the board runs this <span className="text-ink">@action</span> against SQLite on this server.</>}
+                    >
+                        <div className="duotone">
+                            <CodeBlock code={REACTION_CODE} className="p-5 text-[12.5px]" />
                         </div>
-                    </div>
-
-                    <div data-reveal="right" className="flex min-w-0" style={{ ['--reveal-delay']: '100ms' }}>
-                        <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0d]">
-                            <div className="flex items-center gap-2 border-b border-white/5 px-4 py-2.5">
-                                <span className="flex gap-1.5" aria-hidden="true">
-                                    <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
-                                    <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/60" />
-                                    <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/40" />
-                                </span>
-                                <span className="ml-1 font-mono text-[11px] text-zinc-400">pages/playground.pyxl</span>
-                            </div>
-                            <CodeBlock code={REACTION_CODE} className="flex-1 p-5 text-[12.5px] text-zinc-300" />
-                        </div>
-                    </div>
+                    </Plate>
                 </div>
             </div>
-        </section>
+        </GpSection>
     );
 }
 
 
-/* ── Closing CTA ──────────────────────────────────────────────────── */
+/* ── 03 · Build it for real (a recipe) ────────────────────────────── */
 
 const INSTALL_STEPS = ['pip install pyxle-framework', 'pyxle init my-app && cd my-app', 'pyxle install', 'pyxle dev'];
 
-function CTASection() {
+function BuildItForReal() {
     return (
-        <section className="relative overflow-hidden px-5 sm:px-6 py-20 sm:py-28">
-            <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-                <div className="aurora aurora-anim parallax-slow absolute inset-x-0 -bottom-40 h-[520px] opacity-60" />
-            </div>
-            <div className="mx-auto max-w-3xl text-center">
-                <div data-reveal>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-400">Ready when you are</p>
-                    <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight sm:text-5xl">Like what you ran? <span className="gradient-text">Build it for real.</span></h2>
-                    <p className="mx-auto mt-4 max-w-lg text-pretty text-sm sm:text-base text-zinc-600 dark:text-zinc-400">Four commands from zero to a running dev server.</p>
-                </div>
-                <div data-reveal className="mx-auto mt-8 max-w-md space-y-2 text-left" style={{ ['--reveal-delay']: '80ms' }}>
+        <GpSection n="03" id="build">
+            <GpHead
+                n="03"
+                eyebrow="Ready when you are"
+                title="Build it for real."
+                lead="Like what you ran? Four commands from zero to a running dev server."
+            />
+
+            <div className="mt-12 max-w-2xl">
+                <ol className="border-t border-rule">
                     {INSTALL_STEPS.map((cmd, i) => (
-                        <div key={cmd} className="flex items-center gap-3 rounded-lg border px-3.5 py-2.5 font-mono text-[13px] border-zinc-200 bg-white dark:border-white/10 dark:bg-white/[0.02]">
-                            <span className="w-4 font-sans text-[11px] font-medium tabular-nums text-zinc-500 dark:text-zinc-400">{i + 1}</span>
-                            <span className="select-none text-zinc-500 dark:text-zinc-400">$</span>
-                            <span className="flex-1 truncate text-zinc-800 dark:text-zinc-200">{cmd}</span>
-                            <CopyButton text={cmd} />
-                        </div>
+                        <li key={cmd} data-reveal className="border-b border-rule py-4" style={{ ['--reveal-delay']: `${i * 90}ms` }}>
+                            <div className="flex items-baseline gap-4">
+                                <span className="font-display text-lg font-[540] text-press" aria-hidden="true">{i + 1}</span>
+                                <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink sm:text-sm">{cmd}</code>
+                                <span className="shrink-0"><CopyButton text={cmd} /></span>
+                            </div>
+                        </li>
                     ))}
-                </div>
-                <div data-reveal className="mt-7 flex flex-wrap items-center justify-center gap-3" style={{ ['--reveal-delay']: '160ms' }}>
-                    <Link href="/docs/getting-started/installation" className="focus-ring group inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-900 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200 transition-colors">
-                        Read the docs
-                        <svg className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5-5 5M6 12h12" /></svg>
-                    </Link>
-                    <a href="https://github.com/pyxle-dev/pyxle" target="_blank" rel="noreferrer" className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg border px-5 py-3 text-sm font-medium border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10 transition-colors">
-                        <svg className="h-4 w-4 text-amber-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.48 3.5a.56.56 0 011.04 0l2.09 4.94 5.34.46c.5.04.7.66.32.99l-4.05 3.5 1.21 5.22c.11.49-.42.87-.85.61L12 16.98l-4.59 2.74c-.43.26-.96-.12-.85-.61l1.21-5.22-4.05-3.5a.56.56 0 01.32-.99l5.34-.46L11.48 3.5z" /></svg>
-                        Star on GitHub
-                    </a>
+                </ol>
+                <div data-reveal className="mt-8 flex flex-wrap items-center gap-5">
+                    <InkButton href="/docs/getting-started/installation">Read the docs</InkButton>
+                    <EditorialLink href="https://github.com/pyxle-dev/pyxle" external>Star on GitHub ↗</EditorialLink>
                 </div>
             </div>
-        </section>
-    );
-}
-
-
-/* ── Footer ───────────────────────────────────────────────────────── */
-const FOOTER_COLS = [
-    { h: 'Product', links: [['Docs', '/docs'], ['Playground', '/playground'], ['Benchmarks', '/benchmarks'], ['FAQ', '/docs/faq']] },
-    { h: 'Learn', links: [['Getting started', '/docs/getting-started/installation'], ['Server actions', '/docs/core-concepts/server-actions'], ['For AI agents', '/docs/guides/for-ai-agents']] },
-    { h: 'Community', links: [['GitHub', 'https://github.com/pyxle-dev/pyxle', true], ['Issues', 'https://github.com/pyxle-dev/pyxle/issues', true], ['Releases', 'https://github.com/pyxle-dev/pyxle/releases', true]] },
-];
-
-function Footer() {
-    const linkCls = 'text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors';
-    return (
-        <footer className="relative border-t border-zinc-200 dark:border-white/5">
-            <div aria-hidden="true" className="gradient-edge-static absolute inset-x-0 top-0 h-px opacity-80" />
-            <div className="mx-auto max-w-6xl px-5 sm:px-6 py-14">
-                <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="sm:col-span-2 lg:col-span-1">
-                        <Link href="/" aria-label="Pyxle home" className="focus-ring inline-flex items-center gap-2 rounded">
-                            <img src="/branding/pyxle-mark.svg" alt="" width="28" height="28" className="h-7 w-7" />
-                            <span className="text-[15px] font-semibold tracking-tight">Pyxle</span>
-                        </Link>
-                        <p className="mt-3 max-w-xs text-sm text-zinc-500 dark:text-zinc-400">Python and React in one file. The full-stack framework that gets out of your way.</p>
-                    </div>
-                    {FOOTER_COLS.map((col) => (
-                        <div key={col.h}>
-                            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">{col.h}</h3>
-                            <ul className="mt-4 space-y-2.5">
-                                {col.links.map(([label, href, ext]) => (
-                                    <li key={label}>{ext ? <a href={href} target="_blank" rel="noreferrer" className={linkCls}>{label}</a> : <Link href={href} className={linkCls}>{label}</Link>}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    ))}
-                </div>
-                <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-zinc-200 pt-6 dark:border-white/5 sm:flex-row">
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">Pyxle Framework — MIT licensed · open source.</p>
-                    <p className="inline-flex items-center gap-1.5 font-mono text-[11px] text-zinc-500 dark:text-zinc-400"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> built with Pyxle</p>
-                </div>
-            </div>
-        </footer>
+        </GpSection>
     );
 }
 
 
 /* ── Page ─────────────────────────────────────────────────────────── */
+
 export default function PlaygroundPage({ data }) {
     useScrollReveal();
     return (
@@ -594,7 +508,7 @@ export default function PlaygroundPage({ data }) {
                 <title>Playground — Try Pyxle with zero install</title>
                 <meta name="description" content="Try Pyxle with zero install: write a real .pyxl and run it in an isolated in-browser sandbox. The same @server and @action code runs server-side in a real app." />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <meta name="theme-color" content="#0a0a0b" />
+                <meta name="theme-color" content="#101411" />
                 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
                 <meta property="og:title" content="Pyxle Playground — try it with zero install" />
                 <meta property="og:description" content="Write and run real Pyxle in an isolated sandbox — zero install. Real apps run this Python server-side." />
@@ -605,11 +519,11 @@ export default function PlaygroundPage({ data }) {
                 <meta name="twitter:image" content="https://pyxle.dev/branding/og-default.png" />
             </Head>
             <main id="main">
-                <Repl />
+                <Bench />
                 <ReactionBoard data={data} />
-                <CTASection />
+                <BuildItForReal />
             </main>
-            <Footer />
+            <GalleyFooter version={data && data.version} />
         </>
     );
 }
