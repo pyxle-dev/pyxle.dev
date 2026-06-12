@@ -323,8 +323,7 @@ function Bench() {
 
                 {/* Example switcher — mono text tabs on the rule. */}
                 <div
-                    className="mt-6 flex flex-wrap items-center gap-x-7 gap-y-3"
-                   
+                    className="mt-6 flex flex-wrap items-center gap-2.5"
                     role="tablist"
                     aria-label="Examples"
                 >
@@ -335,12 +334,14 @@ function Bench() {
                             role="tab"
                             aria-selected={idx === i}
                             onClick={() => setI(idx)}
-                            className={`focus-ring rounded font-mono text-[13px] transition-colors ${
-                                idx === i ? 'text-ink' : 'text-ink2 hover:text-ink'
+                            className={`focus-ring cursor-pointer rounded-[6px] border px-3.5 py-2 font-mono text-[13px] transition-all duration-200 ${
+                                idx === i
+                                    ? 'border-ink bg-ink text-paper shadow-[0_1px_2px_rgba(20,25,21,0.12)]'
+                                    : 'border-rule bg-transparent text-ink2 hover:-translate-y-px hover:border-ink2 hover:text-ink'
                             }`}
                         >
-                            <span className={idx === i ? 'underline decoration-accent decoration-2 underline-offset-[6px]' : ''}>{e.label}</span>
-                            <span className="ml-2 hidden text-[10px] sm:inline">{e.blurb}</span>
+                            <span>{e.label}</span>
+                            <span className={`ml-2 hidden text-[10px] sm:inline ${idx === i ? 'text-paper/60' : 'opacity-60'}`}>{e.blurb}</span>
                         </button>
                     ))}
                 </div>
