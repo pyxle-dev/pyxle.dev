@@ -1,8 +1,29 @@
 {
-  "founding_slots_total": 5,
-  "official": [
+  "_comment": "Forward-compatible ecosystem registry. The page renders official plugins + the founding cohort TODAY; as community plugins arrive it grows into a capability-organised directory (group by `category`, tier within each: official > recommended > community) with NO page rewrite — just more rows here. `categories` is the published taxonomy a plugin slots into. `tier`: official (Pyxle team) | recommended (community, reviewed, the suggested default for its category) | community (listed, meets standards). `contract` names the capability interface a plugin implements, so providers in one category become swappable by config — the ecosystem's real differentiator.",
+  "categories": [
+    "Authentication",
+    "Databases",
+    "Caching",
+    "Mail",
+    "Storage",
+    "Background Jobs",
+    "Payments",
+    "AI",
+    "Monitoring",
+    "Search",
+    "Security",
+    "Developer Tools"
+  ],
+  "founding": {
+    "slots_total": 5,
+    "claimed": 0
+  },
+  "plugins": [
     {
       "name": "pyxle-db",
+      "tier": "official",
+      "category": "Databases",
+      "contract": "DatabaseLike",
       "description": "One explicit-SQL API over SQLite, PostgreSQL, and MySQL — portable placeholders, a uniform Row, checksum-tracked migrations, and the DatabaseLike contract other plugins build on.",
       "pypi": "https://pypi.org/project/pyxle-db/",
       "docs": "/docs/plugins/pyxle-db",
@@ -11,12 +32,14 @@
     },
     {
       "name": "pyxle-auth",
+      "tier": "official",
+      "category": "Authentication",
+      "contract": null,
       "description": "Email + password accounts on argon2id — sliding sessions, password-reset and verification flows, wildcard RBAC, scoped API tokens, and request guards. Fail-secure by default.",
       "pypi": "https://pypi.org/project/pyxle-auth/",
       "docs": "/docs/plugins/pyxle-auth",
       "repo": "https://github.com/pyxle-dev/pyxle-plugins",
       "tags": ["auth", "sessions", "rbac", "tokens"]
     }
-  ],
-  "community": []
+  ]
 }

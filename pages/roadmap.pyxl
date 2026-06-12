@@ -62,7 +62,7 @@ const ERAS = [
         lead: 'Started, public, and moving — these have pages you can act on today.',
         status: 'now',
         items: [
-            ['The Founding Plugin Program', 'Five permanent slots in the plugin directory, reserved for the first community plugins that meet the published standards. The bar is public; the race is to the bar, not to the submit button.', '/plugins', 'Claim a slot'],
+            ['The founding plugin cohort', 'A launch program: the first five community plugins that meet the published standards are recognised as ecosystem pioneers, with the spotlight and a roadmap seat. The bar is public; the race is to the bar, not to the submit button.', '/plugins', 'Claim a spot'],
             ['RFC: plugin routes & pages', 'The Phase B design discussion is open — how plugins will ship their own API endpoints, then whole pages. Founding authors co-design it.', '/docs/plugins/rfc-plugin-pages', 'Read the RFC'],
         ],
     },
@@ -76,6 +76,7 @@ const ERAS = [
         items: [
             ['Plugins ship API routes (Phase B1)', 'pyxle-auth providing its own sign-in endpoints out of the box; webhook plugins owning their URLs with the right CSRF posture.'],
             ['Plugins ship pages (Phase B2)', 'Sign-in screens, dashboards — and the admin-panel moment this framework should eventually have.'],
+            ['Capability contracts', 'The DatabaseLike idea, generalised: framework-defined interfaces for mail, storage, cache, and more, so providers (Postmark, SES, S3, R2…) are swappable by config, not code. Pyxle ships the interface; the community ships the adapters — one recommended pick per capability, alternatives behind it.'],
             ['The ecosystem quests', 'Mail, storage, jobs, observability — the plugins the ideas page calls for, built by the community or by us.', '/docs/plugins/ideas', 'Browse the ideas'],
             ['TypeScript across the boundary', 'Write .tsx in your .pyxl, and get loader-data types generated from the Python side — the request that comes up most, answered end to end.'],
             ['Validated actions', 'Type-hint a Pydantic model on an @action and get parsing, validation, and clean 422s for free — Python-native, FastAPI-familiar.'],

@@ -105,18 +105,25 @@ function Official({ registry }) {
                 lead="Built and maintained by the core team, held to the same standards we ask of everyone — tested against real PostgreSQL and MySQL servers in CI, fail-secure by default, honest about scope."
             />
             <div className="mt-12 grid gap-6 md:grid-cols-2">
-                {registry.official.map((p, i) => (
-                    <PluginCard key={p.name} plugin={p} badge="official" delay={i * 80} />
+                {registry.plugins.filter((p) => p.tier === 'official').map((p, i) => (
+                    <PluginCard key={p.name} plugin={p} badge={p.category} delay={i * 80} />
                 ))}
             </div>
+            <p className="mt-8 max-w-[60ch] text-[15px] leading-[1.7] text-ink2">
+                As the ecosystem grows, this directory organises by what you're
+                trying to do — Mail, Storage, Caching, Background Jobs — with a
+                recommended pick and the alternatives in each. The aim isn't the most
+                plugins; it's <span className="text-ink">one obvious way to do most
+                things, with room to choose differently.</span>
+            </p>
         </GpSection>
     );
 }
 
-/* ── 02 · The Founding Five ──────────────────────────────────── */
+/* ── 02 · The founding cohort ────────────────────────────────── */
 
 const OFFER_ROWS = [
-    ['The badge', 'A permanent Founding Plugin mark in this directory — it never expires'],
+    ['Pioneer recognition', 'A permanent place among the plugins that started the ecosystem — recognition that grows in value as Pyxle does, not a gate on anyone after you'],
     ['The spotlight', 'A featured slot on this page and a launch write-up from the official account'],
     ['The review', 'Direct code review and pairing from the core team while you build'],
     ['The seat', 'Co-design input on Phase B — the plugin pages & routes API — before it ships'],
@@ -156,17 +163,18 @@ function FoundingSlot({ entry, index }) {
 }
 
 function Founding({ registry }) {
-    const total = registry.founding_slots_total ?? 5;
-    const slotEntries = Array.from({ length: total }, (_, i) => registry.community[i] ?? null);
-    const taken = registry.community.length;
+    const total = registry.founding?.slots_total ?? 5;
+    const community = registry.plugins.filter((p) => p.tier !== 'official');
+    const slotEntries = Array.from({ length: total }, (_, i) => community[i] ?? null);
+    const taken = community.length;
 
     return (
         <GpSection n="02" id="founding">
             <GpHead
                 n="02"
-                eyebrow="The Founding Five"
-                title="Five slots. First to the bar, not first to submit."
-                lead={`The first ${total} community plugins that meet the published standards join this directory as Founding Plugins — permanently. ${taken === 0 ? 'All five slots are open.' : `${total - taken} of ${total} slots remain.`}`}
+                eyebrow="The founding cohort"
+                title="Be one of the first five."
+                lead={`A launch program, not a permanent club: the first ${total} community plugins to meet the published standards are recognised as ecosystem pioneers — and get the spotlight, review, and roadmap seat below while they build. ${taken === 0 ? 'All five spots are open.' : `${total - taken} of ${total} spots remain.`} After the cohort, the directory stays open to everyone, organised by capability.`}
             />
             <div className="mt-12 max-w-3xl">
                 <dl className="border-t border-rule">
@@ -183,9 +191,11 @@ function Founding({ registry }) {
                     <FoundingSlot key={i} entry={entry} index={i} />
                 ))}
             </div>
-            <p className="mt-6 max-w-[60ch] font-mono text-xs leading-relaxed text-ink2">
-                Community plugins are listed under their author's name and are not
-                security-audited by the Pyxle team. The bar is public; reviews are honest.
+            <p className="mt-6 max-w-[64ch] font-mono text-xs leading-relaxed text-ink2">
+                Ship under your own package name — the bare <span className="text-ink">pyxle-*</span> namespace
+                is reserved for official plugins, and a cohort plugin may be granted its
+                canonical name. Community plugins are listed under their author's name and
+                are not security-audited by the Pyxle team. The bar is public; reviews are honest.
             </p>
         </GpSection>
     );
