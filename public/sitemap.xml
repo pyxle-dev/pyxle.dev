@@ -1,41 +1,40 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://pyxle.dev/</loc><priority>1.0</priority></url>
+  <url><loc>https://pyxle.dev/docs</loc><priority>0.9</priority></url>
   <url><loc>https://pyxle.dev/playground</loc><priority>0.8</priority></url>
   <url><loc>https://pyxle.dev/benchmarks</loc><priority>0.7</priority></url>
-
-  <!-- Getting Started -->
+  <url><loc>https://pyxle.dev/docs/getting-started/introduction</loc><priority>0.9</priority></url>
   <url><loc>https://pyxle.dev/docs/getting-started/installation</loc><priority>0.9</priority></url>
   <url><loc>https://pyxle.dev/docs/getting-started/quick-start</loc><priority>0.9</priority></url>
-  <url><loc>https://pyxle.dev/docs/getting-started/project-structure</loc><priority>0.8</priority></url>
-
-  <!-- Core Concepts -->
+  <url><loc>https://pyxle.dev/docs/getting-started/project-structure</loc><priority>0.9</priority></url>
   <url><loc>https://pyxle.dev/docs/core-concepts/pyxl-files</loc><priority>0.8</priority></url>
   <url><loc>https://pyxle.dev/docs/core-concepts/routing</loc><priority>0.8</priority></url>
   <url><loc>https://pyxle.dev/docs/core-concepts/data-loading</loc><priority>0.8</priority></url>
   <url><loc>https://pyxle.dev/docs/core-concepts/server-actions</loc><priority>0.8</priority></url>
-  <url><loc>https://pyxle.dev/docs/core-concepts/layouts</loc><priority>0.7</priority></url>
-
-  <!-- Guides -->
+  <url><loc>https://pyxle.dev/docs/core-concepts/layouts</loc><priority>0.8</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/comparison</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/styling</loc><priority>0.7</priority></url>
-  <url><loc>https://pyxle.dev/docs/guides/head-management</loc><priority>0.6</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/head-management</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/api-routes</loc><priority>0.7</priority></url>
-  <url><loc>https://pyxle.dev/docs/guides/middleware</loc><priority>0.6</priority></url>
-  <url><loc>https://pyxle.dev/docs/guides/environment-variables</loc><priority>0.6</priority></url>
-  <url><loc>https://pyxle.dev/docs/guides/error-handling</loc><priority>0.6</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/middleware</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/plugins</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/environment-variables</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/error-handling</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/client-components</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/security</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/deployment</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/editor-setup</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/for-ai-agents</loc><priority>0.7</priority></url>
-
-  <!-- Reference -->
+  <url><loc>https://pyxle.dev/docs/guides/migration-pyx-to-pyxl</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/reference/cli</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/reference/configuration</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/reference/runtime-api</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/reference/client-api</loc><priority>0.7</priority></url>
-
-  <!-- Architecture -->
+  <url><loc>https://pyxle.dev/docs/reference/plugins-api</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/plugins/pyxle-db</loc><priority>0.8</priority></url>
+  <url><loc>https://pyxle.dev/docs/plugins/pyxle-auth</loc><priority>0.8</priority></url>
+  <url><loc>https://pyxle.dev/docs/architecture/README</loc><priority>0.5</priority></url>
   <url><loc>https://pyxle.dev/docs/architecture/overview</loc><priority>0.5</priority></url>
   <url><loc>https://pyxle.dev/docs/architecture/pyxl-files</loc><priority>0.5</priority></url>
   <url><loc>https://pyxle.dev/docs/architecture/parser</loc><priority>0.5</priority></url>
@@ -46,11 +45,8 @@
   <url><loc>https://pyxle.dev/docs/architecture/build-and-serve</loc><priority>0.5</priority></url>
   <url><loc>https://pyxle.dev/docs/architecture/runtime</loc><priority>0.5</priority></url>
   <url><loc>https://pyxle.dev/docs/architecture/cli</loc><priority>0.5</priority></url>
-
-  <!-- Advanced -->
   <url><loc>https://pyxle.dev/docs/advanced/ssr-pipeline</loc><priority>0.5</priority></url>
   <url><loc>https://pyxle.dev/docs/advanced/compiler-internals</loc><priority>0.5</priority></url>
-
-  <!-- FAQ -->
   <url><loc>https://pyxle.dev/docs/faq</loc><priority>0.6</priority></url>
+  <url><loc>https://pyxle.dev/docs/changelog</loc><priority>0.6</priority></url>
 </urlset>

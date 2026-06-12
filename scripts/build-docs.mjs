@@ -615,7 +615,49 @@ function build() {
   }
 
   writeFileSync(join(OUT_DIR, "manifest.json"), JSON.stringify(manifest, null, 2));
-  console.log(`\nDone: ${flatPages.length} pages, manifest written.`);
+
+  // ── Sitemap ─────────────────────────────────────────────────────
+  // Generated here, not hand-maintained: NAV_STRUCTURE is the single
+  // source of truth for every URL that churns (the docs catch-all), so
+  // the sitemap can never drift from the site again. Hand-edits to
+  // public/sitemap.xml will be overwritten by the next docs build.
+  const SITE_URL = "https://pyxle.dev";
+  const STATIC_PAGES = [
+    { path: "/", priority: "1.0" },
+    { path: "/docs", priority: "0.9" },
+    { path: "/playground", priority: "0.8" },
+    { path: "/benchmarks", priority: "0.7" },
+  ];
+  const CATEGORY_PRIORITY = {
+    "getting-started": "0.9",
+    "core-concepts": "0.8",
+    "plugins": "0.8",
+    "guides": "0.7",
+    "reference": "0.7",
+    "architecture": "0.5",
+    "advanced": "0.5",
+  };
+  const sitemapEntries = [
+    ...STATIC_PAGES,
+    ...flatPages.map((page) => ({
+      path: `/docs/${page.path}`,
+      priority: CATEGORY_PRIORITY[page.path.split("/")[0]] ?? "0.6",
+    })),
+  ];
+  const sitemap = [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`,
+    ...sitemapEntries.map(
+      (entry) =>
+        `  <url><loc>${SITE_URL}${entry.path}</loc><priority>${entry.priority}</priority></url>`
+    ),
+    `</urlset>`,
+    ``,
+  ].join("\n");
+  const sitemapPath = join(__dirname, "..", "public", "sitemap.xml");
+  writeFileSync(sitemapPath, sitemap);
+
+  console.log(`\nDone: ${flatPages.length} pages, manifest written, sitemap: ${sitemapEntries.length} URLs.`);
 
   // Fail the build on any link that won't resolve: a doc-to-doc link pointing
   // at an unpublished/nonexistent page, an internal link that isn't a relative
