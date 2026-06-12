@@ -1,4 +1,13 @@
 {
+  "plugins": [
+    {
+      "name": "pyxle-db",
+      "settings": {
+        "path": "data/pyxle.db",
+        "migrationsDir": "migrations"
+      }
+    }
+  ],
   "middleware": [],
   "cache": {
     "/": 60,
@@ -6,6 +15,8 @@
     "/docs/*": 1800
   },
   "csrf": {
-    "exemptPaths": ["/api/__actions/"]
+    "exemptPaths": [
+      "/api/__actions/"
+    ]
   }
 }

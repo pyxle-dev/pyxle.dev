@@ -8,8 +8,8 @@ VALID_EMOJIS = ["heart", "fire", "mind_blown", "rocket", "sparkles", "clap"]
 async def load_playground(request):
     from db import get_reactions, increment_playground_views
 
-    views = increment_playground_views()
-    reactions = get_reactions()
+    views = await increment_playground_views()
+    reactions = await get_reactions()
 
     return {
         "totalViews": views,
@@ -24,7 +24,7 @@ async def react_emoji(request):
 
     client_ip = get_client_ip(request)
     # 5 reactions per hour per IP, scoped to the playground reactions board.
-    if not check_rate_limit(client_ip, scope="react_emoji"):
+    if not await check_rate_limit(client_ip, scope="react_emoji"):
         raise ActionError(
             "Rate limit reached. Please try again after 1 hour.",
             status_code=429,
@@ -35,7 +35,7 @@ async def react_emoji(request):
     if emoji not in VALID_EMOJIS:
         raise ActionError("Invalid reaction", status_code=400)
 
-    new_count = increment_reaction(emoji)
+    new_count = await increment_reaction(emoji)
     return {"ok": True, "emoji": emoji, "count": new_count}
 
 

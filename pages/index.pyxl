@@ -15,7 +15,7 @@ async def subscribe_newsletter(request):
     from db import add_subscriber, check_rate_limit, get_client_ip
 
     client_ip = get_client_ip(request)
-    if not check_rate_limit(client_ip, scope="subscribe_newsletter"):
+    if not await check_rate_limit(client_ip, scope="subscribe_newsletter"):
         raise ActionError(
             "Rate limit reached. Please try again after 1 hour.",
             status_code=429,
@@ -31,7 +31,7 @@ async def subscribe_newsletter(request):
     if len(email) > 254:
         raise ActionError("Email address is too long.", status_code=400)
 
-    add_subscriber(email)
+    await add_subscriber(email)
     return {"message": "You're on the list. We'll keep you posted."}
 
 
@@ -110,7 +110,7 @@ function Hero({ version }) {
                         <p className="mt-7 font-mono text-xs text-ink2">
                             MIT{version ? ` · v${version}` : ''} ·{' '}
                             <Link href="/benchmarks" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">
-                                2.7× faster SSR than Next.js →
+                                up to 4.3× faster SSR than Next.js →
                             </Link>
                         </p>
                     </div>
@@ -342,11 +342,12 @@ function TheIndex() {
 
 /* ── 04 · The numbers (a typeset ledger) ─────────────────────────── */
 
-// From the June 2026 EC2 run (c7i.4xlarge, 16 workers) — see /benchmarks.
+// From the June 2026 off-box EC2 run (2× c7i.2xlarge, oha on its own
+// box, 8 workers) — see /benchmarks.
 const LEDGER = [
-    ['2.7×', 'faster server-side rendering than Next.js'],
-    ['68k+', 'requests per second, POST with body parsing'],
-    ['81k+', 'requests per second, JSON responses'],
+    ['4.3×', 'faster server-side rendering than Next.js, on a landing page'],
+    ['#1 of 7', 'on form POST — ahead of Hono, FastAPI, and Express'],
+    ['56k+', 'JSON requests per second — the fastest Python framework tested'],
 ];
 
 function CircledZero() {

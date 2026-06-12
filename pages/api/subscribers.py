@@ -46,9 +46,9 @@ def _require_auth() -> Response:
     )
 
 
-def _get_subscribers() -> list[dict]:
+async def _get_subscribers() -> list[dict]:
     from db import get_all_subscribers
-    return get_all_subscribers()
+    return await get_all_subscribers()
 
 
 async def endpoint(request: Request) -> Response:
@@ -57,7 +57,7 @@ async def endpoint(request: Request) -> Response:
 
     fmt = request.query_params.get("format", "html")
 
-    subscribers = _get_subscribers()
+    subscribers = await _get_subscribers()
 
     if fmt == "csv":
         buf = io.StringIO()

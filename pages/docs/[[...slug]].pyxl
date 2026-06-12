@@ -246,7 +246,7 @@ async def search_docs(request):
     # fires ~15 requests, so 300 allows ~20 search sessions per hour — plenty
     # for power users browsing docs, but still blocks automated scraping.
     client_ip = get_client_ip(request)
-    if not check_rate_limit(
+    if not await check_rate_limit(
         client_ip,
         scope="search_docs",
         max_attempts=300,

@@ -38,8 +38,9 @@ pages/                     # File-based routes
     +-- tailwind.css       # Tailwind entry point
 
 public/                    # Static assets (served at /)
-db.py                      # SQLite subscriber storage
-pyxle.config.json          # Pyxle configuration
+db.py                      # Data layer (async, on the pyxle-db plugin)
+migrations/                # pyxle-db migrations (schema source of truth)
+pyxle.config.json          # Pyxle configuration (incl. pyxle-db plugin)
 ```
 
 ---
@@ -53,6 +54,15 @@ This site showcases Pyxle best practices:
 - `HEAD` variable for static meta tags
 - Tailwind CSS for styling
 - File-based routing under `pages/`
+
+### Data Layer (`db.py` + pyxle-db plugin)
+
+- The **pyxle-db plugin** (declared in `pyxle.config.json`) opens `data/pyxle.db`
+  at startup and applies `migrations/` (checksum-tracked — never edit an applied
+  migration; add a new file).
+- `db.py` is the only module that talks to it; all its functions are **async**
+  (`await add_subscriber(...)`, `await check_rate_limit(...)`).
+- Schema changes go in `migrations/NNNN-slug.sql`, not in code.
 
 ### Newsletter Subscription (`pages/index.pyxl`)
 
