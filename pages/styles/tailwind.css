@@ -421,12 +421,22 @@ html.dark .preview-scope input { border-color: rgba(255,255,255,0.12); }
     html.js [data-reveal].is-visible .gp-struck-text { opacity: 0.85; }
 }
 
-/* ── Line-mask headline reveal (section h2s only — never the h1) ── */
+/* ── Line-mask headline reveal (section h2s only — never the h1) ──
+   Fraunces' font box is taller than the tight display leading, so the
+   last line's descenders paint below the line box; the mask needs a
+   bottom bleed or it crops them (g, p, y). The negative margin gives
+   the bleed back to layout, and the hidden offset clears the enlarged
+   window so pre-reveal text can't peek through it. */
 @layer utilities {
-    .gp-lm { display: block; overflow: hidden; }
+    .gp-lm {
+        display: block;
+        overflow: hidden;
+        padding-bottom: 0.25em;
+        margin-bottom: -0.25em;
+    }
     html.js .gp-lm > span {
         display: block;
-        transform: translateY(110%);
+        transform: translateY(calc(110% + 0.3em));
         transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
         transition-delay: var(--lm-delay, 0ms);
     }
