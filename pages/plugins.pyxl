@@ -59,7 +59,7 @@ function Hero() {
                 <p className="mt-7 max-w-[58ch] text-pretty text-lg leading-[1.7] text-ink2">
                     Pyxle plugins are one config line: declare them in{' '}
                     <span className="font-mono text-[0.92em] text-ink">pyxle.config.json</span>{' '}
-                    and they wire themselves at startup. Two official plugins ship today —
+                    and they wire themselves at startup. Three official plugins ship today —
                     and <span className="text-ink">five founding slots</span> in this
                     directory are reserved for the community.
                 </p>

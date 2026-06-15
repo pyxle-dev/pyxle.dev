@@ -80,6 +80,7 @@ const NAV_STRUCTURE = [
     items: [
       { file: "plugins/pyxle-db.md", slug: "pyxle-db" },
       { file: "plugins/pyxle-auth.md", slug: "pyxle-auth" },
+      { file: "plugins/pyxle-mail.md", slug: "pyxle-mail" },
       { file: "plugins/standards.md", slug: "standards" },
       { file: "plugins/ideas.md", slug: "ideas" },
       { file: "plugins/rfc-plugin-pages.md", slug: "rfc-plugin-pages" },
@@ -160,6 +161,7 @@ const SEARCH_KEYWORDS = {
   "reference/client-api": ["client api", "hooks", "useaction", "link", "navigate", "form", "head"],
   "plugins/pyxle-db": ["database", "db", "sqlite", "postgres", "postgresql", "mysql", "sql", "orm", "migrations", "transactions", "rows", "placeholders", "pool"],
   "plugins/pyxle-auth": ["auth", "authentication", "login", "sign in", "sessions", "password", "users", "rbac", "permissions", "roles", "api tokens", "bearer", "argon2", "password reset", "email verification", "rate limit", "guards"],
+  "plugins/pyxle-mail": ["mail", "email", "smtp", "resend", "transactional", "send", "welcome email", "mailprovider", "console provider", "reply-to"],
   "plugins/standards": ["plugin standards", "directory", "submit plugin", "community plugin", "review", "founding", "quality bar", "naming"],
   "plugins/ideas": ["plugin ideas", "build a plugin", "mail", "email", "storage", "s3", "cache", "redis", "sentry", "stripe", "payments", "jobs", "queue", "feature flags", "oauth", "search"],
   "plugins/rfc-plugin-pages": ["rfc", "phase b", "plugin pages", "plugin routes", "admin", "roadmap", "contribute routes"],

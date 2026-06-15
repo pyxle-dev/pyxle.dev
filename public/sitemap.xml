@@ -36,6 +36,7 @@
   <url><loc>https://pyxle.dev/docs/reference/plugins-api</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/plugins/pyxle-db</loc><priority>0.8</priority></url>
   <url><loc>https://pyxle.dev/docs/plugins/pyxle-auth</loc><priority>0.8</priority></url>
+  <url><loc>https://pyxle.dev/docs/plugins/pyxle-mail</loc><priority>0.8</priority></url>
   <url><loc>https://pyxle.dev/docs/plugins/standards</loc><priority>0.8</priority></url>
   <url><loc>https://pyxle.dev/docs/plugins/ideas</loc><priority>0.8</priority></url>
   <url><loc>https://pyxle.dev/docs/plugins/rfc-plugin-pages</loc><priority>0.8</priority></url>

@@ -40,6 +40,17 @@
       "docs": "/docs/plugins/pyxle-auth",
       "repo": "https://github.com/pyxle-dev/pyxle-plugins",
       "tags": ["auth", "sessions", "rbac", "tokens"]
+    },
+    {
+      "name": "pyxle-mail",
+      "tier": "official",
+      "category": "Mail",
+      "contract": "MailProvider",
+      "description": "Transactional email over a swappable MailProvider contract — console, SMTP, and Resend providers, sender defaults, and fail-loud config. The mailer pyxle-auth's reset and verification flows hand their tokens to.",
+      "pypi": "https://pypi.org/project/pyxle-mail/",
+      "docs": "/docs/plugins/pyxle-mail",
+      "repo": "https://github.com/pyxle-dev/pyxle-plugins",
+      "tags": ["mail", "email", "smtp", "resend", "transactional"]
     }
   ]
 }
