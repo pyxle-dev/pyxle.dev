@@ -475,6 +475,10 @@ function TheNumbers() {
                     Reproduce them yourself — full methodology, hardware, and harness at{' '}
                     <Link href="/benchmarks" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">/benchmarks →</Link>
                 </p>
+                <p data-reveal className="mt-3 font-mono text-xs leading-relaxed text-ink2" style={{ ['--reveal-delay']: '80ms' }}>
+                    Beyond raw speed — the full picture against Django, FastAPI, and Next.js is in{' '}
+                    <Link href="/docs/guides/comparison" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">the comparison →</Link>
+                </p>
             </div>
         </GpSection>
     );

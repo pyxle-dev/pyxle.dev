@@ -479,6 +479,7 @@ function build() {
 
   const manifest = { nav: [], searchIndex: [], pages: {} };
   const flatPages = []; // for prev/next linking
+  const llmsPages = []; // {title,description,category,path,markdown} for llms.txt / llms-full.txt
 
   // Map every published page's absolute SOURCE path → its published URL path.
   // Used to (a) resolve internal .md links to the correct URL — including links
@@ -623,6 +624,9 @@ function build() {
 
       manifest.pages[pagePath] = { title, category: section.category };
 
+      // For llms.txt / llms-full.txt (llmstxt.org — AI-readable site map).
+      llmsPages.push({ title, description, category: section.category, path: pagePath, markdown: md });
+
       console.log(`  OK: ${pagePath} — "${title}"`);
     }
 
@@ -681,7 +685,53 @@ function build() {
   const sitemapPath = join(__dirname, "..", "public", "sitemap.xml");
   writeFileSync(sitemapPath, sitemap);
 
-  console.log(`\nDone: ${flatPages.length} pages, manifest written, sitemap: ${sitemapEntries.length} URLs.`);
+  // ── llms.txt / llms-full.txt (llmstxt.org) ──────────────────────
+  // Pyxle is "AI-first"; this gives coding agents (and LLM-backed search) a
+  // clean, link-rich map of the docs without crawling client routes.
+  // Regenerated from NAV_STRUCTURE so it can never drift from the site.
+  const PUBLIC_DIR = join(__dirname, "..", "public");
+  const TAGLINE =
+    "Python and React in one file. A Python-first full-stack framework where @server loaders and @action mutations sit beside real React 18 (SSR + hydration) in a single .pyxl file — file-based routing, no API plumbing, no separate front-end build to wire up.";
+  const oneLine = (s) => (s || "").replace(/\s+/g, " ").trim();
+
+  const llms = [`# Pyxle`, ``, `> ${TAGLINE}`, ``];
+  for (const section of NAV_STRUCTURE) {
+    const pages = llmsPages.filter((p) => p.category === section.category);
+    if (!pages.length) continue;
+    llms.push(`## ${section.category}`, ``);
+    for (const p of pages) {
+      const note = oneLine(p.description);
+      llms.push(`- [${p.title}](${SITE_URL}/docs/${p.path})${note ? `: ${note}` : ""}`);
+    }
+    llms.push(``);
+  }
+  llms.push(
+    `## More`,
+    ``,
+    `- [Plugin directory](${SITE_URL}/plugins): official and community plugins`,
+    `- [Benchmarks & methodology](${SITE_URL}/benchmarks): reproducible performance numbers`,
+    `- [Interactive playground](${SITE_URL}/playground): run Pyxle in the browser`,
+    ``
+  );
+  writeFileSync(join(PUBLIC_DIR, "llms.txt"), llms.join("\n"));
+
+  // Full corpus: every page's markdown inlined, for agents that want it all.
+  const full = [
+    `# Pyxle — full documentation`,
+    ``,
+    `> ${TAGLINE}`,
+    ``,
+    `Every Pyxle documentation page, concatenated. Canonical site: ${SITE_URL}`,
+    ``,
+    `---`,
+    ``,
+  ];
+  for (const p of llmsPages) {
+    full.push(`Source: ${SITE_URL}/docs/${p.path}`, ``, p.markdown.trim(), ``, `---`, ``);
+  }
+  writeFileSync(join(PUBLIC_DIR, "llms-full.txt"), full.join("\n"));
+
+  console.log(`\nDone: ${flatPages.length} pages, manifest written, sitemap: ${sitemapEntries.length} URLs, llms.txt (${llmsPages.length} pages) + llms-full.txt.`);
 
   // Fail the build on any link that won't resolve: a doc-to-doc link pointing
   // at an unpublished/nonexistent page, an internal link that isn't a relative
