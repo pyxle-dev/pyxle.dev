@@ -51,6 +51,51 @@ async def _get_subscribers() -> list[dict]:
     return await get_all_subscribers()
 
 
+# Human labels for the stored unsubscribe reason categories
+# (db.UNSUBSCRIBE_REASONS). Unknown values fall back to the raw value, escaped.
+_REASON_LABELS = {
+    "too_many_emails": "Too many emails",
+    "not_relevant": "Not relevant",
+    "didnt_signup": "Didn't sign up",
+    "inbox_cleanup": "Inbox cleanup",
+    "other": "Other",
+}
+
+
+def _csv_safe(value: object) -> str:
+    """Neutralise spreadsheet formula injection in an exported cell.
+
+    Subscriber feedback is attacker-influenced free text, and a cell that
+    begins with ``= + - @`` (or a leading control char) is run as a formula
+    when the CSV is opened in Excel or Google Sheets. Prefixing a single quote
+    forces the value to be treated as literal text. Harmless for normal data.
+    """
+    text = "" if value is None else str(value)
+    if text and text[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + text
+    return text
+
+
+_STATUS_COLORS = {
+    "active": "#4ade80",
+    "unsubscribed": "#f87171",
+    "bounced": "#fb923c",
+    "complained": "#f87171",
+}
+
+
+def _status(sub: dict) -> str:
+    """Coarse delivery status for a subscriber, most-severe first. A spam
+    complaint also flags unsubscribed; a hard bounce is a suppression."""
+    if sub.get("suppression_reason") == "spam_complaint":
+        return "complained"
+    if sub.get("suppression_reason") == "hard_bounce":
+        return "bounced"
+    if sub["unsubscribed_at"]:
+        return "unsubscribed"
+    return "active"
+
+
 async def endpoint(request: Request) -> Response:
     if not _check_auth(request):
         return _require_auth()
@@ -62,23 +107,56 @@ async def endpoint(request: Request) -> Response:
     if fmt == "csv":
         buf = io.StringIO()
         writer = csv.writer(buf)
-        writer.writerow(["id", "email", "subscribed_at"])
+        writer.writerow([
+            "id", "email", "status", "subscribed_at", "unsubscribed_at",
+            "unsubscribe_reason", "unsubscribe_feedback", "welcome_email_sent",
+            "suppressed_at", "suppression_reason",
+        ])
         for sub in subscribers:
-            writer.writerow([sub["id"], sub["email"], sub["subscribed_at"]])
+            writer.writerow([
+                _csv_safe(sub["id"]),
+                _csv_safe(sub["email"]),
+                _status(sub),
+                _csv_safe(sub["subscribed_at"]),
+                _csv_safe(sub["unsubscribed_at"]),
+                _csv_safe(sub["unsubscribe_reason"]),
+                _csv_safe(sub["unsubscribe_feedback"]),
+                _csv_safe(sub["welcome_email_sent"]),
+                _csv_safe(sub["suppressed_at"]),
+                _csv_safe(sub["suppression_reason"]),
+            ])
         return Response(
             content=buf.getvalue(),
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=pyxle-subscribers.csv"},
         )
 
-    count = len(subscribers)
+    total = len(subscribers)
+    suppressed = sum(1 for s in subscribers if s["suppressed_at"])
+    unsubscribed = sum(1 for s in subscribers if s["unsubscribed_at"] and not s["suppressed_at"])
+    active = total - suppressed - unsubscribed
+
+    td = "padding:8px 16px;border-bottom:1px solid #222;vertical-align:top"
     rows_html = ""
     for sub in subscribers:
+        is_unsubbed = bool(sub["unsubscribed_at"])
+        st = _status(sub)
+        status = f'<span style="color:{_STATUS_COLORS[st]}">{st.capitalize()}</span>'
+        welcome = "✓" if sub["welcome_email_sent"] else "—"
+        unsubbed_at = escape(sub["unsubscribed_at"]) if is_unsubbed else "—"
+        reason_raw = sub["unsubscribe_reason"]
+        reason = escape(_REASON_LABELS.get(reason_raw, reason_raw)) if reason_raw else "—"
+        feedback = escape(sub["unsubscribe_feedback"]) if sub["unsubscribe_feedback"] else "—"
         rows_html += (
             f"<tr>"
-            f'<td style="padding:8px 16px;border-bottom:1px solid #222">{sub["id"]}</td>'
-            f'<td style="padding:8px 16px;border-bottom:1px solid #222">{escape(sub["email"])}</td>'
-            f'<td style="padding:8px 16px;border-bottom:1px solid #222">{escape(sub["subscribed_at"])}</td>'
+            f'<td style="{td}">{sub["id"]}</td>'
+            f'<td style="{td}">{escape(sub["email"])}</td>'
+            f'<td style="{td}">{status}</td>'
+            f'<td style="{td};text-align:center">{welcome}</td>'
+            f'<td style="{td};color:#a1a1aa;white-space:nowrap">{escape(sub["subscribed_at"])}</td>'
+            f'<td style="{td};color:#a1a1aa;white-space:nowrap">{unsubbed_at}</td>'
+            f'<td style="{td}">{reason}</td>'
+            f'<td style="{td};max-width:280px;word-break:break-word;color:#d4d4d8">{feedback}</td>'
             f"</tr>"
         )
 
@@ -106,23 +184,30 @@ async def endpoint(request: Request) -> Response:
 </head>
 <body>
   <h1>Newsletter Subscribers</h1>
-  <p class="meta">{count} subscriber{"s" if count != 1 else ""} total</p>
+  <p class="meta">{active} active &middot; {unsubscribed} unsubscribed &middot; {suppressed} suppressed &middot; {total} total</p>
   <div class="actions">
     <a href="/api/subscribers?format=csv" class="btn btn-primary">Download CSV</a>
     <a href="/api/subscribers" class="btn btn-secondary">Refresh</a>
   </div>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Email</th>
-        <th>Subscribed At</th>
-      </tr>
-    </thead>
-    <tbody>
-      {rows_html if rows_html else '<tr><td colspan="3" class="empty">No subscribers yet.</td></tr>'}
-    </tbody>
-  </table>
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Email</th>
+          <th>Status</th>
+          <th style="text-align:center">Welcome</th>
+          <th>Subscribed</th>
+          <th>Unsubscribed</th>
+          <th>Reason</th>
+          <th>Feedback</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows_html if rows_html else '<tr><td colspan="8" class="empty">No subscribers yet.</td></tr>'}
+      </tbody>
+    </table>
+  </div>
 </body>
 </html>"""
 

@@ -6,6 +6,9 @@
         "path": "data/pyxle.db",
         "migrationsDir": "migrations"
       }
+    },
+    {
+      "name": "pyxle-mail"
     }
   ],
   "middleware": [],
@@ -18,7 +21,9 @@
   },
   "csrf": {
     "exemptPaths": [
-      "/api/__actions/"
+      "/api/__actions/",
+      "/api/unsubscribe",
+      "/api/resend-webhook"
     ]
   }
 }
