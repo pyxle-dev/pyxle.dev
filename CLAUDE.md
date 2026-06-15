@@ -38,9 +38,12 @@ pages/                     # File-based routes
     +-- tailwind.css       # Tailwind entry point
 
 public/                    # Static assets (served at /)
+|-- docs-data/             # GENERATED docs JSON — do not hand-edit (see "Docs are generated")
++-- plugins-registry.json  # Drives the /plugins directory
+scripts/build-docs.mjs     # Builds public/docs-data/ from ../pyxle/docs/
 db.py                      # Data layer (async, on the pyxle-db plugin)
 migrations/                # pyxle-db migrations (schema source of truth)
-pyxle.config.json          # Pyxle configuration (incl. pyxle-db plugin)
+pyxle.config.json          # Pyxle config (plugins, CSRF exempt paths, edge cache)
 ```
 
 ---
@@ -77,6 +80,17 @@ This site showcases Pyxle best practices:
 - Client uses debounced `useAction` with a `searching` loading state
 - Invalid doc slugs render the `NotFoundPage` component with "Back to docs" link
 
+### Docs are generated — NOT authored in this repo
+
+The `/docs` pages are built from the **framework repo's** markdown:
+- `scripts/build-docs.mjs` reads `../pyxle/docs/**/*.md` → writes `public/docs-data/*.json` (the nav manifest + per-page JSON that `pages/docs/[[...slug]].pyxl` serves).
+- **After changing any framework doc in `pyxle/docs/`, run `node scripts/build-docs.mjs` and redeploy** — otherwise pyxle.dev keeps serving the old generated JSON. A framework-docs change (or a `pyxle-framework` release) alone does **not** update the site.
+- Nav order + per-page search keywords are **hardcoded** in `build-docs.mjs`; a brand-new doc must be added there to appear in the sidebar/search.
+
+### Plugins directory (`/plugins`)
+
+`pages/plugins.pyxl` renders `public/plugins-registry.json` (filtered by `tier`). To add an official plugin: add a registry entry, bump the hardcoded "N official plugins ship today" line in `plugins.pyxl`, **and** add its doc to `build-docs.mjs`'s nav.
+
 ### Theme System (`pages/layout.pyxl`)
 
 Root layout provides `ThemeContext` with `useTheme()` hook. Theme is stored in `localStorage`.
@@ -88,7 +102,16 @@ Root layout provides `ThemeContext` with `useTheme()` hook. Theme is stored in `
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `PYXLE_ADMIN_USERNAME` | No | Admin panel username (default: `admin`) |
-| `PYXLE_ADMIN_PASSWORD` | **Yes** | Admin panel password. Endpoint returns 401 if unset. |
+| `PYXLE_ADMIN_PASSWORD` | **Yes** | Admin panel password. `GET /api/subscribers` returns 401 if unset. |
+| `PYXLE_SECRET_KEY` | **Yes (prod)** | Signs CSRF tokens **and** unsubscribe HMAC links. Falls back to a public dev key if unset (forgeable). In prod it's set in the systemd unit. |
+| `PYXLE_MAIL_PROVIDER` | No | `console` (default, logs) \| `smtp` \| `resend`. Welcome-email transport. |
+| `PYXLE_MAIL_FROM` / `_FROM_NAME` / `_REPLY_TO` | smtp/resend | Sender identity (`hello@mail.pyxle.dev`, reply-to `shivam@pyxle.dev`). |
+| `PYXLE_MAIL_RESEND_API_KEY` | resend | Resend API key (secret). |
+| `PYXLE_PUBLIC_TURNSTILE_SITE_KEY` | No | Turnstile **site** key — public, **baked into the client bundle at `pyxle build` time**, so it must be in the *build* env or the subscribe form silently skips the bot check. |
+| `PYXLE_TURNSTILE_SECRET` | No | Turnstile **secret** — server-side, read per request. Unset ⇒ bot check skipped (local dev). |
+| `PYXLE_RESEND_WEBHOOK_SECRET` | No | Svix signing secret for `POST /api/resend-webhook`. Unset ⇒ endpoint fails closed (503). |
+
+Secrets live in the box `.env` (or the systemd unit) and are **never committed**. `pyxle build` *and* `pyxle serve` both load `.env` from the project dir (production mode), so prod env vars go in `pyxle-dev/.env` on the box (it's rsync-excluded, so it persists).
 
 ---
 
@@ -101,7 +124,11 @@ pyxle build
 pyxle serve --host 127.0.0.1 --port 8000 --skip-build
 ```
 
-Health check: `GET /api/healthz`
+Health check: `GET /api/healthz`. Deploy gotchas:
+- The prod `pip install` must upgrade **both** `pyxle-framework` **and** `pyxle-mail` (a runtime dep) — the `DEPLOYMENT.md` one-liner is the source of truth; make sure it lists both.
+- `PYXLE_PUBLIC_TURNSTILE_SITE_KEY` must be present at `pyxle build` time (baked into the client bundle); prod reads it from the box `pyxle-dev/.env`.
+- After deploying changes to **edge-cached routes** (`/docs/*`, `/plugins`, `/roadmap`, etc. per `pyxle.config.json::cache`), **purge the Cloudflare cache** (or wait the TTL, 1800s) or the old content keeps serving.
+- A framework-docs change only reaches `/docs` after `node scripts/build-docs.mjs` regenerates `public/docs-data/` and you redeploy (see "Docs are generated").
 
 ---
 
