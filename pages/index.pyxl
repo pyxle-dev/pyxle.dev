@@ -15,13 +15,24 @@ async def subscribe_newsletter(request):
     from db import add_subscriber, check_rate_limit, get_client_ip
 
     client_ip = get_client_ip(request)
-    if not await check_rate_limit(client_ip, scope="subscribe_newsletter"):
+    if not await check_rate_limit(
+        client_ip, scope="subscribe_newsletter", max_attempts=5, window_seconds=6 * 3600
+    ):
         raise ActionError(
-            "Rate limit reached. Please try again after 1 hour.",
+            "Too many attempts. Please try again in a few hours.",
             status_code=429,
         )
 
     body = await request.json()
+
+    # Bot check (Cloudflare Turnstile). Skipped when no secret is configured
+    # (local dev); enforced and fail-closed in production.
+    if not await _verify_turnstile(body.get("turnstileToken") or "", client_ip):
+        raise ActionError(
+            "Couldn't verify you're human. Please refresh and try again.",
+            status_code=400,
+        )
+
     email = (body.get("email") or "").strip().lower()
 
     if not email:
@@ -31,8 +42,84 @@ async def subscribe_newsletter(request):
     if len(email) > 254:
         raise ActionError("Email address is too long.", status_code=400)
 
-    await add_subscriber(email)
+    added = await add_subscriber(email)
+    if added:
+        await _send_welcome_email(request, email)
     return {"message": "You're on the list. We'll keep you posted."}
+
+
+async def _verify_turnstile(token: str, remote_ip: str) -> bool:
+    """Verify a Cloudflare Turnstile token via the siteverify API.
+
+    Returns ``True`` when valid. If ``PYXLE_TURNSTILE_SECRET`` is unset (local
+    dev) the check is skipped so the form still works without keys. In
+    production (secret set) it is enforced and **fails closed**: a missing
+    token, a rejected token, or a verify error all return ``False``.
+    """
+    import logging
+    import os
+
+    import httpx
+
+    secret = os.environ.get("PYXLE_TURNSTILE_SECRET", "")
+    if not secret:
+        return True  # not configured (dev) — don't block subscriptions
+    if not token:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(
+                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                data={"secret": secret, "response": token, "remoteip": remote_ip},
+            )
+        return bool(resp.json().get("success"))
+    except Exception:  # noqa: BLE001 - a verify failure must never pass as verified
+        logging.getLogger("pyxle_dev").warning("turnstile verify failed", exc_info=True)
+        return False
+
+
+async def _send_welcome_email(request, email: str) -> None:
+    """Best-effort welcome email — a mail failure must never fail the
+    subscribe (the row is already saved). Logs and moves on."""
+    import logging
+
+    from db import make_unsubscribe_token, mark_welcome_email_sent
+    from emails import welcome_email
+    from pyxle_mail import get_mail_service
+
+    try:
+        row = await _subscriber_row(email)
+        if row is None or row["welcome_email_sent"]:
+            return  # already welcomed once — never double-send
+        token = make_unsubscribe_token(row["id"])
+        base = str(request.base_url).rstrip("/")
+        unsubscribe_url = f"{base}/unsubscribe?id={row['id']}&token={token}"
+        subject, html, text = welcome_email(unsubscribe_url)
+        await get_mail_service().send(
+            to=email,
+            subject=subject,
+            html=html,
+            text=text,
+            headers={
+                "List-Unsubscribe": f"<{base}/api/unsubscribe?id={row['id']}&token={token}>",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
+        )
+        await mark_welcome_email_sent(row["id"])
+    except Exception:  # noqa: BLE001 - mail is non-critical to the subscribe
+        logging.getLogger("pyxle_dev").warning(
+            "welcome email failed to send", exc_info=True
+        )
+
+
+async def _subscriber_row(email: str):
+    from db import get_database
+
+    db = get_database()
+    row = await db.fetchone(
+        "SELECT id, welcome_email_sent FROM subscribers WHERE email = ?", (email,)
+    )
+    return row.asdict() if row else None
 
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
@@ -589,12 +676,57 @@ const RECIPE = [
     ['pyxle dev', 'SSR dev server with HMR at localhost:8000'],
 ];
 
+const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+let _turnstileLoader = null;
+function loadTurnstile() {
+    if (typeof window === 'undefined') return Promise.resolve(null);
+    if (window.turnstile) return Promise.resolve(window.turnstile);
+    if (_turnstileLoader) return _turnstileLoader;
+    _turnstileLoader = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = TURNSTILE_SRC;
+        s.async = true;
+        s.defer = true;
+        s.onload = () => resolve(window.turnstile || null);
+        s.onerror = reject;
+        document.head.appendChild(s);
+    });
+    return _turnstileLoader;
+}
+
 function GetStarted() {
+    // Turnstile site key — public, injected into the client bundle at build time
+    // via the PYXLE_PUBLIC_ convention. Guarded so an unset key degrades to ''.
+    const turnstileSiteKey = (import.meta.env && import.meta.env.PYXLE_PUBLIC_TURNSTILE_SITE_KEY) || '';
     const subscribe = useAction('subscribe_newsletter');
     const [email, setEmail] = useState('');
     const [status, setStatus] = useState(null);
     const [message, setMessage] = useState('');
     const successRef = useRef(null);
+
+    // Cloudflare Turnstile — armed lazily on first focus of the email field so
+    // the script never loads for visitors who don't engage the form.
+    const widgetRef = useRef(null);
+    const widgetIdRef = useRef(null);
+    const [tsToken, setTsToken] = useState('');
+    // True between a submit click and the Turnstile token landing — lets us
+    // wait (and auto-submit) instead of erroring when the check isn't done yet.
+    const [verifying, setVerifying] = useState(false);
+    const verifyTimerRef = useRef(null);
+
+    const armTurnstile = useCallback(() => {
+        if (!turnstileSiteKey || widgetIdRef.current !== null) return;
+        loadTurnstile().then((ts) => {
+            if (!ts || !widgetRef.current || widgetIdRef.current !== null) return;
+            widgetIdRef.current = ts.render(widgetRef.current, {
+                sitekey: turnstileSiteKey,
+                appearance: 'interaction-only',
+                callback: setTsToken,
+                'expired-callback': () => setTsToken(''),
+                'error-callback': () => setTsToken(''),
+            });
+        }).catch(() => {});
+    }, [turnstileSiteKey]);
 
     // The form unmounts on success — move focus to the confirmation so
     // keyboard users aren't dropped at the document body.
@@ -602,11 +734,15 @@ function GetStarted() {
         if (status === 'success' && successRef.current) successRef.current.focus();
     }, [status]);
 
-    const handleSubmit = useCallback(async (e) => {
-        e.preventDefault();
-        setStatus(null);
-        setMessage('');
-        const result = await subscribe({ email });
+    // The network submit, shared by the direct path (token already present) and
+    // the deferred path (token arrives after the click — see the effect below).
+    const doSubscribe = useCallback(async (token) => {
+        if (verifyTimerRef.current) {
+            clearTimeout(verifyTimerRef.current);
+            verifyTimerRef.current = null;
+        }
+        setVerifying(false);
+        const result = await subscribe({ email, turnstileToken: token });
         if (result.ok) {
             setStatus('success');
             setMessage(result.message);
@@ -614,8 +750,48 @@ function GetStarted() {
         } else {
             setStatus('error');
             setMessage(result.error);
+            // Turnstile tokens are single-use — get a fresh one for the retry.
+            if (widgetIdRef.current !== null && window.turnstile) {
+                window.turnstile.reset(widgetIdRef.current);
+                setTsToken('');
+            }
         }
     }, [email, subscribe]);
+
+    const handleSubmit = useCallback((e) => {
+        e.preventDefault();
+        setStatus(null);
+        setMessage('');
+        if (turnstileSiteKey && !tsToken) {
+            // The token isn't ready (the widget is still arming, or a challenge
+            // needs solving). Don't error — arm it and wait; the effect below
+            // fires the submit the instant the token lands, so there's no
+            // second click and no scary red error on a legitimate visitor.
+            armTurnstile();
+            setVerifying(true);
+            setStatus('verifying');
+            setMessage('One moment — running a quick human check…');
+            if (verifyTimerRef.current) clearTimeout(verifyTimerRef.current);
+            verifyTimerRef.current = setTimeout(() => {
+                verifyTimerRef.current = null;
+                setVerifying(false);
+                setStatus('error');
+                setMessage("Couldn't finish the human check — please try again.");
+            }, 30000);
+            return;
+        }
+        doSubscribe(tsToken);
+    }, [turnstileSiteKey, tsToken, armTurnstile, doSubscribe]);
+
+    // A submit is waiting on the human check and the token just arrived → send it.
+    useEffect(() => {
+        if (verifying && tsToken) doSubscribe(tsToken);
+    }, [verifying, tsToken, doSubscribe]);
+
+    // Drop the pending timer if we unmount mid-verify.
+    useEffect(() => () => {
+        if (verifyTimerRef.current) clearTimeout(verifyTimerRef.current);
+    }, []);
 
     return (
         <GpSection n="07" id="start">
@@ -690,6 +866,7 @@ function GetStarted() {
                                         type="email"
                                         value={email}
                                         onChange={(e) => { setEmail(e.target.value); setStatus(null); }}
+                                        onFocus={armTurnstile}
                                         placeholder="you@example.com"
                                         required
                                         autoComplete="email"
@@ -697,14 +874,16 @@ function GetStarted() {
                                     />
                                     <button
                                         type="submit"
-                                        disabled={subscribe.pending}
+                                        disabled={verifying || subscribe.pending}
                                         className="focus-ring shrink-0 rounded-[3px] bg-ink px-5 py-2.5 font-mono text-[13px] text-paper transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
-                                        {subscribe.pending ? 'Sending…' : 'Subscribe'}
+                                        {verifying ? 'Verifying…' : subscribe.pending ? 'Sending…' : 'Subscribe'}
                                     </button>
                                 </form>
+                                <div ref={widgetRef} className="mt-3 empty:hidden" />
                                 <div className="min-h-[1.5rem] pt-2" aria-live="polite">
                                     {status === 'error' && <p className="font-mono text-xs text-red-600 dark:text-red-400">error: {message}</p>}
+                                    {status === 'verifying' && <p className="font-mono text-xs text-ink2">{message}</p>}
                                 </div>
                                 <p className="mt-2 font-mono text-[11px] leading-relaxed text-ink2">
                                     def subscribe_newsletter(request) · validated, rate-limited, and stored by{' '}
