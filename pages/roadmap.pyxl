@@ -51,7 +51,7 @@ const ERAS = [
             ['Benchmarks in the open', 'Reproducible two-box benchmarks against six frameworks, load generator on its own hardware, losses shown alongside wins.', 'site'],
             ['A security wave', 'HEAD output rebuilt through a sanitising allowlist, CSRF exemptions matched on path boundaries, oversized form posts failing loud.', 'v0.4.3'],
             ['Multi-core serving', 'pyxle serve --workers N: independent server processes per core, sync endpoints threadpooled, small assets served from memory. This site runs it.', 'v0.4.3'],
-            ['Official plugins on PyPI', 'pyxle-db (SQLite, PostgreSQL, MySQL behind one explicit-SQL API) and pyxle-auth (argon2id sessions, RBAC, API tokens) — every claim enforced against live database servers in CI.', 'plugins 0.2'],
+            ['Official plugins on PyPI', 'pyxle-db (SQLite, PostgreSQL, MySQL behind one explicit-SQL API), pyxle-auth (argon2id sessions, RBAC, API tokens), and pyxle-mail (transactional email over SMTP, Resend, or the console) — every plugin tested in CI, the database claims against live PostgreSQL and MySQL.', 'plugins 0.2'],
         ],
     },
     {
