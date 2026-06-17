@@ -483,6 +483,7 @@ async def delete_user(request):
 - **The `@server` function must be `async`.** Pyxle enforces this at compile time.
 - **Use any Python imports.** Standard `import` / `from` statements stay in the Python section because they parse as valid Python. (A JavaScript import such as `import React from 'react'` isn't valid Python, so it is correctly treated as part of the JSX section — the split is by what parses, not by the leading keyword.)
 - **The `@server` and `@action` decorators are available globally** -- you do not need to import them (the compiler injects the import automatically).
+- **An optional `CACHE = {"revalidate": N}` directive** caches the rendered page for `N` seconds (server-side, with incremental regeneration). See [Caching](../guides/caching.md).
 
 ## The JSX section
 
@@ -518,6 +519,31 @@ export default function MyPage({ data }) {
 - **Can import from `pyxle/client`.** This gives you `<Head>`, `<Script>`, `<Image>`, `<ClientOnly>`, `<Form>`, `useAction`, `<Link>`, `navigate`, and `prefetch`.
 - **Can import from `node_modules`.** Any npm package in your `package.json` is available.
 - **Cannot import Python code.** The Python and JSX sections are compiled separately.
+- **Must be a pure function of its props.** No data fetching, I/O, secrets, Node built-ins, side effects, or non-deterministic values (`Date.now()`, `Math.random()`) in the render body — load in `@server`, mutate in `@action`, and put browser-only or effectful code in `useEffect` / event handlers / `<ClientOnly>`. See [Component purity](#component-purity) below.
+
+## Component purity
+
+A component's **render** is a pure function of its props: given the same `data`, it produces the same HTML, with no side effects. Whatever runs while the page renders on the server must be deterministic.
+
+**Don't, in the render body:**
+
+- fetch data, query a database, or touch the filesystem / network — that's the loader's job
+- read secrets or `process.env`
+- import Node built-ins (`fs`, `path`, `crypto`, `child_process`, …)
+- mutate state or cause other side effects
+- use non-deterministic values like `Date.now()`, `Math.random()`, or `new Date()` — they differ between the server render and the client and cause hydration mismatches
+
+**Do instead:**
+
+| You want to… | Use |
+|---|---|
+| load data for the page | a `@server` loader (runs before render; the result arrives as `data`) |
+| change data | an `@action`, called with `useAction` or `<Form>` |
+| run code after mount, or anything browser-only | `useEffect`, an event handler, or `<ClientOnly>` |
+
+This isn't a stylistic preference — purity is what makes a component **hydration-safe** (server and client render the same thing), **testable** (render is a function you can assert on), and **fast** (no hidden per-render I/O). It also keeps rendering portable to faster, sandboxed SSR backends in the future.
+
+Effects and event handlers are **exempt** — they don't run during the server render. Purity is about the *render pass*, not the whole component.
 
 ## Controlling the document `<head>`
 
@@ -828,6 +854,25 @@ async def load_page(request):
     return {"item": item}
 ```
 
+## Caching the render
+
+For a page whose content is the same for every visitor and changes rarely,
+return a `{"data": ..., "revalidate": <seconds>}` envelope instead of a plain
+dict. Pyxle caches the rendered HTML and serves it back without re-running the
+loader, refreshing it in the background once it goes stale:
+
+```python
+@server
+async def load_post(request):
+    post = await fetch_post(request.path_params["slug"])
+    return {"data": {"post": post}, "revalidate": 60}
+```
+
+`data` is the props your component receives; `revalidate` is the freshness
+window in seconds. **Only do this for pages that render no per-user data** — a
+cached render is shared with every visitor. See [Caching](../guides/caching.md)
+for invalidation, incremental regeneration, and the full contract.
+
 ## Error handling in loaders
 
 Raise `LoaderError` to trigger the nearest error boundary:
@@ -923,7 +968,7 @@ export default function StaticPage() {
 5. The full HTML is sent to the browser
 6. React hydrates the page on the client, using the same props embedded in the HTML
 
-The loader runs on **every request**. There is no built-in caching -- use your own caching strategy in the loader if needed.
+By default the loader runs on **every request**. To cache the rendered page and skip the loader on later requests, return a `{"data": ..., "revalidate": N}` envelope -- see [Caching](../guides/caching.md).
 
 ## Next steps
 
@@ -1899,6 +1944,524 @@ If no `<title>` element is provided by any source, Pyxle inserts a default:
 
 ---
 
+Source: https://pyxle.dev/docs/guides/caching
+
+# Caching
+
+By default a page's `@server` loader runs on **every request** and the page is
+rendered fresh each time. For pages whose content is the same for everyone and
+changes rarely — a marketing page, a docs article, a blog post — that work is
+wasted. Pyxle's **page cache** stores the rendered HTML and serves it back
+without re-running the loader or the SSR render, then refreshes it in the
+background when it goes stale.
+
+> **The one rule: only cache pages that render no per-user data.** A cached
+> render is shared byte-for-byte with every visitor. If a page embeds a logged-in
+> user's name, a CSRF token, or anything request-specific, **do not cache it** —
+> you would serve one user's page to another. Caching is always opt-in, exactly
+> so this stays your deliberate choice.
+
+## Making a page cacheable
+
+Return a `{"data": ..., "revalidate": <seconds>}` envelope from your loader
+instead of a plain dict. `data` is the props your component receives (exactly
+as before); `revalidate` is how many seconds the cached render stays fresh.
+
+```python
+@server
+async def load_post(request):
+    post = await fetch_post(request.path_params["slug"])
+    return {
+        "data": {"post": post},
+        "revalidate": 60,   # cache this render for 60 seconds
+    }
+```
+
+```jsx
+export default function Post({ data }) {
+  return <article>{data.post.body}</article>;   // `data` is the inner dict
+}
+```
+
+That's it. The first request renders and stores the page; requests within the
+next 60 seconds are served from the cache — no loader, no Node render.
+
+The envelope is recognised only in its exact two-key shape (`data` **and**
+`revalidate`, nothing else). A normal loader that happens to return keys named
+`data` or `revalidate` is never mistaken for a cache directive.
+
+### Pages without a loader
+
+A page with no `@server` loader can still opt into caching with a module-level
+`CACHE` directive in its Python section:
+
+```python
+CACHE = {"revalidate": 3600}   # cache this static page for an hour
+```
+
+```jsx
+export default function About() {
+  return <main><h1>About Us</h1></main>;
+}
+```
+
+`revalidate` is the freshness window in seconds, exactly as in the loader
+envelope (`0` means "serve cached but re-render every request"). It is validated
+at compile time — a non-numeric or negative value is a build error. If a page
+declares *both* a loader envelope and a `CACHE` directive, the loader's
+`revalidate` wins.
+
+## Incremental regeneration (stale-while-revalidate)
+
+When a cached page passes its `revalidate` window, the **next** request still
+gets the cached (stale) bytes immediately — no one waits for a re-render — and a
+single background re-render refreshes the cache for everyone after it. This is
+incremental static regeneration (ISR): fast responses, fresh-enough content, and
+never a thundering herd (only one refresh runs per page at a time, even under
+load).
+
+`revalidate: 0` is valid and means "serve the cached copy but re-render on every
+request" — useful when you want to absorb bursts without ever serving content
+older than one render.
+
+## Static pre-rendering (`pyxle build --static`)
+
+Pages with no `@server` loader and no dynamic route parameters render the same
+HTML for everyone, every time. `pyxle build --static` renders them **once at
+build time** and stores the result, so the first request after a deploy is
+already a cache hit — no cold SSR render, even for the very first visitor.
+
+```bash
+pyxle build --static
+```
+
+This pre-renders every loader-less, non-dynamic page into `dist/prerendered/`;
+on startup `pyxle serve` warms its page cache from that directory. Pages with a
+loader (or a `{param}` route) are skipped — they still render live and cache at
+runtime as before. Pre-rendered entries have no expiry until you
+`cache.invalidate(...)` the route. With the default in-memory backend they are
+re-warmed from the new `dist/prerendered/` on every restart; with a **shared
+file/redis backend**, warmed copies persist in that store, so if a later deploy
+stops passing `--static` (or adds a loader to a previously-static route), flush
+the cache or invalidate those routes — replacing `dist/` does not clear them.
+
+## Invalidating the cache
+
+When the underlying data changes — you publish a post, edit a page — purge the
+cached render so the next request re-renders immediately instead of waiting out
+the `revalidate` window:
+
+```python
+from pyxle import cache
+
+@action
+async def publish_post(request):
+    body = await request.json()
+    await save_post(body)
+    await cache.invalidate(f"/posts/{body['slug']}")   # drop that page's cache
+    return {"ok": True}
+```
+
+- `await cache.invalidate(path)` purges one route's cached render. Returns
+  `True` if something was cached, `False` otherwise — safe to call either way.
+- `await cache.invalidate_all()` purges every cached render.
+
+## How it interacts with the edge cache
+
+A route listed in your `pyxle.config.json` [`cache`](../reference/configuration.md)
+block (the **edge** cache, which sets `Cache-Control: public, s-maxage=…` for a
+CDN) is *also* served from the server-side page cache automatically, using that
+same TTL — you don't need to repeat yourself. When both apply, a loader's
+`revalidate` wins over the edge `s-maxage`.
+
+Cached page responses carry a strong `ETag`, so a conditional request
+(`If-None-Match`) gets a `304 Not Modified`, and an `x-pyxle-cache` response
+header reports `HIT`, `STALE`, or `MISS` for debugging.
+
+## Where the cache lives
+
+The cache is enabled automatically for production serves (`pyxle serve`) and
+disabled in `pyxle dev` so a cached render never hides an edit while you work.
+Choose where rendered HTML is stored with the `PYXLE_PAGE_CACHE_BACKEND`
+environment variable:
+
+| `PYXLE_PAGE_CACHE_BACKEND` | Stores in | Use when |
+|---|---|---|
+| `memory` *(default)* | bounded in-process memory (LRU) | single process, or any deploy where per-worker caches are fine |
+| `file` | local disk (`PYXLE_PAGE_CACHE_DIR`) | one host, multiple workers sharing a cache that survives restarts |
+| `redis` | shared Redis (`PYXLE_PAGE_CACHE_REDIS_URL`) | multiple hosts, or cross-worker invalidation |
+| `off` | nothing — caching disabled | you want it off in production |
+
+The in-memory backend is **bounded** by entry count (`PYXLE_PAGE_CACHE_MAX_ENTRIES`,
+default 512) and total body bytes (`PYXLE_PAGE_CACHE_MAX_BYTES`, default 64 MiB)
+with LRU eviction, so it never grows without limit. The Redis backend needs the
+optional extra: `pip install 'pyxle[redis]'`.
+
+**Invalidation and workers.** With the in-memory or file backend under
+`pyxle serve --workers N`, each worker keeps its own store, so
+`cache.invalidate(...)` reaches the worker that handled the action; entries
+still expire everywhere on their own via `revalidate`. The **Redis** backend is
+shared across every worker and host, so an invalidation fans out to all of them
+— choose it when you need cross-worker purges.
+
+## When *not* to cache
+
+- Pages that show the signed-in user's data, a per-user CSRF token, or anything
+  that varies by request. Leave these as plain loaders (`return {...}`), and they
+  are never cached.
+- Pages that must always reflect the absolute latest data with zero staleness —
+  use a plain loader, or `revalidate: 0` plus `cache.invalidate(...)` on every
+  write.
+
+> **Query strings:** the cache keys on the route **path** only, so a request
+> that carries a query string (`/search?q=…`, `?page=2`) is always served live —
+> never cached and never served a cached entry. A page whose content varies by
+> query is therefore never collapsed onto one shared render.
+
+## Next steps
+
+- Load data: [Data Loading](../core-concepts/data-loading.md)
+- Mutate data: [Server Actions](../core-concepts/server-actions.md)
+- Configure the edge cache: [Configuration](../reference/configuration.md)
+
+---
+
+Source: https://pyxle.dev/docs/guides/streaming
+
+# Streaming SSR
+
+By default Pyxle renders a page to its complete HTML string and then sends it.
+For a page with a slow part — a section that waits on a third-party API, a
+heavy below-the-fold widget — the visitor stares at a blank screen until the
+*whole* page is ready.
+
+**Streaming SSR** sends the page in pieces. Pyxle flushes the fast part (the
+"shell") immediately, so the browser can paint it, and streams the slow parts
+in as they become ready. Time-to-first-byte drops to the time it takes to
+render the shell instead of the whole page.
+
+Streaming is built on React 18's `renderToPipeableStream` and is **opt-in**: a
+page streams only when it uses a `<Suspense>` boundary. Every other page keeps
+the buffered render, unchanged.
+
+## Opting in with `<Suspense>`
+
+Wrap the slow part of your page in a `<Suspense>` boundary and give it a
+`fallback`. The fallback renders into the shell and streams immediately; the
+boundary's real content streams in when it resolves.
+
+```jsx
+import React, { Suspense } from 'react';
+
+export default function Dashboard({ data }) {
+  return (
+    <main>
+      <h1>{data.title}</h1>          {/* shell — flushed immediately */}
+
+      <Suspense fallback={<p>Loading activity…</p>}>
+        <ActivityFeed />            {/* streams in when it resolves */}
+      </Suspense>
+    </main>
+  );
+}
+```
+
+The compiler detects the `<Suspense>` at build time and marks the page as
+streamable — there's no configuration and no flag to set. A page with no
+`<Suspense>` is never affected.
+
+`<Suspense>` works the way it does in any React 18 app: a child suspends by
+throwing a promise (via `React.lazy`, a `use(promise)` call, or your own
+promise-throwing data source), and React shows the `fallback` until it
+resolves. Pyxle's `@server` loader still runs first and passes its result as
+`data` props, exactly as for a buffered page — streaming governs how the
+**rendered** page is delivered, not how the loader runs.
+
+## Route-level loading states with `loading.pyxl`
+
+A `loading.pyxl` file declares a **route-level** loading state — the React
+component it exports becomes the fallback for the whole route, the way Next.js's
+`loading.js` does:
+
+```
+pages/
+├── loading.pyxl              # fallback for every route
+└── dashboard/
+    ├── loading.pyxl          # fallback for /dashboard and everything under it
+    └── index.pyxl
+```
+
+```jsx
+// pages/dashboard/loading.pyxl
+import React from 'react';
+
+export default function DashboardLoading() {
+  return <p>Loading the dashboard…</p>;
+}
+```
+
+Pyxle wraps the page in `<Suspense fallback={<DashboardLoading/>}>` — on the
+server (so the loading state streams as the shell) **and** on the client (so
+hydration matches). The **nearest** `loading.pyxl` wins, walking up the
+directory tree exactly like [`error.pyxl`](error-handling.md). It composes with
+a page's own inner `<Suspense>`: an inner boundary handles its own subtree, and
+anything it doesn't catch bubbles up to the `loading.pyxl` shell. A
+`loading.pyxl` is compiled but never routable on its own.
+
+> **A `loading.pyxl` only shows if the render actually suspends.** Because the
+> `@server` loader runs *before* the component renders, a page whose data comes
+> entirely from the loader has its props ready by render time and **never
+> suspends** — so the fallback never appears, and the full page streams at once.
+> The loading state shows only when the render itself suspends: a child using
+> `React.lazy`, `use(promise)`, or a thrown promise. This is the honest
+> consequence of Pyxle's loader-first model; if you want a loading state for slow
+> *loader* data, that data isn't what `loading.pyxl` defers.
+
+A `loading.pyxl` should not declare a `<Head>` — like any streamed fallback it
+renders before the head is finalized, and on a client-side navigation the head
+is updated before the fallback renders, so a fallback's `<Head>` is ignored.
+
+## Hydration
+
+Nothing changes about hydration. The browser hydrates the same component it
+always did; React 18 reconciles the streamed markup (including the parts that
+arrived after the shell) natively. A streaming page is hydrated exactly like a
+buffered one.
+
+Hydration is **selective**: React hydrates the shell (and makes its interactive
+parts live) without waiting for a `<Suspense>` boundary to finish — an
+interactive control above the boundary responds to input while the boundary is
+still resolving, and each boundary hydrates as its content arrives.
+
+## Faster time-to-first-byte
+
+The point of streaming is that the browser receives — and can paint — the shell
+before the slow boundary is ready. For a page whose boundary takes, say, 600 ms
+to resolve, the shell's first byte arrives in tens of milliseconds rather than
+after the full ~600 ms a buffered render would wait. The slower the boundary,
+the bigger the win; a page with no slow boundary gains nothing, which is exactly
+why streaming is opt-in.
+
+## When a page does **not** stream
+
+Streaming is deliberately narrow. A page falls back to the buffered render when:
+
+- **It has no `<Suspense>` boundary.** There's nothing to defer, so there's no
+  shell to flush early.
+- **It is publicly cacheable** — a loader `{"data", "revalidate"}` envelope, a
+  `CACHE` directive, or an edge `cache` config entry (see [Caching](caching.md)).
+  A cacheable render has to be materialised in full so it can be stored and
+  given an `ETag`; streaming it would buy nothing, so cacheable routes always
+  render buffered. Streaming helps the dynamic, per-request pages that *can't*
+  be cached.
+- **The server is running without an SSR worker pool.** Streaming needs the
+  pool's multi-frame transport. `pyxle serve` runs the pool by default.
+
+A streamed response is always `Cache-Control: private, no-cache` — it is a
+per-request render and is never shared between visitors.
+
+## The head is static while streaming
+
+Because the document `<head>` is flushed *before* the component renders (that's
+what makes the shell fast), only the **static** head is available to a streamed
+page: the `HEAD` variable (including a `HEAD` callable evaluated from loader
+data) and `<Head>` blocks declared in your JSX or layout.
+
+A `<Head>` element registered *during* render — i.e. returned from a component
+as it renders — arrives too late to reach the already-flushed head and is
+omitted from a streamed page. Put meta tags a streamed page needs in the `HEAD`
+variable, not in a runtime-rendered `<Head>`. This only affects pages that opt
+into streaming; buffered pages merge runtime `<Head>` exactly as before.
+
+## Errors
+
+If the render fails before the first byte is sent — an error while producing
+the shell — Pyxle does **not** emit a half-written document. It falls back to
+the nearest [`error.pyxl`](error-handling.md) boundary (or the sanitized error
+page), exactly like a buffered render. Once the shell has flushed, an error
+inside a `<Suspense>` boundary is handled by React: it streams the boundary's
+fallback and recovers on the client.
+
+---
+
+Source: https://pyxle.dev/docs/guides/websockets
+
+# WebSockets
+
+A Pyxle page can serve a **WebSocket** alongside its HTML. Add a module-level
+`async def websocket(ws)` to a page's Python section and Pyxle registers a
+WebSocket route at the page's path — the same file serves both the rendered page
+over HTTP and a live connection over WS.
+
+```python
+# pages/chat/[room].pyxl
+
+from pyxle.realtime import channel
+
+async def websocket(ws):
+    await ws.accept()
+    room = ws.path_params["room"]
+    async with channel(ws, f"room:{room}") as live:
+        async for message in ws.iter_text():
+            await live.publish(message)
+
+
+# --- JavaScript/PSX (Client + Server) ---
+
+import React from 'react';
+import { useWebSocket } from 'pyxle/client';
+
+export default function Chat() {
+  const { status, send, lastMessage } = useWebSocket(window.location.pathname);
+  // …render the chat UI…
+}
+```
+
+Open `/chat/lobby` and you get the page; the client hook upgrades the **same
+path** to a WebSocket. Two browsers in `/chat/lobby` exchange messages in real
+time; `/chat/general` is a separate room.
+
+## The `websocket` handler
+
+Detection is by **convention**, not a decorator: a module-scope coroutine named
+`websocket` is the handler. (This matches how `pages/api/**` modules already
+expose a `websocket` callable, and keeps `pyxle.runtime` free of new symbols.)
+
+- It must be `async def` at module scope — a `def websocket` or a `class
+  websocket` is a compile error (almost always a mistyped handler).
+- Its first argument is the Starlette
+  [`WebSocket`](https://www.starlette.io/websockets/) — name it whatever you
+  like (`ws`, `socket`, …); it is **not** a `Request`.
+- Dynamic segments resolve into `ws.path_params` (e.g. `ws.path_params["room"]`
+  for `pages/chat/[room].pyxl`), exactly like a page loader.
+
+You call `await ws.accept()` yourself, then read with `ws.receive_text()` /
+`ws.iter_text()` and write with `ws.send_text()` / `ws.send_json()`. The handler
+owns the full connection lifecycle.
+
+> A page WebSocket handler runs **without middleware** — no auth population, no
+> CSRF, no route hooks. Starlette runs HTTP middleware only for `http` scope.
+> See [Authentication](#authentication-in-a-websocket-handler) below.
+
+## Channels (pub/sub)
+
+`pyxle.realtime` provides a small broadcast layer so you don't hand-roll
+connection bookkeeping. `channel(ws, name)` subscribes the connection to a named
+channel for the life of the `async with` block (unsubscribing on disconnect),
+and gives you a handle to `publish` to everyone in it:
+
+```python
+from pyxle.realtime import channel
+
+async def websocket(ws):
+    await ws.accept()
+    async with channel(ws, "notifications") as feed:
+        await feed.publish({"type": "joined"})       # dict → JSON frame
+        async for raw in ws.iter_text():
+            await feed.publish(raw)                   # str → text frame
+```
+
+A published message reaches **every** subscriber, including the sender — a chat
+UI that doesn't want to echo the sender's own messages filters them client-side.
+`bytes` are delivered as binary frames, `str` as text, anything else as JSON.
+
+The broker lives on `app.state.pyxle_broker` (one per process). For a custom
+backend, implement the `Broker` protocol (`subscribe` / `unsubscribe` /
+`publish`) and set your own.
+
+> **Multi-worker caveat.** The default `InProcessBroker` lives in **one
+> process**. Under `pyxle serve --workers N`, each worker has its own broker —
+> a client on worker 1 never receives a message published on worker 2 (Pyxle
+> logs a warning at startup when this combination is detected). For cross-worker
+> realtime, use a shared backend (Redis pub/sub) or sticky-session routing at
+> the load balancer. The default is correct for `pyxle dev` and single-worker
+> `pyxle serve`.
+
+## Authentication in a WebSocket handler
+
+Because the auth middleware never runs for a WebSocket upgrade, `request.user`
+is **not** available. Resolve the session yourself with
+`authenticate_websocket`, which reads the session cookie off the handshake and
+returns the user (or `None`):
+
+```python
+from pyxle.realtime import authenticate_websocket
+
+async def websocket(ws):
+    user = await authenticate_websocket(ws)
+    if user is None:
+        await ws.close(code=4401)   # unauthorized
+        return
+    await ws.accept()
+    # …user is the signed-in pyxle-auth user…
+```
+
+It returns `None` (doing zero work) when [`pyxle-auth`](../plugins/pyxle-auth.md)
+isn't installed or no session cookie is present.
+
+**Origin checking.** CSRF doesn't apply to a WebSocket upgrade, so a cross-site
+origin check is the equivalent guard against a hostile page opening a socket
+with the victim's cookie. Enforce it when the socket carries privileged state:
+
+```python
+from pyxle.realtime import origin_allowed
+
+async def websocket(ws):
+    if not origin_allowed(ws, ["https://app.example.com"]):
+        await ws.close(code=4403)
+        return
+    ...
+```
+
+## The `useWebSocket()` client hook
+
+`useWebSocket(path, options?)` connects from the browser with auto-reconnect,
+JSON parsing, and connection state. It **never connects during SSR** and
+reconnects with exponential backoff (capped, with jitter).
+
+```jsx
+import { useWebSocket } from 'pyxle/client';
+
+function Chat({ room }) {
+  const { status, send, lastMessage, error } = useWebSocket(`/chat/${room}`, {
+    onMessage(data) {
+      // data is JSON-parsed when the frame is valid JSON, else the raw string
+    },
+  });
+
+  return (
+    <div>
+      <span>{status}</span>                         {/* 'connecting' | 'open' | 'closed' */}
+      <button disabled={status !== 'open'} onClick={() => send({ text: 'hi' })}>
+        Send
+      </button>
+      {error && <p role="alert">{error}</p>}
+    </div>
+  );
+}
+```
+
+| Returns | Type | Description |
+|---|---|---|
+| `status` | `'connecting' \| 'open' \| 'closed'` | Connection state |
+| `send(data)` | `(data) => boolean` | Send a string as-is, or JSON-encode anything else; `false` if not open |
+| `lastMessage` | `unknown` | The most recent received message (JSON-parsed when possible) |
+| `error` | `string \| null` | The last error message |
+
+Options: `onMessage(data, event)`, `protocols`, `reconnect` (default `true`),
+`maxRetries` (default `Infinity`). A relative `path` is resolved against the
+current origin with the matching scheme (`wss:` on `https:`); an absolute
+`ws://` / `wss://` URL passes through.
+
+## See also
+
+- [API routes](api-routes.md) — `pages/api/**` modules can export a `websocket`
+  callable too (and an `endpoint` for HTTP on the same path).
+- [pyxle-auth](../plugins/pyxle-auth.md) — the session the WS auth helper reads.
+- [Deployment](deployment.md) — multi-core serving and the broker caveat.
+
+---
+
 Source: https://pyxle.dev/docs/guides/api-routes
 
 # API Routes
@@ -2846,6 +3409,22 @@ From lowest to highest:
 3. `.env` files
 4. `PYXLE_` environment variables
 5. CLI flags (`--host`, `--port`, etc.)
+
+## Page cache backend
+
+These select where the server-side [page cache](caching.md) stores rendered
+HTML. The default needs no configuration.
+
+| Variable | Meaning |
+|----------|---------|
+| `PYXLE_PAGE_CACHE_BACKEND` | `memory` (default), `file`, `redis`, or `off` |
+| `PYXLE_PAGE_CACHE_MAX_ENTRIES` | in-memory: max entries before LRU eviction (default `512`) |
+| `PYXLE_PAGE_CACHE_MAX_BYTES` | in-memory: max total body bytes (default `67108864`, 64 MiB) |
+| `PYXLE_PAGE_CACHE_DIR` | file backend: directory for cache files (required for `file`) |
+| `PYXLE_PAGE_CACHE_REDIS_URL` | redis backend: connection URL (falls back to `REDIS_URL`) |
+
+The cache is active only for production serves (`pyxle serve`); `pyxle dev`
+never caches. The `redis` backend needs `pip install 'pyxle[redis]'`.
 
 ## Using environment variables in loaders
 
@@ -4856,12 +5435,14 @@ pyxle build [directory] [options]
 | `--config` | -- | Path to `pyxle.config.json` |
 | `--out-dir` | `dist/` | Output directory for build artifacts |
 | `--incremental` / `--no-incremental` | `false` | Reuse cached artifacts |
+| `--static` / `--no-static` | `false` | Pre-render loader-less, non-dynamic pages to HTML at build time (SSG) — see [Caching](../guides/caching.md#static-pre-rendering-pyxle-build-static) |
 
 **Examples:**
 
 ```bash
 pyxle build
 pyxle build --out-dir ./output --incremental
+pyxle build --static
 ```
 
 ## `pyxle serve`
@@ -5452,6 +6033,61 @@ Parameters:
 
 Returns the `response` argument (possibly with a header or sentinel key added) so you can `return invalidate_routes(...)` in one line.
 
+## WebSockets — `pyxle.realtime`
+
+A page that exports a module-scope `async def websocket(ws)` also serves a
+WebSocket at its path. `pyxle.realtime` provides the pub/sub and auth helpers
+those handlers use. See the [WebSockets guide](../guides/websockets.md) for the
+full walkthrough.
+
+### `channel(ws, name, *, broker=None)`
+
+An async context manager that subscribes `ws` to a named channel for the life of
+the block (unsubscribing on exit, including disconnect) and yields a handle with
+`.publish(message)`:
+
+```python
+from pyxle.realtime import channel
+
+async def websocket(ws):
+    await ws.accept()
+    async with channel(ws, f"room:{ws.path_params['room']}") as room:
+        async for message in ws.iter_text():
+            await room.publish(message)   # reaches every subscriber
+```
+
+A published `dict`/`list` is sent as a JSON frame, `str` as text, `bytes` as
+binary. The broker defaults to the app-scoped `InProcessBroker` on
+`app.state.pyxle_broker` (one per process — see the guide's **multi-worker
+caveat**). Implement the `Broker` protocol (`subscribe` / `unsubscribe` /
+`publish`) for a Redis/NATS backend.
+
+### `authenticate_websocket(ws)`
+
+Resolve the signed-in [`pyxle-auth`](../plugins/pyxle-auth.md) user for a
+WebSocket upgrade, or `None`. The auth middleware never runs for WebSocket scope,
+so a handler that needs the user must call this (it reads the session cookie off
+the handshake). Returns `None` — zero database work — when the plugin isn't
+installed or no cookie is present.
+
+```python
+from pyxle.realtime import authenticate_websocket
+
+async def websocket(ws):
+    user = await authenticate_websocket(ws)
+    if user is None:
+        await ws.close(code=4401)
+        return
+    await ws.accept()
+    ...
+```
+
+### `origin_allowed(ws, allowed_origins)`
+
+Whether the upgrade's `Origin` is permitted. CSRF doesn't apply to a WebSocket,
+so checking the origin is the equivalent guard. An empty `allowed_origins`
+allows all; a missing `Origin` header (same-origin / non-browser) is allowed.
+
 ## Document `<head>` elements
 
 Pyxle offers two ways to contribute elements to the document `<head>`: the `<Head>` component (**recommended**) and the `HEAD` Python variable (lower-level alternative). Both are merged with automatic deduplication.
@@ -5523,7 +6159,7 @@ All client-side components and hooks are importable from `pyxle/client`:
 ```jsx
 import {
   Head, Script, Image, ClientOnly,
-  Form, useAction,
+  Form, useAction, useAuth, useWebSocket,
   Link, navigate, prefetch, refresh, usePathname
 } from 'pyxle/client';
 ```
@@ -5773,6 +6409,134 @@ function NavLink({ href, children }) {
   — no hydration mismatch
 - Subscribes to framework navigation events (`Link`, `navigate()`,
   `refresh()`, `popstate`) and re-renders on change
+
+---
+
+### `useAuth()`
+
+Read and mutate the signed-in user. State is **shared across every component**
+that calls the hook, so a sign-out in the navbar updates the user everywhere at
+once.
+
+```jsx
+import { useAuth } from 'pyxle/client';
+
+function AccountMenu() {
+  const { user, isAuthenticated, loading, logout } = useAuth();
+
+  if (loading) return <span>…</span>;
+  if (!isAuthenticated) return <a href="/login">Sign in</a>;
+
+  return (
+    <div>
+      <span>{user.email}</span>
+      <button onClick={() => logout()}>Sign out</button>
+    </div>
+  );
+}
+```
+
+A login form is just `login()` plus the error/loading state the hook exposes:
+
+```jsx
+function LoginForm() {
+  const { login, loading, error } = useAuth();
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    const result = await login({
+      email: data.get('email'),
+      password: data.get('password'),
+    });
+    if (result.ok) navigate('/dashboard');
+  }
+
+  return (
+    <form onSubmit={onSubmit}>
+      <input name="email" type="email" />
+      <input name="password" type="password" />
+      {error && <p role="alert">{error}</p>}
+      <button disabled={loading}>Sign in</button>
+    </form>
+  );
+}
+```
+
+**Returns** an object with:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user` | `PyxleUser \| null` | The signed-in user, or `null` when anonymous |
+| `isAuthenticated` | `boolean` | `true` when a user is signed in |
+| `loading` | `boolean` | `true` while a sign-in / sign-up / refresh is in flight |
+| `error` | `string \| null` | The last error message, or `null` |
+| `login(credentials)` | `(creds) => Promise<AuthResult>` | Sign in via `POST {prefix}/login` |
+| `signup(credentials)` | `(creds) => Promise<AuthResult>` | Create an account via `POST {prefix}/signup` |
+| `logout()` | `() => Promise<void>` | Sign out via `POST {prefix}/logout` and clear local state |
+| `refresh()` | `() => Promise<PyxleUser \| null>` | Re-fetch the user from `GET {prefix}/me` |
+
+**Behaviour:**
+- Requires the [`pyxle-auth`](../plugins/pyxle-auth.md) plugin, which serves the
+  endpoints and seeds the initial user.
+- Seeds the user from the server render (`window.__PYXLE_AUTH__`), so a
+  signed-in user appears on the first client frame **with no round-trip** and
+  no hydration mismatch. When no seed is present (e.g. a client-only render),
+  the session is resolved once on mount via `{prefix}/me`.
+- `login` / `signup` / `logout` send the CSRF token automatically, exactly like
+  [`useAction`](#useactionactionname-options) and [`<Form>`](#form).
+- `login` / `signup` resolve to `{ ok, user?, error?, code? }`; the `code`
+  mirrors the server (`invalid_credentials`, `account_exists`, `weak_password`,
+  `email_not_verified`, `rate_limited`).
+
+> The login/signup endpoints are on by default. Apps that own their sign-in flow
+> set `enableCredentialsApi: false` on the plugin and call their own `@action`,
+> then `refresh()` — `useAuth` still manages shared user state, `/me`, and
+> `logout`.
+
+---
+
+### `useWebSocket(path, options?)`
+
+Connect to a WebSocket endpoint — a page's `async def websocket(ws)` handler, or
+any `ws` path — with auto-reconnect, JSON parsing, and connection state.
+
+```jsx
+import { useWebSocket } from 'pyxle/client';
+
+function Chat({ room }) {
+  const { status, send, lastMessage, error } = useWebSocket(`/chat/${room}`, {
+    onMessage(data) { /* data is JSON-parsed when possible */ },
+  });
+
+  return (
+    <button disabled={status !== 'open'} onClick={() => send({ text: 'hi' })}>
+      {status === 'open' ? 'Send' : status}
+    </button>
+  );
+}
+```
+
+**Returns** `{ status, send, lastMessage, error }`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | `'connecting' \| 'open' \| 'closed'` | Connection state |
+| `send(data)` | `(data) => boolean` | Send a string as-is, or JSON-encode anything else; `false` if not open |
+| `lastMessage` | `unknown` | The most recent received message (JSON-parsed when the frame is valid JSON) |
+| `error` | `string \| null` | The last error message |
+
+**Options:** `onMessage(data, event)`, `protocols`, `reconnect` (default `true`),
+`maxRetries` (default `Infinity`).
+
+**Behaviour:**
+- **Never connects during SSR** — all socket code is gated behind a window check,
+  so there's no hydration mismatch.
+- Reconnects with **exponential backoff** (capped at 30s, with jitter) unless
+  `reconnect: false`.
+- A relative `path` resolves against the current origin with the matching scheme
+  (`wss:` on `https:`); an absolute `ws://` / `wss://` URL passes through.
+- See the [WebSockets guide](../guides/websockets.md) for the server side.
 
 ---
 
@@ -6169,9 +6933,9 @@ Source: https://pyxle.dev/docs/plugins/pyxle-db
 
 # pyxle-db
 
-`pyxle-db` is Pyxle's official database plugin: one explicit-SQL API over **SQLite, PostgreSQL, and MySQL**, with portable placeholders, a uniform `Row` type, checksum-tracked migrations, and a startup-managed connection your loaders and actions just use. It is deliberately *not* an ORM — you write SQL, it makes that SQL portable.
+`pyxle-db` is Pyxle's official database plugin over **SQLite, PostgreSQL, and MySQL**. It offers two first-class paths: an **explicit-SQL** API (portable placeholders, a uniform `Row` type, checksum-tracked migrations — you write SQL, it makes that SQL portable) and an optional **SQLAlchemy ORM** path. Either way, every loader and action gets a request-scoped database handle, and writes commit or roll back automatically.
 
-> **Version 0.2.0.** SQLite needs nothing beyond the package; PostgreSQL and MySQL ship as extras. Every backend-specific behaviour documented here is enforced by test suites that run against real PostgreSQL 16 and MySQL 8 servers in CI.
+> **Version 0.3.0.** SQLite needs nothing beyond the package; PostgreSQL, MySQL, and the SQLAlchemy ORM ship as extras (the base install stays SQLAlchemy-free). Every backend-specific behaviour documented here is enforced by test suites that run against real PostgreSQL 16 and MySQL 8 servers in CI.
 
 ## Install
 
@@ -6308,6 +7072,53 @@ async with db.transaction() as tx:
 ```
 
 The transaction object carries the full query surface (`execute`, `executemany`, `fetchone`, `fetchall`, `get`). Two escape hatches are SQLite-only and raise `UnsupportedOperationError` on server backends: `db.sync_transaction()` and `db.close()` — prefer `await db.aclose()`, which works everywhere.
+
+## Request-scoped access and auto-transactions
+
+With the plugin installed, every loader and action gets a lazy database handle on `request.state.db` — no import, no service lookup. A request that never queries opens no connection.
+
+```python
+@server
+async def load(request):
+    rows = await request.state.db.fetchall("SELECT * FROM posts ORDER BY id DESC")
+    return {"posts": rows}
+
+@action
+async def create_post(request):
+    await request.state.db.execute("INSERT INTO posts (title) VALUES (?)", (title,))
+    return {"ok": True}   # committed automatically on success
+```
+
+On an unsafe method (`POST`/`PUT`/`PATCH`/`DELETE`) the request's writes run inside **one transaction that commits when the action succeeds and rolls back when it fails** — where "fails" means the action raised `ActionError` (or any exception), which Pyxle turns into a non-2xx response. You never call `commit()`/`rollback()`, and a failed action never leaves a partial write behind. `GET`/`HEAD` run read-only.
+
+Opt out per action with `@no_auto_transaction` (then manage `async with request.state.db.transaction()` yourself), or app-wide with `"autoTransactions": false`.
+
+## The ORM path (SQLAlchemy)
+
+Prefer an ORM? Install `pip install 'pyxle-db[sqlalchemy]'` and set `"orm": {"metadata": "app.models:Base"}` in the plugin settings. Models subclass `pyxle_db.orm.Base`; loaders and actions get a request-scoped `AsyncSession` on `request.state.session` under the same auto-transaction rules:
+
+```python
+from sqlalchemy import select
+
+@server
+async def load(request):
+    notes = (await request.state.session.scalars(select(Note))).all()
+    return {"notes": [n.body for n in notes]}
+```
+
+SQLAlchemy errors surface as the **same** pyxle-db error types as the explicit-SQL path. The base install stays SQLAlchemy-free.
+
+## The `pyxle-db` CLI
+
+```bash
+pyxle-db migrate              # apply pending checksum migrations
+pyxle-db status               # applied vs pending
+pyxle-db alembic-init         # scaffold Alembic for the ORM path
+pyxle-db revision -m "…" --autogenerate
+pyxle-db upgrade head         # / downgrade / current / history
+```
+
+The CLI reads the same `pyxle.config.json` + `.env` the app uses. Pick one migration tool per app: the checksum migrator for explicit-SQL, Alembic for the ORM.
 
 ## Datetimes
 
@@ -6505,6 +7316,35 @@ async def endpoint(request: Request) -> JSONResponse:
 - Sessions are **sliding**: each resolved request can extend the expiry (`resolve_session(cookie_value=..., extend=True)`), up to an absolute maximum age. Defaults: 30-day sliding window, 90-day absolute cap.
 - `revoke_all_sessions(user_id=...)` signs out everywhere; `list_sessions` / `revoke_session` power a "manage devices" page. Password changes and resets revoke every session automatically.
 
+## Session middleware, `request.user`, and `useAuth()`
+
+Listing the plugin installs **`AuthSessionMiddleware`** automatically. On every request it resolves the session cookie and sets `request.user` (a `User`, or `None` when anonymous) — so loaders and actions can read the signed-in user without calling a guard. A request **without** the cookie does zero database work; one **with** it does a single indexed lookup that the guards then reuse, so a guarded loader never resolves the session twice.
+
+The middleware also serves the endpoints the client [`useAuth()`](../reference/client-api.md#useauth) hook talks to, under `authPathPrefix` (default `/auth`):
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /auth/me` | The current user as JSON. |
+| `POST /auth/login` | Sign in with `{ email, password }`. *(opt-out)* |
+| `POST /auth/signup` | Create an account with `{ email, password }`. *(opt-out)* |
+| `POST /auth/logout` | Revoke the session and clear the cookie. |
+
+`/login` and `/signup` reuse `AuthService.sign_in` / `sign_up` — same rate limiting, same enumeration-safe errors — and map failures to status codes (`401` invalid credentials, `409` account exists, `422` weak password, `403` unverified email, `429` rate limited with `Retry-After`). They are state-changing POSTs, so the framework's CSRF protection applies; `useAuth` sends the token for you. Set `enableCredentialsApi: false` to turn them off and drive sign-in from your own `@action` instead (then call `useAuth().refresh()`); `/me` and `/logout` stay available.
+
+```jsx
+// A whole auth UI, client-side:
+import { useAuth } from 'pyxle/client';
+
+function Account() {
+  const { user, isAuthenticated, login, logout } = useAuth();
+  return isAuthenticated
+    ? <button onClick={() => logout()}>Sign out {user.email}</button>
+    : <button onClick={() => login({ email, password })}>Sign in</button>;
+}
+```
+
+The signed-in user is **seeded into the server render** (`window.__PYXLE_AUTH__`), so `useAuth` shows the right state on the first frame — no flash of "logged out", no extra round-trip.
+
 ## Guards
 
 Drop-in checks for loaders, actions, and API routes:
@@ -6517,6 +7357,17 @@ Drop-in checks for loaders, actions, and API routes:
 | `require_permission_page(request, permission)` | User must hold the permission, else 401/403. |
 | `require_permission_action(request, permission)` | Same, for actions. |
 | `bearer_token(request)` | Extracts a `Bearer` token from the `Authorization` header, or `None`. |
+
+The roadmap-named aliases `login_required` / `login_required_action` and `permission_required` / `permission_required_action` are the same functions as `require_user_*` / `require_permission_*` — call them at the top of a loader or action (Pyxle guards are awaited, not wrapping decorators):
+
+```python
+from pyxle_auth import login_required
+
+@server
+async def load(request):
+    user = await login_required(request)   # raises LoaderError(401) when anonymous
+    return {"email": user.email}
+```
 
 ## Passwords
 
@@ -6636,6 +7487,8 @@ Configure in `pyxle.config.json` (camelCase), override per environment with `PYX
 | `cookieSecure` | `PYXLE_AUTH_COOKIE_SECURE` | `true` |
 | `cookieSameSite` | `PYXLE_AUTH_COOKIE_SAMESITE` | `"Lax"` |
 | `cookieDomain` | `PYXLE_AUTH_COOKIE_DOMAIN` | unset |
+| `authPathPrefix` | `PYXLE_AUTH_PATH_PREFIX` | `"/auth"` |
+| `enableCredentialsApi` | `PYXLE_AUTH_ENABLE_CREDENTIALS_API` | `true` |
 | `passwordResetTtlSeconds` | `PYXLE_AUTH_PASSWORD_RESET_TTL_SECONDS` | `1800` (30 min) |
 | `emailVerifyTtlSeconds` | `PYXLE_AUTH_EMAIL_VERIFY_TTL_SECONDS` | `86400` (24 h) |
 | `rateLimitSignInPerHour` | `PYXLE_AUTH_RL_SIGN_IN_PER_HOUR` | `10` |
@@ -6671,12 +7524,109 @@ All inherit from `AuthError`:
 | `TokenLimitReached` | API-token cap hit. |
 | `RoleNotFound` | Granting an undefined role. |
 
+## OAuth sign-in (Google, GitHub, Discord)
+
+Social sign-in ships in the `pyxle_auth.oauth` subpackage behind the `[oauth]`
+extra (`pip install 'pyxle-auth[oauth]'`). Enable it with the `oauth` setting:
+
+```json
+{
+  "plugins": [
+    "pyxle-db",
+    {
+      "name": "pyxle-auth",
+      "settings": {
+        "oauth": {
+          "providers": ["google", "github"],
+          "failureRedirect": "/login"
+        }
+      }
+    }
+  ]
+}
+```
+
+Client credentials are read **from the environment only** — never put them in
+`pyxle.config.json`:
+
+```bash
+PYXLE_AUTH_OAUTH_GOOGLE_CLIENT_ID=...
+PYXLE_AUTH_OAUTH_GOOGLE_CLIENT_SECRET=...
+PYXLE_AUTH_SECRET=...   # signs the OAuth state cookie (required in strict mode)
+```
+
+A sign-in link is just an anchor to the start endpoint:
+
+```jsx
+<a href="/auth/oauth/google/start?next=/dashboard">Continue with Google</a>
+```
+
+The middleware redirects to the provider, handles the callback, creates or
+links the local account, sets the session cookie, and sends the user to `next`.
+On failure it redirects to `failureRedirect` with `?oauth_error=<reason>`
+(`state`, `denied`, `email_unverified`, `exchange`, `unknown_provider`).
+
+**Security model** — the callback is a `GET` carrying an attacker-influenceable
+`?code&state`, so the defenses are deliberate:
+
+- **PKCE `S256` is mandatory**; the verifier lives only in the signed cookie.
+- A **signed, single-use, HttpOnly `state` cookie** binds the flow to the
+  browser; the `state` the provider echoes must equal the cookie's nonce
+  (constant-time) — this is the login-CSRF defense.
+- An identity links to an existing account **only when the provider says the
+  email is verified** — otherwise an attacker could pre-register the victim's
+  address at the provider and hijack the account.
+- `next` is **same-origin path only** (open-redirect guard).
+- Secrets come from the environment, are redacted in `repr`, and never reach a
+  log or the browser.
+
+Set `redirectBaseUrl` when behind a reverse proxy / on a custom domain so the
+`redirect_uri` matches what you registered with the provider.
+
+## JWT for API & mobile clients
+
+For clients that send `Authorization: Bearer` instead of a cookie, enable JWT
+(`[jwt]` extra) with the `jwt` setting:
+
+```json
+{ "name": "pyxle-auth", "settings": { "jwt": { "accessTtlSeconds": 900 } } }
+```
+
+Two endpoints appear (sign with `PYXLE_AUTH_SECRET` / `PYXLE_SECRET_KEY`):
+
+| Endpoint | Body | Returns |
+|---|---|---|
+| `POST /auth/token` | `{ email, password }` | `{ accessToken, refreshToken, expiresIn }` |
+| `POST /auth/token/refresh` | `{ refreshToken }` | a rotated pair |
+
+- **Access token** — a short-lived signed JWT (HS256), verified statelessly.
+- **Refresh token** — a long-lived **opaque** string stored only as its hash.
+  Refresh **rotates**: each use issues a new token and invalidates the old one.
+  Replaying a rotated token **revokes the whole family** (theft detection).
+
+> **CSRF:** these endpoints authenticate from the request body (not a cookie),
+> so they aren't CSRF-vulnerable — but the framework's CSRF middleware still
+> guards POSTs. Add `/auth/token` and `/auth/token/refresh` to
+> `csrf.exempt_paths` so non-browser clients can reach them.
+
+Resolve a bearer token in a loader or API route with the guards, which try
+**JWT then PAT** (and `authenticate` tries the **session** first):
+
+```python
+from pyxle_auth import bearer_user, authenticate
+
+user = await bearer_user(request)              # JWT access token → PAT
+user = await authenticate(request)             # session → JWT → PAT
+```
+
+`JWTService` is also usable directly (`auth.jwt` service): `issue_pair`,
+`verify_access`, `refresh`, `revoke_family`, `revoke_all_for_user`.
+
 ## What pyxle-auth is not (yet)
 
 Honest scope, so you can plan around it:
 
 - **No email delivery** — by design, permanently. Bring your mailer.
-- **No OAuth / OIDC sign-in** (Google, GitHub) — not implemented yet.
 - **No multi-factor authentication** (TOTP, WebAuthn) — not implemented yet.
 
 The building blocks (sessions, `TokenService`, guards) compose underneath whatever you add on top; contributions are welcome.
@@ -10927,7 +11877,12 @@ The Node.js worker:
 2. **Evaluates the bundle in a fresh context.** The default export is
    the React component function.
 3. **Calls `react-dom/server.renderToString`.** This produces a
-   plain HTML string from the component tree.
+   plain HTML string from the component tree. (A request flagged
+   `stream: true` instead drives `renderToPipeableStream` and replies
+   with a sequence of `chunk`/`end`/`error` frames sharing the request
+   id — see [Streaming SSR](../guides/streaming.md). The buffered
+   `renderToString` path described here remains the default for every
+   non-streaming, cacheable, and statically generated render.)
 4. **Collects head elements emitted by `<Head>` blocks.** When the
    component renders a `<Head>...</Head>` block, the runtime
    captures the children and returns them separately (so they can
@@ -13350,6 +14305,13 @@ Source: https://pyxle.dev/docs/changelog
 # Changelog
 
 Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include breaking changes — those are called out explicitly here. To upgrade, run `pip install --upgrade pyxle-framework`.
+
+## Unreleased
+
+- **WebSockets — page handlers, a client hook, and pub/sub.** A page `.pyxl` can now export a module-scope `async def websocket(ws)` and Pyxle serves a WebSocket route at the page's path, alongside its HTTP render — the same file handles both protocols, and dynamic segments (`pages/chat/[room].pyxl`) resolve into `ws.path_params`. Detection is by convention (the function name, not a decorator), matching how `pages/api/**` modules already expose a `websocket` callable. The new `pyxle.realtime` module ships a small pub/sub layer: `async with channel(ws, "room") as room: await room.publish(msg)` subscribes a connection to a named channel and broadcasts to everyone in it, with stale-connection pruning. Because Starlette runs HTTP middleware only for `http` scope, a WS handler gets **no** middleware — so `pyxle.realtime` also provides `authenticate_websocket(ws)` (resolve the pyxle-auth session from the handshake cookie) and `origin_allowed(ws, origins)` (the WS equivalent of CSRF). On the client, the generated `useWebSocket(path, options?)` hook gives `{ status, send, lastMessage, error }` with JSON parsing and exponential-backoff reconnect, and never opens a socket during SSR. **Multi-worker caveat (called out honestly):** the default in-process broker lives in one process, so under `pyxle serve --workers N` a message published on one worker isn't seen by clients on another — Pyxle logs a warning when it detects this, and the `Broker` protocol lets a Redis-backed broker drop in. See [WebSockets](guides/websockets.md).
+- **Streaming SSR for `<Suspense>` pages.** A page that wraps a slow part in a React 18 `<Suspense>` boundary now streams: Pyxle flushes the shell (everything outside the boundary) immediately for a fast time-to-first-byte, then streams each boundary's content in as it resolves. It's opt-in and zero-config — the compiler detects `<Suspense>` and only those pages stream; every other page keeps the buffered render byte-for-byte. The page hydrates exactly as before (the browser hydrates the same component), so no app changes are needed beyond adding the boundary. Streaming applies to dynamic, per-request pages only: a publicly cacheable route (`{"data", "revalidate"}` envelope, `CACHE` directive, or edge `cache` entry) still renders buffered so it can be stored and `ETag`'d, and a streamed response is always `private, no-cache`. The document head is flushed before the component renders, so a streamed page uses its static `HEAD` (a runtime-rendered `<Head>` lands too late — buffered pages are unaffected). A render error before the first byte falls back to the nearest `error.pyxl` rather than emitting a partial document. Built on the Node worker's new multi-frame `renderToPipeableStream` transport. See [Streaming SSR](guides/streaming.md).
+- **`loading.pyxl` route-level loading states.** A `loading.pyxl` file declares a loading component that wraps the whole route in `<Suspense fallback={<Loading/>}>` — streamed as the shell on the server and applied identically on the client so hydration matches. The nearest `loading.pyxl` wins (directory walk-up, like `error.pyxl`), and it composes with a page's own inner `<Suspense>`. Honest caveat: because the `@server` loader runs before render, the fallback only appears when the *render* suspends (a child using `React.lazy`, `use()`, or a thrown promise) — a page whose data comes entirely from its loader never suspends and streams at once. See [Streaming SSR → Route-level loading states](guides/streaming.md#route-level-loading-states-with-loadingpyxl).
+- **Server-side page caching with incremental regeneration.** A `@server` loader can now return a `{"data": ..., "revalidate": N}` envelope to cache its rendered HTML for `N` seconds — later requests are served from the cache without re-running the loader or the Node SSR render. A loader-less page can opt in the same way with a module-level `CACHE = {"revalidate": N}` directive. And `pyxle build --static` pre-renders every loader-less, non-dynamic page to HTML at build time and warms the cache from it on startup, so the first request after a deploy is a hit — no cold render. Once the window passes, the stale page is served instantly while a single background re-render refreshes it (incremental static regeneration — no thundering herd). Purge a route on demand from an action with `await cache.invalidate("/path")` (or `cache.invalidate_all()`). Routes already declared in the `pyxle.config.json` edge `cache` block are server-cached automatically under the same TTL. Cached responses carry a strong `ETag` (so conditional requests get a `304`) and an `x-pyxle-cache: HIT|STALE|MISS` header. The cache is enabled for `pyxle serve` (off in `pyxle dev`) and stores to a bounded in-memory backend by default, or to local disk or a shared Redis via `PYXLE_PAGE_CACHE_BACKEND` (Redis needs `pip install 'pyxle[redis]'`). Only cache pages that render no per-user data — a cached render is shared with every visitor. See [Caching](guides/caching.md).
 
 ## 0.4.5
 

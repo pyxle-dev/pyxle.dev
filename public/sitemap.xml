@@ -18,6 +18,9 @@
   <url><loc>https://pyxle.dev/docs/guides/comparison</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/styling</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/head-management</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/caching</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/streaming</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/websockets</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/api-routes</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/middleware</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/plugins</loc><priority>0.7</priority></url>

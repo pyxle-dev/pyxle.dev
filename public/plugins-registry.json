@@ -24,11 +24,11 @@
       "tier": "official",
       "category": "Databases",
       "contract": "DatabaseLike",
-      "description": "One explicit-SQL API over SQLite, PostgreSQL, and MySQL — portable placeholders, a uniform Row, checksum-tracked migrations, and the DatabaseLike contract other plugins build on.",
+      "description": "Database for Pyxle over SQLite, PostgreSQL, and MySQL — an explicit-SQL API or an optional SQLAlchemy ORM, both with request-scoped injection, automatic transactions, and a migration CLI (checksum migrator or Alembic).",
       "pypi": "https://pypi.org/project/pyxle-db/",
       "docs": "/docs/plugins/pyxle-db",
       "repo": "https://github.com/pyxle-dev/pyxle-plugins",
-      "tags": ["database", "sqlite", "postgresql", "mysql"]
+      "tags": ["database", "sqlite", "postgresql", "mysql", "orm", "sqlalchemy", "migrations"]
     },
     {
       "name": "pyxle-auth",

@@ -22,6 +22,9 @@
 - [Pyxle vs. other frameworks](https://pyxle.dev/docs/guides/comparison): Pyxle isn't the only way to build a full-stack app in Python, and it isn't the right tool for every job. This page is an honest map of the landscape — what each alternative is genuinely great at, and
 - [Styling](https://pyxle.dev/docs/guides/styling): Pyxle ships with Tailwind CSS out of the box. The recommended way to load your stylesheets is to **import them from a JSX module** so Vite can compile, bundle, and content-hash them — exactly like it
 - [Head Management](https://pyxle.dev/docs/guides/head-management): Pyxle offers two ways to control the document `<head>`: the `<Head>` component (**recommended**) and the `HEAD` Python variable. Both merge together with automatic deduplication, and either works — bu
+- [Caching](https://pyxle.dev/docs/guides/caching): By default a page's `@server` loader runs on **every request** and the page is rendered fresh each time. For pages whose content is the same for everyone and changes rarely — a marketing page, a docs
+- [Streaming SSR](https://pyxle.dev/docs/guides/streaming): By default Pyxle renders a page to its complete HTML string and then sends it. For a page with a slow part — a section that waits on a third-party API, a heavy below-the-fold widget — the visitor star
+- [WebSockets](https://pyxle.dev/docs/guides/websockets): A Pyxle page can serve a **WebSocket** alongside its HTML. Add a module-level `async def websocket(ws)` to a page's Python section and Pyxle registers a WebSocket route at the page's path — the same f
 - [API Routes](https://pyxle.dev/docs/guides/api-routes): Files under `pages/api/` are API endpoints. They are plain Python files (not `.pyxl`) that handle HTTP requests and return JSON or other responses.
 - [Middleware](https://pyxle.dev/docs/guides/middleware): Pyxle supports two levels of middleware: **application-level middleware** that wraps every request, and **route-level hooks** that run only for specific route types.
 - [Plugins](https://pyxle.dev/docs/guides/plugins): Pyxle plugins are reusable pieces of functionality — database layers, auth systems, storage adapters — that a host app composes via `pyxle.config.json` rather than hand-wiring in its entry point. The
@@ -44,7 +47,7 @@
 
 ## Plugins
 
-- [pyxle-db](https://pyxle.dev/docs/plugins/pyxle-db): `pyxle-db` is Pyxle's official database plugin: one explicit-SQL API over **SQLite, PostgreSQL, and MySQL**, with portable placeholders, a uniform `Row` type, checksum-tracked migrations, and a startu
+- [pyxle-db](https://pyxle.dev/docs/plugins/pyxle-db): `pyxle-db` is Pyxle's official database plugin over **SQLite, PostgreSQL, and MySQL**. It offers two first-class paths: an **explicit-SQL** API (portable placeholders, a uniform `Row` type, checksum-t
 - [pyxle-auth](https://pyxle.dev/docs/plugins/pyxle-auth): `pyxle-auth` is Pyxle's official authentication plugin: email + password accounts, sliding sessions, password-reset and email-verification flows, role-based access control, and scoped API tokens — wir
 - [pyxle-mail](https://pyxle.dev/docs/plugins/pyxle-mail): `pyxle-mail` is Pyxle's official email plugin: one `mail.service` your loaders, actions, and API routes call as `await mail.send(...)`, delivered over SMTP, [Resend](https://resend.com), or any backen
 - [Plugin Standards](https://pyxle.dev/docs/plugins/standards): The bar a plugin must clear to be listed in the [pyxle.dev plugin directory](/plugins). It exists so that anything a Pyxle user installs from the directory behaves the way the official plugins do — pr
