@@ -20,6 +20,7 @@
 ## Guides
 
 - [Pyxle vs. other frameworks](https://pyxle.dev/docs/guides/comparison): Pyxle isn't the only way to build a full-stack app in Python, and it isn't the right tool for every job. This page is an honest map of the landscape — what each alternative is genuinely great at, and
+- [Migrating from Flask or Django](https://pyxle.dev/docs/guides/migration-from-flask-django): This guide maps the concepts you already know from **Flask** and **Django** to their Pyxle equivalents, so you can port an app a route at a time. It assumes you've read [Core Concepts](../core-concept
 - [Styling](https://pyxle.dev/docs/guides/styling): Pyxle ships with Tailwind CSS out of the box. The recommended way to load your stylesheets is to **import them from a JSX module** so Vite can compile, bundle, and content-hash them — exactly like it
 - [Head Management](https://pyxle.dev/docs/guides/head-management): Pyxle offers two ways to control the document `<head>`: the `<Head>` component (**recommended**) and the `HEAD` Python variable. Both merge together with automatic deduplication, and either works — bu
 - [Caching](https://pyxle.dev/docs/guides/caching): By default a page's `@server` loader runs on **every request** and the page is rendered fresh each time. For pages whose content is the same for everyone and changes rarely — a marketing page, a docs
@@ -37,6 +38,7 @@
 - [Observability](https://pyxle.dev/docs/guides/observability): Pyxle gives every request a **correlation id** and measures how long it takes — on by default, with no setup. Both are cheap enough (a `uuid4` and two `perf_counter` reads, no I/O) to run on every req
 - [Deployment](https://pyxle.dev/docs/guides/deployment): Deploy a Pyxle application with `pyxle build` to compile assets and `pyxle serve` to run in production.
 - [Editor setup](https://pyxle.dev/docs/guides/editor-setup): Pyxle Language Tools brings first-class IDE support to `.pyxl` files — syntax highlighting, diagnostics, completions, hover documentation, go-to-definition, and formatting. Everything works out of the
+- [TypeScript](https://pyxle.dev/docs/guides/typescript): Pyxle gives you typed editor support and an opt-in type-check gate **without** asking you to write TypeScript in your `.pyxl` files. The model is **consumption, not authoring**: your server code is ty
 - [Pyxle for AI coding agents](https://pyxle.dev/docs/guides/for-ai-agents): Copilot, whatever you use — can read, write, debug, and ship real full-stack features with a tiny fraction of the context, files, tools, and languages that traditional frameworks demand. One file per
 - [Migrating from .pyx to .pyxl](https://pyxle.dev/docs/guides/migration-pyx-to-pyxl): Pyxle's file extension has changed from `.pyx` to `.pyxl`. This guide explains why and how to update your project.
 
