@@ -1271,6 +1271,24 @@ Pyxle attaches an `x-pyxle-invalidate: /posts, /dashboard` header to the respons
 
 For purely client-driven invalidation (no server roundtrip), use [`invalidate(url)`](../reference/client-api.md#invalidateurl) from `pyxle/client`.
 
+## Running work after the response
+
+To do work without making the client wait — send an email, emit a webhook —
+schedule it on `request.state.background`. Pyxle runs it after the response is
+sent:
+
+```python
+@action
+async def signup(request, body: Signup):
+    user = await db.create_user(body.email)
+    request.state.background.add_task(send_welcome_email, user.email)
+    return {"id": user.id}
+```
+
+For a single task you can return the shorthand `{"background": [fn, *args]}`
+instead. For fire-and-forget work that isn't tied to this response (including
+from `@server` loaders), use [`pyxle.tasks.enqueue`](../guides/background-tasks.md#fire-and-forget-work--pyxletasks). See the [Background Tasks guide](../guides/background-tasks.md).
+
 ## How actions are routed
 
 Each `@action` function gets an automatic endpoint:
@@ -2831,6 +2849,123 @@ async def endpoint(request: Request) -> JSONResponse:
 
 - Add middleware to your routes: [Middleware](middleware.md)
 - Protect routes with CSRF: [Security](security.md)
+
+---
+
+Source: https://pyxle.dev/docs/guides/background-tasks
+
+# Background Tasks
+
+Some work shouldn't make the user wait: sending a welcome email, emitting a
+webhook, warming a cache. Pyxle gives you two ways to run it off the request's
+critical path — pick by *when* the work should run.
+
+| You want… | Use | Runs |
+|-----------|-----|------|
+| Work tied to a response (after this `@action` replies) | `request.state.background` | After the response is sent |
+| Fire-and-forget work from anywhere (loader, action, API) | `pyxle.tasks.enqueue` | On a background worker pool |
+
+Both run **in-process** on the app's event loop. For work that must survive a
+restart or run exactly once across machines, reach for a real job queue —
+[see below](#production-job-queues).
+
+## Post-response work in an `@action`
+
+Inside an `@action`, `request.state.background` is a Starlette
+[`BackgroundTasks`](https://www.starlette.io/background/). Add tasks to it and
+Pyxle runs them **after** the response is sent, so the client isn't kept
+waiting:
+
+```python
+from pyxle.runtime import action
+
+async def send_welcome_email(email: str):
+    await mailer.send(email, template="welcome")
+
+@action
+async def signup(request, body: Signup):
+    user = await db.create_user(body.email)
+    # The client gets its response immediately; the email sends afterward.
+    request.state.background.add_task(send_welcome_email, user.email)
+    return {"id": user.id}
+```
+
+`add_task(func, *args, **kwargs)` accepts a coroutine function or a plain
+function (run in a threadpool). The task runs after the response — a failure in
+it can't change what the client already received, so log inside the task if you
+need to know it ran.
+
+### The `{"background": [...]}` shorthand
+
+For a single task, you can return it from the action instead of touching
+`request.state`:
+
+```python
+@action
+async def signup(request, body: Signup):
+    user = await db.create_user(body.email)
+    return {"id": user.id, "background": [send_welcome_email, user.email]}
+```
+
+The value is `[callable, *args]`; Pyxle strips the `background` key from the
+response body and schedules `callable(*args)` to run after the response. For
+more than one task, use `request.state.background.add_task(...)`.
+
+## Fire-and-forget work — `pyxle.tasks`
+
+When the work isn't tied to a particular response — a loader that wants to
+refresh something, an API route emitting an event — enqueue it on the app's
+in-process task queue:
+
+```python
+from pyxle.tasks import enqueue
+
+@server
+async def load_article(request):
+    article = await db.get_article(request.path_params["slug"])
+    enqueue(record_view, article.id)   # fire-and-forget; the loader returns now
+    return {"article": article.to_dict()}
+```
+
+`enqueue(func, *args, **kwargs)` schedules `func` on a small pool of background
+workers (coroutine functions are awaited; plain callables run in a thread, so a
+blocking SDK call won't stall the loop). It returns immediately. A task that
+raises is logged — it never takes a worker down. The queue is bounded; under
+sustained overload `enqueue` raises `TaskQueueFull` rather than growing without
+limit.
+
+The queue starts and stops with the app, so `enqueue` works inside any request.
+Called outside a running app it raises `TaskQueueNotRunning`.
+
+> **Multi-worker caveat.** The in-process queue lives in **one** process, so
+> under `pyxle serve --workers N` each worker has its own queue, and queued work
+> is lost if that worker restarts. It's the same trade-off as the in-process
+> [WebSocket broker](websockets.md). For durability or exactly-once semantics
+> across workers, use a real job queue.
+
+## Production job queues
+
+Pyxle's in-process tasks are deliberately small — perfect for "send an email
+after signup," not for a video-transcoding pipeline. When you need retries,
+scheduling, durability, or workers on separate machines, hand off to a
+dedicated queue. They slot in cleanly because an `@action` is just async Python:
+
+- **[Celery](https://docs.celeryq.dev/)** — the most common choice. Define a
+  `@celery_app.task`, then call `your_task.delay(arg)` from an action. Run
+  `celery -A app worker` as a separate process.
+- **[ARQ](https://arq-docs.helpmanual.io/)** — async-native, Redis-backed.
+  `await redis.enqueue_job("task_name", arg)` from an action; ARQ's worker runs
+  it. A natural fit since Pyxle handlers are already async.
+- **[Dramatiq](https://dramatiq.io/)** — `@dramatiq.actor` then `task.send(arg)`.
+
+In every case the pattern is the same: the action enqueues a job and returns;
+the external worker does the heavy lifting. Pyxle doesn't wrap these — use their
+own client directly so you keep their full feature set.
+
+## See also
+
+- [Server Actions](../core-concepts/server-actions.md)
+- [Runtime API → `pyxle.tasks`](../reference/runtime-api.md#pyxletasks)
 
 ---
 
@@ -6571,6 +6706,43 @@ Parameters:
 | `*urls` | `str` | URLs to invalidate. Empty / duplicate values are filtered. |
 
 Returns the `response` argument (possibly with a header or sentinel key added) so you can `return invalidate_routes(...)` in one line.
+
+## Background tasks — `pyxle.tasks`
+
+Fire-and-forget background work that runs in-process on the app's event loop.
+See the [Background Tasks guide](../guides/background-tasks.md).
+
+### `enqueue(func, *args, **kwargs)`
+
+Schedule `func(*args, **kwargs)` on the app's bounded worker pool and return
+immediately. Coroutine functions are awaited; plain callables run in a thread.
+Usable from any loader or action while the app is running.
+
+```python
+from pyxle.tasks import enqueue
+
+@server
+async def load_article(request):
+    enqueue(record_view, request.path_params["slug"])  # returns now
+    return {"article": ...}
+```
+
+| Raises | When |
+|--------|------|
+| `TaskQueueNotRunning` | Called outside a running Pyxle app (no active queue) |
+| `TaskQueueFull` | The bounded queue is at capacity (sustained overload) |
+
+A task that raises is logged (`pyxle.tasks` logger) and never takes a worker
+down. The queue is **per-process** — under `pyxle serve --workers N` each worker
+has its own, and queued work is lost on restart. For durable or cross-worker
+jobs, use a real job queue (Celery / ARQ / Dramatiq) — see the guide.
+
+### Post-response tasks in an `@action`
+
+Inside an `@action`, `request.state.background` is a Starlette
+[`BackgroundTasks`](https://www.starlette.io/background/); `add_task(func, *args)`
+runs after the response is sent. Returning `{"background": [fn, *args]}` from the
+action is shorthand for a single such task.
 
 ## WebSockets — `pyxle.realtime`
 
@@ -14851,6 +15023,7 @@ Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include
 
 ## Unreleased
 
+- **Background tasks & deferred work.** Two ways to run work off the request's critical path. Inside an `@action`, `request.state.background.add_task(fn, *args)` (a Starlette `BackgroundTasks`) runs after the response is sent — ideal for "send the welcome email after signup"; returning `{"background": [fn, *args]}` is shorthand for a single such task. For fire-and-forget work from anywhere (loaders, actions, API routes), the new `pyxle.tasks.enqueue(fn, *args)` schedules it on a small **in-process** worker pool — coroutine functions are awaited, plain callables run in a thread, a failing task is logged (never takes a worker down), and the queue is bounded (`TaskQueueFull` under overload). The queue starts/stops with the app. **Multi-worker caveat:** it's per-process (like the in-process WebSocket broker), so for durability or cross-worker/exactly-once semantics, hand off to a real job queue — the guide documents Celery, ARQ, and Dramatiq integration. See [Background Tasks](guides/background-tasks.md).
 - **OpenTelemetry tracing (opt-in).** Emit OpenTelemetry spans for each request plus child spans for the SSR render, `@server` loaders, and `@action` calls, so a slow page surfaces as a drill-down trace. It's the heaviest integration, so it's a **separate** optional extra (`pip install "pyxle-framework[observability-otel]"`) and **fully off** by default — with the extra absent, spans are a zero-cost no-op (one boolean check), and the exporter endpoint comes from the standard `OTEL_EXPORTER_OTLP_ENDPOINT` env var. Sampling defaults to 5%. A base Pyxle install pulls in no OpenTelemetry packages; enabling `observability.otel` without the extra fails loudly at startup. See [Observability → OpenTelemetry tracing](guides/observability.md#opentelemetry-tracing).
 - **`pyxle dev --dashboard` — a live terminal observability panel.** Opt into a compact panel that refreshes every few seconds with request throughput and error rate, status-class breakdown, request/SSR-render/loader/action latency, and the page-cache hit ratio. It reads the same in-process metrics (so it's free on the request path), is **dependency-free** (no `rich`), and is dev-only — in production you'd scrape the metrics endpoint instead. See [Observability → Dev dashboard](guides/observability.md#dev-dashboard).
 - **Structured access logging.** Opt into one structured log line per request — `method`, `path`, `status`, `duration_ms`, and the request's correlation id — via `observability.accessLog`, in `"console"` (human-readable) or `"json"` format. The correlation id is bound into a context variable for the request's duration, so your own log calls pick it up too. Works with **no new dependency** (a stdlib JSON/console formatter); the optional `[observability]` extra adds [structlog](https://www.structlog.org/) for richer rendering. Off by default so it won't disrupt an existing log pipeline. See [Observability → Structured logging](guides/observability.md#structured-logging).
