@@ -2280,6 +2280,129 @@ shared across every worker and host, so an invalidation fans out to all of them
 
 ---
 
+Source: https://pyxle.dev/docs/guides/build-optimization
+
+# Build Optimization
+
+`pyxle build` produces a hashed, minified, code-split client bundle and a
+matching SSR shell. Most of the optimization is automatic; this guide covers
+what you get for free, how to inspect it, and how to push image and load
+performance further.
+
+## What you get automatically
+
+Pyxle builds the client with [Vite](https://vitejs.dev/) in production mode, so
+out of the box:
+
+- **Minification** — JavaScript and CSS are minified with esbuild.
+- **Tree-shaking** — unused exports (including unused `pyxle/client` helpers)
+  are dropped by Rollup.
+- **Code splitting** — shared code lands in its own chunks, so two pages that
+  import the same component download it once and cache it across navigations.
+- **Content hashing** — every asset is fingerprinted (`index-DzNTdgZx.js`) for
+  immutable, long-lived caching.
+- **Per-page CSS** — only the CSS a page actually uses is linked from its shell.
+
+## Preload hints
+
+Pyxle's SSR shell injects a `<link rel="modulepreload">` for the page's entry
+module **and every chunk it statically imports**, derived from the build
+manifest's import graph. The browser then fetches those chunks in parallel with
+HTML parsing instead of discovering them only after parsing the entry — a
+meaningful first-load win on multi-chunk pages. It's automatic; there's nothing
+to configure. (Browsers that don't support `modulepreload` simply ignore the
+hints — the page still loads.)
+
+## Inspecting the bundle — `pyxle build --analyze`
+
+To see what ships, add `--analyze`:
+
+```bash
+pyxle build --analyze
+```
+
+It prints every JS/CSS asset with its raw and gzipped size, largest first, plus
+a total:
+
+```
+Bundle analysis (raw / gzip):
+  dist/assets/use-auth-BoNlCwWb.js     76.2KB /   25.2KB gzip
+  dist/assets/layout-B_QEnH4f.css      65.3KB /   12.7KB gzip
+  client-entry.js                      40.1KB /   10.8KB gzip
+  ...
+  ─ total                             675.1KB /  202.5KB gzip (35 file(s))
+```
+
+Use it to catch a dependency that ballooned a chunk, or to confirm a refactor
+shrank the bundle. (It's dependency-free — no extra tooling to install.)
+
+## Image optimization
+
+`<Image>` (from `pyxle/client`) is an optimized `<img>` on par with Next.js's
+component for everything that doesn't require a server-side image optimizer:
+
+```jsx
+import { Image } from 'pyxle/client';
+
+<Image src="/hero.jpg" alt="Hero" width={1200} height={630} priority />
+```
+
+Out of the box it:
+
+- **Prevents layout shift** — `width`/`height` reserve the right space before
+  the image loads (no CLS).
+- **Lazy-loads** below-the-fold images (`loading="lazy"`), and **prioritizes**
+  the LCP image when you pass `priority` (`fetchpriority="high"` + eager + sync
+  decode).
+- Supports a **blur-up placeholder** (`placeholder="blur"` + `blurDataURL`),
+  an automatic **`fallbackSrc`**, and **`fill`** mode (cover a positioned
+  parent).
+
+### Responsive images with a loader
+
+Actual resizing and format conversion (WebP/AVIF) need a backend — a CDN or a
+build plugin. Provide a `loader` and `<Image>` emits a responsive `srcset`
+across a device-size ladder; the browser downloads the size it needs:
+
+```jsx
+// Cloudinary-style loader.
+function cloudinary({ src, width, quality }) {
+  return `https://res.cloudinary.com/demo/image/fetch/w_${width},q_${quality || 'auto'},f_auto${src}`;
+}
+
+<Image src="/hero.jpg" alt="Hero" width={1200} height={630}
+       sizes="(max-width: 768px) 100vw, 1200px"
+       loader={cloudinary} quality={80} priority />
+```
+
+Most CDN loaders also do format negotiation (serving AVIF/WebP based on the
+`Accept` header) and compression, so a single `loader` gives you resizing *and*
+modern formats. imgix, Cloudflare Images, Vercel, and ImageKit all fit the same
+`({ src, width, quality }) => url` shape.
+
+> **Why no default resizing backend?** Without one, a `srcset` would just point
+> at the original image at every width — the browser would download the full
+> image regardless, which is slower, not faster. So Pyxle stays honest: no
+> loader → a clean, CLS-safe `<img>`; a loader → real responsive images.
+
+### Build-time optimization with a Vite plugin
+
+If you'd rather optimize images at build time than at the edge, add a Vite image
+plugin to your project and reference the optimized output. For example,
+[`vite-plugin-image-optimizer`](https://github.com/FatehAK/vite-plugin-image-optimizer)
+(compression) or [`vite-imagetools`](https://github.com/JonasKruckenberg/imagetools)
+(on-the-fly resizing + `srcset` generation via import queries). These are
+opt-in: install the npm package and add the plugin to your project's Vite
+config — Pyxle doesn't bundle an image-processing dependency.
+
+## See also
+
+- [`<Image>` reference](../reference/client-api.md#image)
+- [Deployment → CDN and edge caching](deployment.md#cdn-and-edge-caching)
+- [Caching](caching.md)
+
+---
+
 Source: https://pyxle.dev/docs/guides/streaming
 
 # Streaming SSR
@@ -3922,24 +4045,19 @@ Loads external scripts with configurable loading strategies:
 
 ## `<Image>`
 
-Renders an `<img>` tag with automatic lazy loading:
+An optimized `<img>` with lazy loading, layout-shift prevention, a blur
+placeholder, and — with a `loader` — responsive `srcset`:
 
 ```jsx
-<Image src="/photos/hero.jpg" alt="Hero image" width={800} height={600} />
+<Image src="/photos/hero.jpg" alt="Hero image" width={800} height={600} priority />
 ```
 
-### Props
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `src` | `string` | (required) | Image URL |
-| `alt` | `string` | `""` | Alt text |
-| `width` | `number` | -- | Image width |
-| `height` | `number` | -- | Image height |
-| `priority` | `boolean` | `false` | Eager load (above the fold) |
-| `lazy` | `boolean` | `true` | Lazy load (below the fold) |
-
-When `priority` is `true`, the image uses `loading="eager"`. Otherwise, it uses `loading="lazy"`.
+`priority` loads the image eagerly with `fetchpriority="high"` (use it for the
+LCP image); everything else lazy-loads. Pass a `loader` (a CDN or build plugin)
+for responsive images, or `fill` to cover a positioned parent. See the
+[Build Optimization guide](build-optimization.md#image-optimization) for the
+full prop list and CDN/plugin integration, and the
+[`<Image>` reference](../reference/client-api.md#image).
 
 ## `<ClientOnly>`
 
@@ -5978,11 +6096,13 @@ pyxle build [directory] [options]
 | `--out-dir` | `dist/` | Output directory for build artifacts |
 | `--incremental` / `--no-incremental` | `false` | Reuse cached artifacts |
 | `--static` / `--no-static` | `false` | Pre-render loader-less, non-dynamic pages to HTML at build time (SSG) — see [Caching](../guides/caching.md#static-pre-rendering-pyxle-build-static) |
+| `--analyze` / `--no-analyze` | `false` | Print a JS/CSS bundle-size report (raw + gzip, largest first) after the build — see [Build Optimization](../guides/build-optimization.md#inspecting-the-bundle--pyxle-build---analyze) |
 
 **Examples:**
 
 ```bash
 pyxle build
+pyxle build --analyze
 pyxle build --out-dir ./output --incremental
 pyxle build --static
 ```
@@ -6938,10 +7058,12 @@ Loads external scripts with configurable loading strategies.
 
 ### `<Image>`
 
-Renders an `<img>` tag with automatic lazy loading.
+An optimized `<img>` with responsive `srcset` (via a `loader`), `fill` mode,
+priority loading, layout-shift prevention, and a blur placeholder. See the
+[Image optimization guide](../guides/build-optimization.md#image-optimization).
 
 ```jsx
-<Image src="/hero.jpg" alt="Hero" width={1200} height={630} />
+<Image src="/hero.jpg" alt="Hero" width={1200} height={630} priority />
 ```
 
 **Props:**
@@ -6950,16 +7072,21 @@ Renders an `<img>` tag with automatic lazy loading.
 |------|------|---------|-------------|
 | `src` | `string` | (required) | Image source URL |
 | `alt` | `string` | `""` | Alt text for accessibility |
-| `width` | `number` | -- | Image width in pixels |
-| `height` | `number` | -- | Image height in pixels |
-| `priority` | `boolean` | `false` | Eager loading (above-the-fold images) |
-| `lazy` | `boolean` | `true` | Lazy loading (below-the-fold images) |
+| `width` | `number` | -- | Intrinsic width (px). With `height`, reserves space to avoid layout shift |
+| `height` | `number` | -- | Intrinsic height (px) |
+| `fill` | `boolean` | `false` | Fill the nearest positioned ancestor (omit width/height) |
+| `sizes` | `string` | -- | `sizes` attribute — which srcset candidate the browser picks |
+| `loader` | `({src,width,quality}) => string` | -- | Builds optimized URLs per width; **enables a responsive `srcset`**. Without it, a plain `<img>` |
+| `quality` | `number` | -- | 1–100, passed to the `loader` |
+| `objectFit` | `string` | `cover` (under fill) | CSS `object-fit` |
+| `priority` | `boolean` | `false` | Eager + `decoding="sync"` + `fetchpriority="high"` — use for the LCP image |
+| `lazy` | `boolean` | `true` | Native lazy loading (ignored when `priority`) |
 | `placeholder` | `string` | `"empty"` | `"blur"` shows a blur-up placeholder while loading |
 | `blurDataURL` | `string` | -- | Data URL used for the `placeholder="blur"` preview |
-| `placeholderColor` | `string` | `"#e5e5e5"` | Solid placeholder colour shown before the image loads |
+| `placeholderColor` | `string` | `"#e5e5e5"` | Solid placeholder colour before the image loads |
 | `fallbackSrc` | `string` | -- | Image swapped in automatically if `src` fails to load |
 
-**Behaviour:** Renders a standard `<img>` with `loading="eager"` when `priority` is true, `loading="lazy"` otherwise. All additional props are forwarded to the `<img>` element.
+**Responsive images:** provide a `loader` (a CDN such as Cloudinary/imgix, or a build plugin) and `<Image>` emits a `srcset` across a device-size ladder. Without a loader it stays a plain `<img>` — resizing needs a real backend, so Pyxle never emits a fake srcset that re-downloads the full image. All additional props are forwarded to the `<img>`.
 
 ---
 
@@ -15023,6 +15150,7 @@ Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include
 
 ## Unreleased
 
+- **Build optimization: responsive `<Image>`, preload hints, and `--analyze`.** `<Image>` (from `pyxle/client`) is now an optimized image on par with Next.js's for everything that doesn't need a server-side optimizer: pass a `loader` (a CDN like Cloudinary/imgix, or a build plugin) and it emits a responsive `srcset` across a device-size ladder; it also gains `fill` mode, `sizes`, `quality`, `objectFit`, and `priority` → `fetchpriority="high"` for the LCP image — plus the existing blur placeholder, `fallbackSrc`, lazy-loading, and layout-shift prevention. Without a loader it stays a clean `<img>` (no fake srcset that re-downloads the full image — resizing needs a real backend, which stays opt-in). Separately, the SSR shell now injects `<link rel="modulepreload">` for each page's entry and the chunks it imports (from the build manifest's import graph), so they download in parallel with HTML parsing; `pyxle build --analyze` prints a dependency-free JS/CSS bundle-size report (raw + gzip); and the generated Vite config carries an explicit `build` block (faster builds — Vite's slow gzip-size reporting is off since `--analyze` covers it). JS/CSS minification, tree-shaking, and code-splitting were already on via Vite's production defaults. See [Build Optimization](guides/build-optimization.md).
 - **Background tasks & deferred work.** Two ways to run work off the request's critical path. Inside an `@action`, `request.state.background.add_task(fn, *args)` (a Starlette `BackgroundTasks`) runs after the response is sent — ideal for "send the welcome email after signup"; returning `{"background": [fn, *args]}` is shorthand for a single such task. For fire-and-forget work from anywhere (loaders, actions, API routes), the new `pyxle.tasks.enqueue(fn, *args)` schedules it on a small **in-process** worker pool — coroutine functions are awaited, plain callables run in a thread, a failing task is logged (never takes a worker down), and the queue is bounded (`TaskQueueFull` under overload). The queue starts/stops with the app. **Multi-worker caveat:** it's per-process (like the in-process WebSocket broker), so for durability or cross-worker/exactly-once semantics, hand off to a real job queue — the guide documents Celery, ARQ, and Dramatiq integration. See [Background Tasks](guides/background-tasks.md).
 - **OpenTelemetry tracing (opt-in).** Emit OpenTelemetry spans for each request plus child spans for the SSR render, `@server` loaders, and `@action` calls, so a slow page surfaces as a drill-down trace. It's the heaviest integration, so it's a **separate** optional extra (`pip install "pyxle-framework[observability-otel]"`) and **fully off** by default — with the extra absent, spans are a zero-cost no-op (one boolean check), and the exporter endpoint comes from the standard `OTEL_EXPORTER_OTLP_ENDPOINT` env var. Sampling defaults to 5%. A base Pyxle install pulls in no OpenTelemetry packages; enabling `observability.otel` without the extra fails loudly at startup. See [Observability → OpenTelemetry tracing](guides/observability.md#opentelemetry-tracing).
 - **`pyxle dev --dashboard` — a live terminal observability panel.** Opt into a compact panel that refreshes every few seconds with request throughput and error rate, status-class breakdown, request/SSR-render/loader/action latency, and the page-cache hit ratio. It reads the same in-process metrics (so it's free on the request path), is **dependency-free** (no `rich`), and is dev-only — in production you'd scrape the metrics endpoint instead. See [Observability → Dev dashboard](guides/observability.md#dev-dashboard).
