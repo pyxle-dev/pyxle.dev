@@ -4095,6 +4095,191 @@ Content-Security-Policy: default-src 'self'
 
 ---
 
+Source: https://pyxle.dev/docs/guides/observability
+
+# Observability
+
+Pyxle gives every request a **correlation id** and measures how long it takes —
+on by default, with no setup. Both are cheap enough (a `uuid4` and two
+`perf_counter` reads, no I/O) to run on every request in production.
+
+Heavier, exporter-style observability — structured logs, a Prometheus metrics
+endpoint, OpenTelemetry tracing — is configured under the same
+[`observability`](../reference/configuration.md#observability) block and stays
+**off** until you opt in.
+
+## Request IDs
+
+Every request is assigned a correlation id and the response carries it as the
+`X-Request-Id` header:
+
+```
+$ curl -i http://localhost:8000/
+HTTP/1.1 200 OK
+x-request-id: 3f9a1c0b8e7d4a2f9c1b6e5d4a3f2e1d
+...
+```
+
+The same id is available to your server code on `request.state.request_id`, so
+you can log it alongside your own messages and tie a user-reported error back to
+a single request:
+
+```python
+@server
+async def load_dashboard(request):
+    rid = request.state.request_id
+    logger.info("loading dashboard", extra={"request_id": rid})
+    return {"widgets": await fetch_widgets()}
+```
+
+```python
+from pyxle.runtime import ActionError
+
+@action
+async def charge(request, body: ChargeRequest):
+    if not await payments.ok(body):
+        # The id ends up in the response header too, so a user can quote it.
+        raise ActionError(f"Payment failed (ref {request.state.request_id})")
+    ...
+```
+
+A helper is also exported for code that may run before `request.state` is
+populated:
+
+```python
+from pyxle.observability import get_request_id
+
+rid = get_request_id(request)  # str, or None if observability is disabled
+```
+
+### Trusting an upstream id
+
+By default Pyxle **generates a fresh id** and ignores any `X-Request-Id` the
+client sent — echoing a client-supplied value into your logs is a
+log-injection and spoofing vector. When Pyxle runs behind a trusted reverse
+proxy or gateway that already stamps a request id, opt in so the id flows
+through end to end:
+
+```json
+{
+  "observability": {
+    "trustIncomingRequestId": true
+  }
+}
+```
+
+Even then, an incoming id is only honoured if it is well-formed
+(`[A-Za-z0-9._-]`, at most 128 characters); anything else is replaced with a
+generated id.
+
+### Custom header name
+
+```json
+{
+  "observability": {
+    "requestIdHeader": "X-Trace-Id"
+  }
+}
+```
+
+## Request timing
+
+With `timing` enabled (the default), Pyxle records each request's wall-clock
+duration. The measurement is taken at the outermost layer, so it reflects the
+full time the framework spent on the request (to the point the response starts).
+This timing feeds the metrics and structured-logging features; it is the
+foundation the rest of this guide builds on.
+
+## Metrics
+
+Pyxle keeps an in-process registry of request, SSR-render, `@server`-loader, and
+`@action` durations (as fixed-bucket histograms) plus page-cache hit/stale/miss
+counts. Recording is always on and cheap — a handful of integer adds per request,
+no per-request allocation, bounded memory.
+
+Exposing those metrics is **opt-in** (the endpoint reveals internal state). Turn
+on a Prometheus endpoint:
+
+```json
+{
+  "observability": {
+    "metricsEndpoint": true
+  }
+}
+```
+
+```
+$ curl http://localhost:8000/api/__pyxle/metrics
+# TYPE pyxle_requests_total counter
+pyxle_requests_total{worker="40123"} 1843
+# TYPE pyxle_cache_hit_ratio gauge
+pyxle_cache_hit_ratio{worker="40123"} 0.92
+# TYPE pyxle_render_duration_ms histogram
+pyxle_render_duration_ms_bucket{worker="40123",le="50"} 1201
+...
+```
+
+Guard it with a bearer token, and serve it on a custom path, if you like:
+
+```json
+{
+  "observability": {
+    "metricsEndpoint": true,
+    "metricsEndpointPath": "/internal/metrics",
+    "metricsEndpointToken": "from-an-env-var"
+  }
+}
+```
+
+With a token set, the endpoint requires `Authorization: Bearer <token>` (compared
+in constant time). The page-cache metrics require the [server-side page
+cache](caching.md), which runs under `pyxle serve`.
+
+> **Multi-worker note.** Under `pyxle serve --workers N` each worker process keeps
+> its own registry, so the endpoint reports that worker's numbers — every series
+> carries a `worker="<pid>"` label. Aggregate across workers at your Prometheus
+> scraper (e.g. `sum without (worker) (...)`). A shared cross-worker registry is
+> planned for a later release.
+
+## Health probes
+
+Pyxle serves two probes for orchestrators (Kubernetes, load balancers):
+
+- **`GET /healthz`** — *liveness*. Always `200` while the process is up; the body
+  reports `status`, `uptime`, and a `ready` flag.
+- **`GET /readyz`** — *readiness*. `200` once the server has warmed up **and**
+  every dependency check passes, otherwise `503`. The body lists each check:
+
+```
+$ curl http://localhost:8000/readyz
+{
+  "status": "ok",
+  "ready": true,
+  "uptime": 123.4,
+  "checks": { "ssr_pool": { "ok": true, "alive": 4, "size": 4 } },
+  "metrics": { "requests_total": 1843, "cache_hit_ratio": 0.92 }
+}
+```
+
+The dependency checks are fast attribute reads (never a network round-trip), so
+the probe stays cheap. Today `/readyz` verifies the SSR worker pool has at least
+one live worker; point your readiness probe at it so traffic is only routed to a
+worker that can actually render.
+
+## Turning it off
+
+Request-id and timing are individually toggleable, and a bare `false` disables
+both:
+
+```json
+{ "observability": false }
+```
+
+See the [configuration reference](../reference/configuration.md#observability)
+for every key and default.
+
+---
+
 Source: https://pyxle.dev/docs/guides/deployment
 
 # Deployment
@@ -5770,6 +5955,15 @@ Pyxle is configured via `pyxle.config.json` in the project root. All fields are 
   },
   "cache": {},
   "navigation": {},
+  "observability": {
+    "requestId": true,
+    "requestIdHeader": "X-Request-Id",
+    "trustIncomingRequestId": false,
+    "timing": true,
+    "metricsEndpoint": false,
+    "metricsEndpointPath": "/api/__pyxle/metrics",
+    "metricsEndpointToken": null
+  },
   "plugins": []
 }
 ```
@@ -5959,6 +6153,37 @@ Pyxle's client keeps an in-memory **navigation cache** so client-side navigation
 
 A route listed in the [`cache`](#edge-caching) block **reuses its edge-cache TTL** as its navigation-cache lifetime, overriding `defaultPrefetchTtl` for that route -- so a page's client freshness matches how long a CDN would serve it. (Consequence: raising a route's `cache` TTL also lengthens its edge cache, so purge the CDN on deploy -- which you should do regardless.) After a mutation, the client router's `invalidate(href)` drops a cached entry so the next navigation refetches.
 
+## Observability
+
+Request correlation IDs and timing. Both are **on by default** -- generating an id and reading two timestamps per request is sub-microsecond and adds no I/O, and every request gets a correlation key surfaced as the response header and on `request.state.request_id` (readable from any loader or `@action`). See the [Observability guide](../guides/observability.md).
+
+```json
+{
+  "observability": {
+    "requestId": true,
+    "requestIdHeader": "X-Request-Id",
+    "trustIncomingRequestId": false,
+    "timing": true,
+    "metricsEndpoint": false,
+    "metricsEndpointPath": "/api/__pyxle/metrics",
+    "metricsEndpointToken": null
+  }
+}
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `observability` | `object` \| `boolean` | `{}` | Request observability settings. `false` disables request-id and timing; `true` enables both. |
+| `observability.requestId` | `boolean` | `true` | Assign each request a correlation id, expose it on `request.state.request_id`, and echo it as the response header. |
+| `observability.requestIdHeader` | `string` | `"X-Request-Id"` | The request/response header carrying the correlation id. |
+| `observability.trustIncomingRequestId` | `boolean` | `false` | Honour a well-formed incoming id from `requestIdHeader` instead of generating one. **Leave off** unless behind a trusted reverse proxy -- echoing a client-supplied id is a log-injection/spoofing vector. Even when on, an incoming id must match `[A-Za-z0-9._-]{1,128}` or it is replaced. |
+| `observability.timing` | `boolean` | `true` | Measure wall-clock request duration (to the response start). |
+| `observability.metricsEndpoint` | `boolean` | `false` | Expose a Prometheus metrics endpoint (request/render/loader/action durations and page-cache hit ratio). **Off by default** -- it exposes internal state. |
+| `observability.metricsEndpointPath` | `string` | `"/api/__pyxle/metrics"` | Path the metrics endpoint is served at when enabled. |
+| `observability.metricsEndpointToken` | `string` \| `null` | `null` | Optional bearer token: when set, the endpoint requires `Authorization: Bearer <token>` (compared in constant time). |
+
+Shorthand to disable request-id and timing: `"observability": false`. The page-cache hit-ratio metric requires the [server-side page cache](caching.md) (active under `pyxle serve`). **Multi-worker note:** under `pyxle serve --workers N` each worker process exposes its own metrics (with a `worker` label), so aggregate across workers at the scraper.
+
 ## Plugins
 
 ### `plugins`
@@ -6074,6 +6299,7 @@ async def load_page(request):
 | `request.url` | `URL` | Full request URL |
 | `request.method` | `str` | HTTP method |
 | `request.state` | `State` | Mutable state for middleware to attach data |
+| `request.state.request_id` | `str` | The request's correlation id (also the `X-Request-Id` response header), unless [observability](../guides/observability.md) is disabled |
 
 ## `@action`
 
@@ -14527,6 +14753,7 @@ Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include
 
 ## Unreleased
 
+- **Observability: request IDs, timing, metrics, and richer health probes.** Every request now gets a correlation id — surfaced as the `X-Request-Id` response header and on `request.state.request_id`, readable from any `@server` loader or `@action` — and its duration is measured, along with SSR-render, loader, action, and page-cache (hit/stale/miss) metrics. The request-id and timing are **on by default** (a `uuid4` and two `perf_counter` reads, no I/O, added at the outermost layer so even a CSRF rejection is tagged); an incoming `X-Request-Id` is **not** trusted unless you opt in (`observability.trustIncomingRequestId`), since echoing a client value into logs is a spoofing vector. Metrics are recorded into a bounded, allocation-cheap in-process registry and exposed — **opt-in** — at a Prometheus endpoint (`observability.metricsEndpoint`, optionally bearer-guarded); the page-cache hit ratio comes from the existing server cache. `/readyz` now runs **dependency checks** (today: the SSR worker pool has a live worker) and returns `503` until the server is genuinely ready, while `/healthz` stays a pure liveness probe. All configured under the new [`observability`](reference/configuration.md#observability) block (`"observability": false` disables request-id/timing); the helper `from pyxle.observability import get_request_id` reads the id anywhere. **Multi-worker note:** metrics are per-worker (each series carries a `worker` label) — aggregate at the scraper. Structured logging, a `pyxle dev` dashboard, and OpenTelemetry land next in Phase 2.7. See [Observability](guides/observability.md).
 - **Typed request validation for `@action` with Pydantic.** An action can now declare a body parameter annotated with a [Pydantic](https://docs.pydantic.dev/) model — `async def register(request, body: Signup)` — and Pyxle parses, coerces, and validates the request body before the action runs, passing in a fully-typed instance. No more hand-written `await request.json()` + key-by-key checks. On failure the action is **not** called and the client gets a `422` with a top-level `fields` map (field path → messages, dotted for nested models and indexed for list items: `address.zip`, `tags.0`). Both `useAction` and `<Form>` surface it — `result.fields` / the reactive `submit.fields`, and `<Form onError={(message, fields) => …}>` — so you can render messages next to each input. For checks Pydantic can't express (uniqueness, cross-field rules) raise the new `ValidationActionError`, which is auto-imported alongside `ActionError` and produces the same `422` shape. Because the body models are real Pydantic models, `pyxle openapi` generates an [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0) document of every action's request body straight from your code (`--out openapi.json`), derived from runtime introspection so it always matches what the dispatcher validates. Pydantic is an **optional dependency** — install the extra with `pip install "pyxle-framework[pydantic]"`; actions without a model parameter are unaffected, and an action that declares one without Pydantic installed fails with a clear error rather than silently skipping validation. The generated `useAction`/`Form` runtimes now also ship TypeScript declarations (`.d.ts`). See [Server Actions → Validating request bodies](core-concepts/server-actions.md#validating-request-bodies-with-pydantic).
 - **Fix: a server module that fails to import is no longer cached as a broken empty module.** If a page's compiled server module raised during its first import (e.g. a bad top-level `import`), the half-initialised module was left in `sys.modules`, so every later request for that page silently got an *empty* module instead of re-raising the real error. Failed imports are now evicted, so the error surfaces consistently on each request.
 - **WebSockets — page handlers, a client hook, and pub/sub.** A page `.pyxl` can now export a module-scope `async def websocket(ws)` and Pyxle serves a WebSocket route at the page's path, alongside its HTTP render — the same file handles both protocols, and dynamic segments (`pages/chat/[room].pyxl`) resolve into `ws.path_params`. Detection is by convention (the function name, not a decorator), matching how `pages/api/**` modules already expose a `websocket` callable. The new `pyxle.realtime` module ships a small pub/sub layer: `async with channel(ws, "room") as room: await room.publish(msg)` subscribes a connection to a named channel and broadcasts to everyone in it, with stale-connection pruning. Because Starlette runs HTTP middleware only for `http` scope, a WS handler gets **no** middleware — so `pyxle.realtime` also provides `authenticate_websocket(ws)` (resolve the pyxle-auth session from the handshake cookie) and `origin_allowed(ws, origins)` (the WS equivalent of CSRF). On the client, the generated `useWebSocket(path, options?)` hook gives `{ status, send, lastMessage, error }` with JSON parsing and exponential-backoff reconnect, and never opens a socket during SSR. **Multi-worker caveat (called out honestly):** the default in-process broker lives in one process, so under `pyxle serve --workers N` a message published on one worker isn't seen by clients on another — Pyxle logs a warning when it detects this, and the `Broker` protocol lets a Redis-backed broker drop in. See [WebSockets](guides/websockets.md).

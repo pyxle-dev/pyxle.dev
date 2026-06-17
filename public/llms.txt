@@ -32,6 +32,7 @@
 - [Error Handling](https://pyxle.dev/docs/guides/error-handling): Pyxle provides structured error handling through error exceptions, error boundaries, and not-found pages.
 - [Client Components](https://pyxle.dev/docs/guides/client-components): Pyxle provides built-in React components and hooks importable from `pyxle/client`.
 - [Security](https://pyxle.dev/docs/guides/security): Pyxle includes CSRF protection, CORS support, and HEAD element sanitisation out of the box.
+- [Observability](https://pyxle.dev/docs/guides/observability): Pyxle gives every request a **correlation id** and measures how long it takes — on by default, with no setup. Both are cheap enough (a `uuid4` and two `perf_counter` reads, no I/O) to run on every req
 - [Deployment](https://pyxle.dev/docs/guides/deployment): Deploy a Pyxle application with `pyxle build` to compile assets and `pyxle serve` to run in production.
 - [Editor setup](https://pyxle.dev/docs/guides/editor-setup): Pyxle Language Tools brings first-class IDE support to `.pyxl` files — syntax highlighting, diagnostics, completions, hover documentation, go-to-definition, and formatting. Everything works out of the
 - [Pyxle for AI coding agents](https://pyxle.dev/docs/guides/for-ai-agents): Copilot, whatever you use — can read, write, debug, and ship real full-stack features with a tiny fraction of the context, files, tools, and languages that traditional frameworks demand. One file per
