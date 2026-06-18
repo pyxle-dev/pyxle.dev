@@ -16,17 +16,25 @@
   <url><loc>https://pyxle.dev/docs/core-concepts/server-actions</loc><priority>0.8</priority></url>
   <url><loc>https://pyxle.dev/docs/core-concepts/layouts</loc><priority>0.8</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/comparison</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/migration-from-flask-django</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/styling</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/head-management</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/caching</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/build-optimization</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/streaming</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/websockets</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/api-routes</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/background-tasks</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/middleware</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/plugins</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/environment-variables</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/error-handling</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/client-components</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/security</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/observability</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/deployment</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/editor-setup</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/typescript</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/for-ai-agents</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/migration-pyx-to-pyxl</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/reference/cli</loc><priority>0.7</priority></url>

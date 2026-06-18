@@ -48,17 +48,25 @@ const NAV_STRUCTURE = [
     slug: "guides",
     items: [
       { file: "guides/comparison.md", slug: "comparison" },
+      { file: "guides/migration-from-flask-django.md", slug: "migration-from-flask-django" },
       { file: "guides/styling.md", slug: "styling" },
       { file: "guides/head-management.md", slug: "head-management" },
+      { file: "guides/caching.md", slug: "caching" },
+      { file: "guides/build-optimization.md", slug: "build-optimization" },
+      { file: "guides/streaming.md", slug: "streaming" },
+      { file: "guides/websockets.md", slug: "websockets" },
       { file: "guides/api-routes.md", slug: "api-routes" },
+      { file: "guides/background-tasks.md", slug: "background-tasks" },
       { file: "guides/middleware.md", slug: "middleware" },
       { file: "guides/plugins.md", slug: "plugins" },
       { file: "guides/environment-variables.md", slug: "environment-variables" },
       { file: "guides/error-handling.md", slug: "error-handling" },
       { file: "guides/client-components.md", slug: "client-components" },
       { file: "guides/security.md", slug: "security" },
+      { file: "guides/observability.md", slug: "observability" },
       { file: "guides/deployment.md", slug: "deployment" },
       { file: "guides/editor-setup.md", slug: "editor-setup" },
+      { file: "guides/typescript.md", slug: "typescript" },
       { file: "guides/for-ai-agents.md", slug: "for-ai-agents" },
       { file: "guides/migration-pyx-to-pyxl.md", slug: "migration-pyx-to-pyxl" },
     ],
@@ -143,17 +151,25 @@ const SEARCH_KEYWORDS = {
   "core-concepts/server-actions": ["action", "mutation", "form", "useaction", "@action", "post", "submit"],
   "core-concepts/layouts": ["layout", "template", "shared ui", "nav bar", "wrapper", "slots"],
   "guides/comparison": ["comparison", "compare", "vs", "versus", "alternatives", "next.js", "nextjs", "fastapi", "flask", "django", "reflex", "streamlit", "nicegui"],
+  "guides/migration-from-flask-django": ["migration", "migrate", "flask", "django", "port", "porting", "jinja", "template", "url_for", "blueprint", "orm", "views", "urls.py", "settings.py", "wsgi", "switch from"],
   "guides/styling": ["css", "tailwind", "styles", "styling", "stylesheet"],
   "guides/head-management": ["head", "meta tags", "title", "seo", "open graph", "favicon"],
+  "guides/caching": ["cache", "caching", "page cache", "ssr cache", "isr", "incremental static regeneration", "ssg", "static generation", "build --static", "prerender", "revalidate", "stale-while-revalidate", "etag", "invalidate", "redis"],
+  "guides/build-optimization": ["build", "bundle", "image", "images", "optimization", "srcset", "responsive images", "loader", "cloudinary", "imgix", "lazy loading", "lcp", "cls", "modulepreload", "preload", "analyze", "bundle size", "code splitting", "tree shaking", "minify", "minification", "vite", "performance", "blur placeholder", "fill", "priority", "webp", "avif"],
+  "guides/streaming": ["streaming", "stream", "suspense", "renderToPipeableStream", "ttfb", "time to first byte", "shell", "progressive rendering", "loading", "fallback"],
+  "guides/websockets": ["websocket", "websockets", "ws", "wss", "realtime", "real-time", "pub/sub", "pubsub", "channel", "room", "broadcast", "useWebSocket", "live", "chat", "socket"],
   "guides/api-routes": ["api", "rest", "json api", "endpoint", "websocket", "starlette"],
+  "guides/background-tasks": ["background", "background tasks", "tasks", "queue", "async", "fire and forget", "deferred", "post-response", "celery", "arq", "dramatiq", "job queue", "enqueue", "request.state.background", "send email", "webhook"],
   "guides/middleware": ["middleware", "request hook", "auth guard"],
   "guides/plugins": ["plugin", "plugins", "installed apps", "extensions", "packages"],
   "guides/environment-variables": ["env", "environment variables", "secrets", "dotenv", ".env", "config"],
   "guides/error-handling": ["error", "errors", "404", "not found", "exception", "loadererror", "actionerror"],
   "guides/client-components": ["client", "image", "link", "script", "clientonly", "hydration"],
   "guides/security": ["security", "csrf", "cors", "xss", "sanitize"],
+  "guides/observability": ["observability", "monitoring", "request id", "correlation id", "x-request-id", "tracing", "timing", "metrics", "logging", "structured logging", "opentelemetry", "otel", "prometheus", "health", "healthz", "readyz"],
   "guides/deployment": ["deploy", "deployment", "production", "hosting", "serve", "build", "ec2", "docker", "cdn", "edge caching"],
   "guides/editor-setup": ["editor", "vscode", "vs code", "lsp", "syntax highlighting", "ide"],
+  "guides/typescript": ["typescript", "ts", "types", "tsconfig", "d.ts", "type definitions", "typecheck", "tsc", "type checking", "intellisense", "tsx", "strict", "generics"],
   "guides/for-ai-agents": ["ai", "agents", "claude", "cursor", "copilot", "llm", "coding agent"],
   "reference/cli": ["cli", "commands", "pyxle dev", "pyxle build", "pyxle serve", "terminal"],
   "reference/configuration": ["config", "configuration", "pyxle.config.json", "settings", "options"],
@@ -336,19 +352,26 @@ function processMarkdown(md, sourceAbsPath, srcUrlByAbsPath) {
   //      → REJECTED. The browser resolves these against the current page URL
   //      and they land on a category path with no page — a silent 404. This is
   //      the class the old "only validate `.md`" check let slip through.
-  renderer.link = function ({ href, title, text }) {
+  renderer.link = function ({ href, title, text, tokens }) {
     const titleAttr = title ? ` title="${title}"` : '';
+    // In marked v15's object renderer API, `text` is the RAW link label, so a
+    // code span / emphasis inside the label (e.g. ``[`<Image>` reference](…)``)
+    // would leak literal backticks + raw `<Image>` into the <a> — the browser
+    // then parses `<Image>` as a custom element and the link renders mangled.
+    // Render the inner tokens to HTML for the visible label; keep the raw `text`
+    // only in the outbound-link records (used for validation, not display).
+    const label = tokens ? this.parser.parseInline(tokens) : text;
     href = href || '';
 
     // (1) Same-page anchor — validate against THIS page's headings.
     if (href.startsWith('#')) {
       outboundLinks.push({ kind: 'self-anchor', href, text, hash: href.slice(1) });
-      return `<a href="${href}"${titleAttr}>${text}</a>`;
+      return `<a href="${href}"${titleAttr}>${label}</a>`;
     }
 
     // (2) External / protocol-relative / mailto / tel — pass through.
     if (/^(https?:|\/\/|mailto:|tel:)/i.test(href)) {
-      return `<a href="${href}"${titleAttr} target="_blank" rel="noreferrer">${text}</a>`;
+      return `<a href="${href}"${titleAttr} target="_blank" rel="noreferrer">${label}</a>`;
     }
 
     // (3) Internal relative `.md` link — the doc-to-doc convention.
@@ -363,7 +386,7 @@ function processMarkdown(md, sourceAbsPath, srcUrlByAbsPath) {
       // If the target isn't a published page the build fails in build(); emit a
       // best-effort href so the (about-to-be-rejected) output is still valid HTML.
       const docPath = publishedUrl || mdMatch[1].replace(/^(\.\.\/)+/, "");
-      return `<a href="/docs/${docPath}${anchor}"${titleAttr}>${text}</a>`;
+      return `<a href="/docs/${docPath}${anchor}"${titleAttr}>${label}</a>`;
     }
 
     // (4) Root-relative link to a known SITE page (/plugins, /benchmarks…).
@@ -371,14 +394,14 @@ function processMarkdown(md, sourceAbsPath, srcUrlByAbsPath) {
     // fall through to (5) and fail the build.
     const sitePath = (href.split('#')[0] || '').replace(/\/$/, '') || '/';
     if (href.startsWith('/') && SITE_PAGES.some((p) => p.path === sitePath)) {
-      return `<a href="${href}"${titleAttr}>${text}</a>`;
+      return `<a href="${href}"${titleAttr}>${label}</a>`;
     }
 
     // (5) Any other internal link — a directory reference, an absolute
     // `/docs/...` path, or an extensionless relative link. These 404 on the
     // site (categories have no index page). Record so build() rejects it.
     outboundLinks.push({ kind: 'bad-internal', href, text });
-    return `<a href="${href || '#'}"${titleAttr}>${text}</a>`;
+    return `<a href="${href || '#'}"${titleAttr}>${label}</a>`;
   };
 
   marked.setOptions({ renderer, gfm: true, breaks: false });
