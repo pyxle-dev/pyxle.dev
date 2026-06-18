@@ -352,19 +352,26 @@ function processMarkdown(md, sourceAbsPath, srcUrlByAbsPath) {
   //      → REJECTED. The browser resolves these against the current page URL
   //      and they land on a category path with no page — a silent 404. This is
   //      the class the old "only validate `.md`" check let slip through.
-  renderer.link = function ({ href, title, text }) {
+  renderer.link = function ({ href, title, text, tokens }) {
     const titleAttr = title ? ` title="${title}"` : '';
+    // In marked v15's object renderer API, `text` is the RAW link label, so a
+    // code span / emphasis inside the label (e.g. ``[`<Image>` reference](…)``)
+    // would leak literal backticks + raw `<Image>` into the <a> — the browser
+    // then parses `<Image>` as a custom element and the link renders mangled.
+    // Render the inner tokens to HTML for the visible label; keep the raw `text`
+    // only in the outbound-link records (used for validation, not display).
+    const label = tokens ? this.parser.parseInline(tokens) : text;
     href = href || '';
 
     // (1) Same-page anchor — validate against THIS page's headings.
     if (href.startsWith('#')) {
       outboundLinks.push({ kind: 'self-anchor', href, text, hash: href.slice(1) });
-      return `<a href="${href}"${titleAttr}>${text}</a>`;
+      return `<a href="${href}"${titleAttr}>${label}</a>`;
     }
 
     // (2) External / protocol-relative / mailto / tel — pass through.
     if (/^(https?:|\/\/|mailto:|tel:)/i.test(href)) {
-      return `<a href="${href}"${titleAttr} target="_blank" rel="noreferrer">${text}</a>`;
+      return `<a href="${href}"${titleAttr} target="_blank" rel="noreferrer">${label}</a>`;
     }
 
     // (3) Internal relative `.md` link — the doc-to-doc convention.
@@ -379,7 +386,7 @@ function processMarkdown(md, sourceAbsPath, srcUrlByAbsPath) {
       // If the target isn't a published page the build fails in build(); emit a
       // best-effort href so the (about-to-be-rejected) output is still valid HTML.
       const docPath = publishedUrl || mdMatch[1].replace(/^(\.\.\/)+/, "");
-      return `<a href="/docs/${docPath}${anchor}"${titleAttr}>${text}</a>`;
+      return `<a href="/docs/${docPath}${anchor}"${titleAttr}>${label}</a>`;
     }
 
     // (4) Root-relative link to a known SITE page (/plugins, /benchmarks…).
@@ -387,14 +394,14 @@ function processMarkdown(md, sourceAbsPath, srcUrlByAbsPath) {
     // fall through to (5) and fail the build.
     const sitePath = (href.split('#')[0] || '').replace(/\/$/, '') || '/';
     if (href.startsWith('/') && SITE_PAGES.some((p) => p.path === sitePath)) {
-      return `<a href="${href}"${titleAttr}>${text}</a>`;
+      return `<a href="${href}"${titleAttr}>${label}</a>`;
     }
 
     // (5) Any other internal link — a directory reference, an absolute
     // `/docs/...` path, or an extensionless relative link. These 404 on the
     // site (categories have no index page). Record so build() rejects it.
     outboundLinks.push({ kind: 'bad-internal', href, text });
-    return `<a href="${href || '#'}"${titleAttr}>${text}</a>`;
+    return `<a href="${href || '#'}"${titleAttr}>${label}</a>`;
   };
 
   marked.setOptions({ renderer, gfm: true, breaks: false });

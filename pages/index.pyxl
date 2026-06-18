@@ -44,7 +44,18 @@ async def subscribe_newsletter(request):
 
     added = await add_subscriber(email)
     if added:
-        await _send_welcome_email(request, email)
+        # Send the welcome email AFTER the response is returned, off the
+        # subscribe's critical path — Pyxle background tasks (request.state.
+        # background, added in framework 0.5). The subscriber row is already
+        # saved and mail is best-effort, so a slow SMTP/Resend round trip never
+        # adds latency to the user's submit. Falls back to an inline send on an
+        # older framework so the site stays deployable before the upgrade lands.
+        base_url = str(request.base_url).rstrip("/")
+        background = getattr(request.state, "background", None)
+        if background is not None:
+            background.add_task(_send_welcome_email, base_url, email)
+        else:
+            await _send_welcome_email(base_url, email)
     return {"message": "You're on the list. We'll keep you posted."}
 
 
@@ -78,9 +89,11 @@ async def _verify_turnstile(token: str, remote_ip: str) -> bool:
         return False
 
 
-async def _send_welcome_email(request, email: str) -> None:
+async def _send_welcome_email(base_url: str, email: str) -> None:
     """Best-effort welcome email — a mail failure must never fail the
-    subscribe (the row is already saved). Logs and moves on."""
+    subscribe (the row is already saved). Logs and moves on. Runs as a
+    background task after the response, so it takes ``base_url`` as a plain
+    string rather than holding on to the request object."""
     import logging
 
     from db import make_unsubscribe_token, mark_welcome_email_sent
@@ -92,7 +105,7 @@ async def _send_welcome_email(request, email: str) -> None:
         if row is None or row["welcome_email_sent"]:
             return  # already welcomed once — never double-send
         token = make_unsubscribe_token(row["id"])
-        base = str(request.base_url).rstrip("/")
+        base = base_url
         unsubscribe_url = f"{base}/unsubscribe?id={row['id']}&token={token}"
         subject, html, text = welcome_email(unsubscribe_url)
         await get_mail_service().send(
@@ -123,7 +136,7 @@ async def _subscriber_row(email: str):
 
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useAction, Link, Head } from 'pyxle/client';
+import { useAction, Link, Head, Image } from 'pyxle/client';
 import { LivePlayground } from './components/live-playground.jsx';
 import {
     useScrollReveal, CopyButton, CodeBlock, PMark,
@@ -625,6 +638,57 @@ function DemoPreview({ kind }) {
     );
 }
 
+/* The features Pulse exercises — the pitch is "every one of these, in one app". */
+const PULSE_FEATURES = [
+    'SSR + ISR', 'Streaming', 'WebSockets', '@action + Pydantic',
+    'Background jobs', 'Auth', 'pyxle-db', 'Observability', 'Rate limiting',
+];
+
+/* The flagship specimen, given its own plate: Pulse is the reference app that
+   uses every feature, so it leads the section rather than sitting in the grid. */
+function FeaturedPulse() {
+    return (
+        <a
+            href="https://pulse.pyxle.app"
+            target="_blank"
+            rel="noreferrer"
+            data-reveal
+            className="focus-ring group mt-12 block rounded"
+        >
+            <div className="grid items-center gap-8 lg:grid-cols-[1.45fr_1fr] lg:gap-12">
+                <Plate label="pulse.pyxle.app" meta="the reference app">
+                    <Image
+                        src="/visual/pulse-og.svg"
+                        alt="Pulse — a real-time service status page built with Pyxle"
+                        width={1200}
+                        height={630}
+                        priority
+                        className="w-full transition-opacity group-hover:opacity-95"
+                    />
+                </Plate>
+                <div>
+                    <div className="flex items-baseline gap-3">
+                        <span className="font-display text-2xl font-[560] tracking-[-0.01em] text-ink">Pulse</span>
+                        <span className="font-mono text-[11px] text-ink2">real-time status page</span>
+                        <span className="ml-auto font-mono text-[11px] text-acct opacity-0 transition-opacity group-hover:opacity-100">open it ↗</span>
+                    </div>
+                    <p className="mt-4 max-w-[48ch] text-pretty text-[15px] leading-[1.7] text-ink2">
+                        The reference app — a service-status page with a live incident war room — built to
+                        exercise <span className="text-ink">every</span> Pyxle feature in one coherent product.
+                        Python loaders and React UI in the same <code className="font-mono text-[13px] text-ink">.pyxl</code> file,
+                        server-rendered, streamed, and hydrated.
+                    </p>
+                    <div className="mt-5 flex flex-wrap gap-1.5">
+                        {PULSE_FEATURES.map((f) => (
+                            <span key={f} className="rounded-md border border-rule px-2 py-0.5 font-mono text-[10.5px] text-ink2">{f}</span>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </a>
+    );
+}
+
 function InTheWild() {
     return (
         <GpSection n="06" id="demos">
@@ -633,14 +697,17 @@ function InTheWild() {
                     n="06"
                     eyebrow="In the wild"
                     title="Built with Pyxle, running live."
-                    lead="Three small apps, each a handful of .pyxl files, deployed the boring way. Open the source next to the live app — the whole feature really is in one file."
+                    lead="One reference app that uses every feature, plus a few small specimens — each a handful of .pyxl files, deployed the boring way. Open the source next to the live app; the whole feature really is in one file."
                 />
                 <p data-reveal className="shrink-0 pb-1">
                     <EditorialLink href="https://github.com/pyxle-dev/pyxle-demos" external>Source on GitHub ↗</EditorialLink>
                 </p>
             </div>
 
-            <div className="mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
+            <FeaturedPulse />
+
+            <p data-reveal className="mt-16 font-mono text-xs uppercase tracking-[0.14em] text-press">Smaller specimens</p>
+            <div className="mt-6 grid gap-10 md:grid-cols-3 md:gap-8">
                 {DEMOS.map((d, i) => (
                     <a
                         key={d.name}

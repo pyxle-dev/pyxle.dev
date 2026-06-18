@@ -14,9 +14,10 @@ __pycache__/
 # Coverage
 .coverage
 
-# Database files (runtime)
-data/*.db-shm
-data/*.db-wal
+# Database files (runtime) — un-anchored so a stray .db anywhere is ignored too
+*.db
+*.db-wal
+*.db-shm
 
 # IDE
 .idea/

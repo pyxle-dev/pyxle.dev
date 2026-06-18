@@ -682,6 +682,10 @@ Wrap a filename segment in square brackets to create a dynamic route parameter:
 | `pages/users/[id].pyxl` | `/users/:id` | `/users/42` |
 | `pages/[category]/[id].pyxl` | `/:category/:id` | `/electronics/99` |
 
+> The `:slug` notation above is illustrative. The actual registered
+> path uses Starlette's `{slug}` (and `{slug:path}` for catch-alls)
+> placeholders — this is what `pyxle routes` prints.
+
 Access dynamic parameters in your loader via `request.path_params`:
 
 ```python
@@ -756,6 +760,11 @@ Python files under `pages/api/` become API endpoints:
 | `pages/api/users.py` | `/api/users` |
 | `pages/api/users/[id].py` | `/api/users/:id` |
 
+API routes must live under the top-level `pages/api/` directory; use
+`pages/api/<nested>/file.py` to nest within the API tree. A `.py` file
+placed elsewhere under `pages/` is ignored — it becomes neither an API
+route nor a page.
+
 API routes are standard Python files (not `.pyxl`). See [API Routes](../guides/api-routes.md) for details.
 
 ## Viewing your route table
@@ -811,10 +820,11 @@ export default function MyPage({ data }) {
 
 The `@server` function:
 
-1. Receives a Starlette [`Request`](https://www.starlette.io/requests/) object
-2. Must be `async` (enforced at compile time)
+1. Receives a Starlette [`Request`](https://www.starlette.io/requests/) object. Its first parameter **must be named exactly `request`** (enforced at compile time)
+2. Must be `async` (enforced at compile time) and declared at module scope
 3. Must return a JSON-serializable `dict`
 4. The return value is available as `props.data` in the React component
+5. Only **one** `@server` function is allowed per `.pyxl` file
 
 ## Accessing request data
 
@@ -873,6 +883,8 @@ window in seconds. **Only do this for pages that render no per-user data** — a
 cached render is shared with every visitor. See [Caching](../guides/caching.md)
 for invalidation, incremental regeneration, and the full contract.
 
+The envelope is recognized only in its **exact two-key shape** (`{"data", "revalidate"}`) **and** when `data` is itself a dict/mapping. To cache a list, wrap it: `{"data": {"items": [...]}, "revalidate": N}` — a top-level list (`{"data": [...], "revalidate": N}`) is *not* treated as an envelope and is passed through as ordinary props. `revalidate` must be `None` or a non-negative number of seconds; a bool, a negative number, or a string raises a loader error.
+
 ## Error handling in loaders
 
 Raise `LoaderError` to trigger the nearest error boundary:
@@ -893,8 +905,16 @@ async def load_page(request):
 When `LoaderError` is raised:
 
 1. Pyxle searches up the directory tree for the nearest `error.pyxl`
-2. If found, it renders the error boundary with the error context as props
+2. If found, it renders the error boundary, passing the error context on the **`error`** prop (not `data`)
 3. If not found, a default error page is shown
+
+The boundary therefore destructures `error`, and the context keys are `error.message`, `error.statusCode` (camelCase), `error.type`, and optional `error.data` (present only when the `LoaderError` carried non-empty `data`):
+
+```jsx
+export default function Error({ error }) {
+  return <h1>{error.statusCode} — {error.message}</h1>;
+}
+```
 
 See [Error Handling](../guides/error-handling.md) for full details.
 
@@ -1155,9 +1175,11 @@ Pydantic is an **optional dependency**. Install it with the extra:
 pip install "pyxle-framework[pydantic]"
 ```
 
-If an action declares a Pydantic body but Pydantic isn't installed, the request
+If an action declares a **required** Pydantic body but Pydantic isn't installed, the request
 fails with a clear `500` (and the dev server logs why) — actions without a model
-parameter are unaffected.
+parameter are unaffected. An **optional** body (`Model | None` with a default) silently
+skips validation when Pydantic is absent: the action runs with the body never validated
+and the parameter left at its default.
 
 ### What the client receives on a validation failure
 
@@ -1176,7 +1198,9 @@ When the body fails validation, the action is **not** called. The client gets a
 ```
 
 Field paths are dotted for nested models (`address.zip`) and indexed for list
-items (`tags.0`).
+items (`tags.0`). Whole-body errors — a malformed JSON body, or a root-level
+model error — use the key `__root__` rather than a field name; render it as a
+form-level message.
 
 ### Showing field errors in the UI
 
@@ -1373,17 +1397,76 @@ export default function RootLayout({ children }) {
 
 ### Slots
 
-Layouts can export a `slots` object and a `createSlots` function for passing additional content from pages:
+Slots let a page (or a nested layout) inject content into a named placeholder a
+layout renders. There are two halves:
+
+1. A **layout renders a `<Slot>`** — the placeholder.
+2. A **page fills it** by exporting `slots`.
+
+**The layout renders the placeholder.** Import `Slot` from `pyxle/client`, give
+it a `name`, and optionally a `fallback`:
 
 ```jsx
 // pages/layout.pyxl
-export const slots = {};
-export const createSlots = () => slots;
+import { Slot } from 'pyxle/client';
 
 export default function RootLayout({ children }) {
-  return <div>{children}</div>;
+  return (
+    <div>
+      <header>
+        <strong>MyApp</strong>
+        {/* Pages fill this; falls back to null when no page provides it. */}
+        <Slot name="actions" fallback={<a href="/">Home</a>} />
+      </header>
+      <main>{children}</main>
+    </div>
+  );
 }
 ```
+
+**The page fills the slot.** Export a `slots` object whose values are
+**factory functions** that return JSX (`() => <jsx/>`):
+
+```jsx
+// pages/incidents/[id].pyxl
+import { Link } from 'pyxle/client';
+
+export const slots = {
+  actions: () => <Link href="/incidents">← All incidents</Link>,
+};
+
+export default function IncidentPage({ data }) {
+  return <article>{/* ... */}</article>;
+}
+```
+
+Now the `actions` slot in the layout renders the page's `<Link>` instead of the
+fallback, and reverts to the fallback on pages that don't export it.
+
+**`<Slot>` props:**
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `name` | `string` (required) | The slot name to render. |
+| `fallback` | `ReactNode \| (props) => ReactNode` | Rendered when no filler exists. Defaults to `null`. |
+| `props` | `object` | Forwarded to each filler factory (and to a function `fallback`). |
+
+**Rules to know:**
+
+- Each `slots` value must be a **function** returning JSX. A non-function value
+  is silently ignored.
+- `createSlots` is **optional**. A static `export const slots = { ... }` is
+  enough. Use `export const createSlots = (props) => ({ ... })` only when a
+  slot's content depends on the component's props/loader data — it receives the
+  same props as the component (`{ data, layoutData, ... }`) and returns the
+  slots map.
+- Multiple fillers of the **same** slot name are **additive** — if a page and a
+  nested layout both fill `actions`, all of them render (not last-wins).
+
+> **Advanced:** `useSlot(name)` and `useSlots()` (both from `pyxle/client`) let
+> a layout react to whether a slot is filled — e.g. `useSlot('actions')` returns
+> the array of filler factories (or `null`), so you can hide a toolbar wrapper
+> when nothing fills it.
 
 ## Nesting layouts
 
@@ -1446,7 +1529,7 @@ export default function RootLayout({ children, data }) {
 }
 ```
 
-The layout component receives its loader's result on the **`data`** prop -- exactly like a page receives its loader's data. Details:
+The layout component receives its loader's result on the **`data`** prop -- exactly like a page receives its loader's data. (The same data is also available on `layoutData`, the alias-free name the page component reads; either prop works inside a layout.) Details:
 
 - The loader runs **once per request**, before the page renders, and must be `async` (same rules as a page loader).
 - In a nesting chain, every layout/template loader runs and their results are **merged** into one dict (on a key conflict, the outermost layout wins).
@@ -1770,11 +1853,20 @@ Source: https://pyxle.dev/docs/guides/styling
 
 # Styling
 
-Pyxle ships with Tailwind CSS out of the box. The recommended way to load
-your stylesheets is to **import them from a JSX module** so Vite can compile,
-bundle, and content-hash them — exactly like it does for JavaScript modules.
-This means you never have to hand-bump a `?v=N` query string after a deploy
-to invalidate stale browser caches.
+Pyxle ships with Tailwind CSS configured in a fresh `pyxle init` project. The
+recommended way to load your stylesheets is to **import them from a JSX module**
+so Vite can compile, bundle, and content-hash them — exactly like it does for
+JavaScript modules. This means you never have to hand-bump a `?v=N` query string
+after a deploy to invalidate stale browser caches.
+
+> **Prerequisite: a project-root `postcss.config.*` is required for Tailwind.**
+> Vite compiles your CSS through PostCSS, and it only loads the Tailwind plugin
+> when it discovers a `postcss.config.{cjs,js,mjs,ts}` at the project root. The
+> scaffold ships this file, so a fresh project works immediately — but a
+> **hand-built or upgraded project with no `postcss.config.*` silently fails**:
+> the raw `@tailwind base/components/utilities` directives are inlined uncompiled
+> and the page renders **unstyled, with no error**. If your Tailwind classes do
+> nothing, check for this file first.
 
 ## Recommended: Vite-managed CSS (auto-hashed)
 
@@ -1810,11 +1902,13 @@ module.exports = {
 };
 ```
 
-**2. Make sure `autoprefixer` and `postcss` are in `devDependencies`:**
+**2. Make sure `tailwindcss`, `autoprefixer`, and `postcss` are in `devDependencies`:**
 
 ```bash
-npm install --save-dev autoprefixer postcss
+npm install --save-dev tailwindcss autoprefixer postcss
 ```
+
+(The `postcss.config.cjs` above references `tailwindcss: {}`, so all three must be installed.)
 
 **3. Import your stylesheet from a JSX module.** The cleanest place is the
 root `pages/layout.pyxl` so every route picks it up via the layout wrapper:
@@ -1982,6 +2076,14 @@ If you don't want Vite-managed CSS (e.g. you're integrating with an external
 build pipeline), you can use the standalone Tailwind CLI watcher instead.
 **Skip the `postcss.config.*` file** — its presence is what tells Pyxle to
 defer to Vite — and add the watcher scripts to `package.json`:
+
+> **The legacy watcher does not compile JSX-imported CSS.** It writes a separate
+> compiled file (e.g. `public/styles/tailwind.css`) that you must link manually
+> (below). A stylesheet you `import './styles/tailwind.css'` from a JSX module is
+> **not** processed by this watcher — without a `postcss.config.*`, that import
+> is inlined with its `@tailwind` directives uncompiled, so the page renders
+> unstyled. Use this path only when you link the watcher's output by hand and do
+> **not** rely on JSX CSS imports.
 
 ```json
 {
@@ -2381,9 +2483,11 @@ export default function About() {
 
 `revalidate` is the freshness window in seconds, exactly as in the loader
 envelope (`0` means "serve cached but re-render every request"). It is validated
-at compile time — a non-numeric or negative value is a build error. If a page
-declares *both* a loader envelope and a `CACHE` directive, the loader's
-`revalidate` wins.
+at compile time: an invalid `CACHE` directive (non-numeric or negative value, or
+a malformed shape) is reported as a **compile diagnostic** and the page is
+treated as **uncached** — whether that diagnostic blocks the build depends on
+your strict/non-strict diagnostic mode. If a page declares *both* a loader
+envelope and a `CACHE` directive, the loader's `revalidate` wins.
 
 ## Incremental regeneration (stale-while-revalidate)
 
@@ -2409,10 +2513,21 @@ already a cache hit — no cold SSR render, even for the very first visitor.
 pyxle build --static
 ```
 
-This pre-renders every loader-less, non-dynamic page into `dist/prerendered/`;
+This pre-renders every loader-less, non-dynamic page into the build output's
+`prerendered/` subdirectory (`dist/prerendered/` by default; `dist` here means
+the configured build/output directory, i.e. `pyxle build -o/--out-dir`);
 on startup `pyxle serve` warms its page cache from that directory. Pages with a
 loader (or a `{param}` route) are skipped — they still render live and cache at
-runtime as before. Pre-rendered entries have no expiry until you
+runtime as before.
+
+A static page's **layout** loader still runs at build time — its result is baked
+into the pre-rendered HTML, so a layout loader used by static pages should return
+the same data for everyone (global status, navigation), not per-user state. Build-
+time loaders run with the same plugin context a request has, so a layout (or page)
+loader that reads from a plugin like `pyxle-db` pre-renders correctly — the static
+builder opens your plugins' connections at build time, just as a server would.
+
+Pre-rendered entries have no expiry until you
 `cache.invalidate(...)` the route. With the default in-memory backend they are
 re-warmed from the new `dist/prerendered/` on every restart; with a **shared
 file/redis backend**, warmed copies persist in that store, so if a later deploy
@@ -2452,6 +2567,22 @@ Cached page responses carry a strong `ETag`, so a conditional request
 (`If-None-Match`) gets a `304 Not Modified`, and an `x-pyxle-cache` response
 header reports `HIT`, `STALE`, or `MISS` for debugging.
 
+## Client navigation cache
+
+Separately from the server-side page cache, the browser keeps a per-URL
+**navigation cache** of loader payloads so back/forward navigation is instant.
+Its lifetime mirrors a page's real cacheability:
+
+- A page with a `cache` entry (or `CACHE` directive) reuses that TTL.
+- A **dynamic page** — a `@server` loader with no declared cache lifetime — is
+  **not** navigation-cached by default (TTL `0`), so a fresh navigation always
+  refetches and a just-made mutation is visible immediately rather than hidden
+  behind a stale window. **Opt in** by giving the route a `cache` entry.
+- A static, loader-less page uses the client default (2 minutes).
+
+See [Navigation cache TTL](../reference/client-api.md#navigation-cache-ttl) for
+the full client-side details.
+
 ## Where the cache lives
 
 The cache is enabled automatically for production serves (`pyxle serve`) and
@@ -2464,7 +2595,7 @@ environment variable:
 | `memory` *(default)* | bounded in-process memory (LRU) | single process, or any deploy where per-worker caches are fine |
 | `file` | local disk (`PYXLE_PAGE_CACHE_DIR`) | one host, multiple workers sharing a cache that survives restarts |
 | `redis` | shared Redis (`PYXLE_PAGE_CACHE_REDIS_URL`) | multiple hosts, or cross-worker invalidation |
-| `off` | nothing — caching disabled | you want it off in production |
+| `off` | nothing — caching disabled | you want it off in production (`none` and `disabled` are accepted aliases for `off`) |
 
 The in-memory backend is **bounded** by entry count (`PYXLE_PAGE_CACHE_MAX_ENTRIES`,
 default 512) and total body bytes (`PYXLE_PAGE_CACHE_MAX_BYTES`, default 64 MiB)
@@ -2650,6 +2781,11 @@ boundary's real content streams in when it resolves.
 ```jsx
 import React, { Suspense } from 'react';
 
+// React.lazy makes ActivityFeed suspend until its module loads, so the
+// boundary actually defers and streams in. A plain synchronous component
+// inside <Suspense> never suspends — it renders straight into the shell.
+const ActivityFeed = React.lazy(() => import('./ActivityFeed.jsx'));
+
 export default function Dashboard({ data }) {
   return (
     <main>
@@ -2667,12 +2803,22 @@ The compiler detects the `<Suspense>` at build time and marks the page as
 streamable — there's no configuration and no flag to set. A page with no
 `<Suspense>` is never affected.
 
+> **Import `Suspense` under that exact name.** The compiler keys streaming off
+> the literal element name `Suspense` (or `React.Suspense`). A page that aliases
+> the import — `import { Suspense as Boundary } from 'react'` and writes
+> `<Boundary>` — compiles fine but is **not** marked streamable and renders
+> buffered, with no warning.
+
 `<Suspense>` works the way it does in any React 18 app: a child suspends by
-throwing a promise (via `React.lazy`, a `use(promise)` call, or your own
-promise-throwing data source), and React shows the `fallback` until it
-resolves. Pyxle's `@server` loader still runs first and passes its result as
-`data` props, exactly as for a buffered page — streaming governs how the
-**rendered** page is delivered, not how the loader runs.
+throwing a promise (via `React.lazy` or your own promise-throwing data source),
+and React shows the `fallback` until it resolves. Pyxle's `@server` loader still
+runs first and passes its result as `data` props, exactly as for a buffered page
+— streaming governs how the **rendered** page is delivered, not how the loader
+runs.
+
+> Pyxle ships React 18.3.1, which does **not** have `React.use` — that hook is
+> React 19 only. Don't reach for `use(promise)` to suspend; use `React.lazy` (the
+> zero-effort mechanism) or a hand-thrown promise.
 
 ## Route-level loading states with `loading.pyxl`
 
@@ -2710,7 +2856,7 @@ anything it doesn't catch bubbles up to the `loading.pyxl` shell. A
 > entirely from the loader has its props ready by render time and **never
 > suspends** — so the fallback never appears, and the full page streams at once.
 > The loading state shows only when the render itself suspends: a child using
-> `React.lazy`, `use(promise)`, or a thrown promise. This is the honest
+> `React.lazy` or a thrown promise. This is the honest
 > consequence of Pyxle's loader-first model; if you want a loading state for slow
 > *loader* data, that data isn't what `loading.pyxl` defers.
 
@@ -2752,10 +2898,21 @@ Streaming is deliberately narrow. A page falls back to the buffered render when:
   render buffered. Streaming helps the dynamic, per-request pages that *can't*
   be cached.
 - **The server is running without an SSR worker pool.** Streaming needs the
-  pool's multi-frame transport. `pyxle serve` runs the pool by default.
+  pool's multi-frame transport. Both `pyxle dev` and `pyxle serve` run the pool
+  by default (`--ssr-workers 1`), so streaming works in development too; only
+  `--ssr-workers 0` (per-request subprocess mode) disables it.
 
 A streamed response is always `Cache-Control: private, no-cache` — it is a
 per-request render and is never shared between visitors.
+
+### Streaming survives gzip in production
+
+Production builds enable gzip compression. Pyxle uses a streaming-aware gzip
+middleware that flushes the compressor after **every** chunk, so the shell's
+compressed bytes reach the browser immediately instead of being held back until
+the whole response finishes. Streaming SSR therefore works shell-first behind
+gzip under `pyxle serve` — no configuration needed, and no need to disable
+compression to keep the streaming benefit.
 
 ## The head is static while streaming
 
@@ -2769,6 +2926,21 @@ as it renders — arrives too late to reach the already-flushed head and is
 omitted from a streamed page. Put meta tags a streamed page needs in the `HEAD`
 variable, not in a runtime-rendered `<Head>`. This only affects pages that opt
 into streaming; buffered pages merge runtime `<Head>` exactly as before.
+
+## Custom middleware and streaming
+
+A custom middleware that subclasses Starlette's `BaseHTTPMiddleware` **buffers
+the whole response** before passing it on, which is fundamentally incompatible
+with a streamed render. When a `<Suspense>` boundary genuinely defers, the page
+becomes a chunked `StreamingResponse`, and a `BaseHTTPMiddleware` in the stack
+raises `RuntimeError: No response returned.` (This can be intermittent in dev —
+a warm chunk cache resolves the boundary in a single flush — but it fails every
+time a boundary defers on real async data, e.g. in production.)
+
+If you run streaming routes, write custom middleware as **pure ASGI** instead of
+subclassing `BaseHTTPMiddleware`. A pure-ASGI middleware passes streamed and
+buffered responses through identically. See
+[Middleware → Streaming-safe middleware](middleware.md) for the pattern.
 
 ## Errors
 
@@ -2862,9 +3034,25 @@ A published message reaches **every** subscriber, including the sender — a cha
 UI that doesn't want to echo the sender's own messages filters them client-side.
 `bytes` are delivered as binary frames, `str` as text, anything else as JSON.
 
-The broker lives on `app.state.pyxle_broker` (one per process). For a custom
-backend, implement the `Broker` protocol (`subscribe` / `unsubscribe` /
-`publish`) and set your own.
+`channel()` accepts a keyword-only `broker=` to use an explicit broker for that
+call — `channel(ws, name, broker=my_broker)` — useful in tests or against a
+non-default backend without touching `app.state`.
+
+The broker lives on `app.state.pyxle_broker` (one per process). Reach it inside a
+handler with `broker_for(ws)` (the intended accessor) rather than digging into
+`ws.app.state`. The default `InProcessBroker` also offers `broadcast(message)`
+(send to every connection across all channels) and `channel_count()` for
+introspection — extras beyond the core `Broker` protocol. For a custom backend,
+implement the `Broker` protocol (`subscribe` / `unsubscribe` / `publish`) and set
+your own:
+
+```python
+from pyxle.realtime import broker_for
+
+async def websocket(ws):
+    await ws.accept()
+    await broker_for(ws).broadcast({"type": "ping"})
+```
 
 > **Multi-worker caveat.** The default `InProcessBroker` lives in **one
 > process**. Under `pyxle serve --workers N`, each worker has its own broker —
@@ -2873,6 +3061,52 @@ backend, implement the `Broker` protocol (`subscribe` / `unsubscribe` /
 > realtime, use a shared backend (Redis pub/sub) or sticky-session routing at
 > the load balancer. The default is correct for `pyxle dev` and single-worker
 > `pyxle serve`.
+>
+> **Why you may not see this locally.** Workers share one listening socket and the
+> OS load-balances new connections across them via `accept()`. Under light,
+> bursty-by-hand load — opening a couple of browser tabs — the kernel keeps
+> handing consecutive connections to the **same** "hot" worker, so two tabs almost
+> always land together and you'll see them share state (e.g. a presence count of
+> 2). The split across brokers only shows up reliably under **concurrent** load.
+> So "it works on my machine with `--workers 2`" is not evidence that cross-worker
+> realtime is safe — assume separate workers can't see each other and plan a
+> shared broker accordingly.
+
+### Cross-worker realtime with Redis
+
+For multi-worker (or multi-machine) realtime, switch the broker to Redis — no
+code change, just configuration:
+
+```bash
+pip install 'pyxle-framework[redis]'
+
+export PYXLE_REALTIME_BROKER=redis
+export PYXLE_REALTIME_REDIS_URL=redis://localhost:6379   # default if unset
+pyxle serve --workers 4
+```
+
+Every worker now relays `channel()` / `room.publish()` traffic through Redis
+pub/sub: a message published on any worker reaches every subscriber on every
+worker (and every machine pointed at the same Redis), delivered to each
+connection exactly once. Your handler code is **identical** — `channel(ws,
+"room")` and `room.publish(...)` work the same; only the broker behind
+`app.state.pyxle_broker` changes. The connection is pinged at startup, so a
+wrong URL fails loudly rather than silently dropping messages, and the listener
+reconnects automatically if Redis blips.
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `PYXLE_REALTIME_BROKER` | `memory` | `memory` (in-process) or `redis` |
+| `PYXLE_REALTIME_REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
+| `PYXLE_REALTIME_CHANNEL_PREFIX` | `pyxle:rt:` | namespace for the Redis channels |
+
+> **Presence counts are still per-process unless you share that state too.** The
+> broker makes *message delivery* span workers, but a "users online" counter you
+> keep in a module-level dict is per-process — derive presence from a shared
+> store (e.g. a Redis counter) if you need an exact cross-worker count. The Redis
+> broker is the default in-process broker's drop-in replacement (`PSUBSCRIBE`s the
+> namespace and filters locally); for very high channel counts, a per-channel
+> subscription variant is a future optimisation.
 
 ## Authentication in a WebSocket handler
 
@@ -2895,6 +3129,28 @@ async def websocket(ws):
 
 It returns `None` (doing zero work) when [`pyxle-auth`](../plugins/pyxle-auth.md)
 isn't installed or no session cookie is present.
+
+**Gating specific actions on a public socket.** A socket can stay open to
+everyone (read-only) while restricting *writes* to authenticated users. Call
+`authenticate_websocket(ws)` when a privileged frame arrives, and take the
+identity from the session — never from the client payload, which can be forged:
+
+```python
+from pyxle.realtime import authenticate_websocket, channel
+
+async def websocket(ws):
+    await ws.accept()                         # anyone may connect and watch
+    async with channel(ws, "incident:42") as room:
+        async for raw in ws.iter_text():
+            msg = json.loads(raw)
+            if msg["type"] == "update":       # posting is privileged
+                user = await authenticate_websocket(ws)
+                if user is None:
+                    continue                  # ignore (or close) anonymous writes
+                await room.publish({"type": "update",
+                                    "author": user.email,   # trust the session, not msg
+                                    "text": msg["text"]})
+```
 
 **Origin checking.** CSRF doesn't apply to a WebSocket upgrade, so a cross-site
 origin check is the equivalent guard against a hostile page opening a socket
@@ -3238,6 +3494,11 @@ function (run in a threadpool). The task runs after the response — a failure i
 it can't change what the client already received, so log inside the task if you
 need to know it ran.
 
+> `request.state.background` exists **only inside an `@action`**. A `@server`
+> loader or a plain API route never gets it, so `request.state.background` raises
+> `AttributeError` there — use `pyxle.tasks.enqueue` (below) from a loader or API
+> route instead.
+
 ### The `{"background": [...]}` shorthand
 
 For a single task, you can return it from the action instead of touching
@@ -3251,8 +3512,10 @@ async def signup(request, body: Signup):
 ```
 
 The value is `[callable, *args]`; Pyxle strips the `background` key from the
-response body and schedules `callable(*args)` to run after the response. For
-more than one task, use `request.state.background.add_task(...)`.
+response body and schedules `callable(*args)` to run after the response. The
+shorthand passes **positional args only** — there's no way to express keyword
+args in the flat list. For keyword args or more than one task, use
+`request.state.background.add_task(...)`.
 
 ## Fire-and-forget work — `pyxle.tasks`
 
@@ -3331,7 +3594,12 @@ Add Starlette-compatible middleware classes to your config:
 }
 ```
 
-Each entry is a string in `module.path:ClassName` format. The class must be a standard Starlette middleware or `BaseHTTPMiddleware` subclass.
+Each entry is a string in `module.path:ClassName` format. The resolved attribute can be any of:
+
+- a **class** (a standard Starlette middleware or `BaseHTTPMiddleware` subclass);
+- an already-constructed Starlette **`Middleware` instance**;
+- a **`(class, {options})` tuple** — the only way to pass constructor kwargs to a config-loaded middleware (the class must subclass `BaseHTTPMiddleware`);
+- a **zero-argument factory callable** returning any of the above.
 
 ### Writing a middleware
 
@@ -3351,7 +3619,43 @@ class TimingMiddleware(BaseHTTPMiddleware):
         return response
 ```
 
-Middleware is applied in the order listed in config. The first middleware in the list is the outermost wrapper.
+> `BaseHTTPMiddleware` is convenient but buffers the response, so it is **incompatible with streaming SSR**. If any route streams, use the pure-ASGI form below.
+
+### Streaming-safe (pure-ASGI) middleware
+
+A pure-ASGI middleware passes streamed and buffered responses through identically — it never buffers, so it works with a streaming `<Suspense>` render. Set headers at `http.response.start` by wrapping `send`:
+
+```python
+# myapp/middleware.py
+import time
+
+
+class TimingMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        start = time.perf_counter()
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                duration = time.perf_counter() - start
+                headers = message.setdefault("headers", [])
+                headers.append((b"server-timing", f"app;dur={duration * 1000:.1f}".encode()))
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+```
+
+This is the streaming-safe equivalent of the `BaseHTTPMiddleware` example above. Register it the same way (`"myapp.middleware:TimingMiddleware"`).
+
+Middleware is applied in the order listed in config: the first entry is the outermost wrapper *among your custom middleware*. The whole custom group runs **inside** the framework's CORS, CSRF, and static-serving layers — see [Middleware execution order](#middleware-execution-order) below.
+
+> **Streaming SSR caveat.** A middleware subclassing `BaseHTTPMiddleware` **buffers the whole response**, which breaks streaming SSR: when a `<Suspense>` boundary defers, the page becomes a chunked `StreamingResponse` and `BaseHTTPMiddleware` raises `RuntimeError: No response returned.` If you run streaming routes, write custom middleware as **pure ASGI** instead (see [Streaming-safe (pure-ASGI) middleware](#streaming-safe-pure-asgi-middleware) below).
 
 ## Route-level hooks
 
@@ -3457,6 +3761,8 @@ Pyxle ships a dependency-free **token-bucket** rate limiter, `pyxle.middleware.R
 
 Each client gets a bucket holding up to `requests` tokens that refills at `requests / window` tokens per second. A request spends one token; when the bucket is empty the request is rejected with `429 Too Many Requests` and a `Retry-After` header. This permits a short burst up to the capacity while bounding the sustained rate — friendlier than a hard fixed window, and it never blocks the event loop.
 
+The 429 response carries the JSON body `{"ok": false, "error": "Too Many Requests"}` with `Content-Type: application/json` and an integer `Retry-After` (seconds) header, so a client can detect and parse throttling.
+
 - **Client key** — the connection's remote IP, or the first `X-Forwarded-For` hop when `trustForwardedFor` is set. Only trust the header behind a proxy you control; otherwise a client can spoof it to dodge the limit.
 - **Exempt paths** — `exemptPaths` skips the limiter on segment boundaries (same matching as `csrf.exemptPaths`). List health checks and metrics scrapes here so monitors aren't throttled.
 - **Placement** — the limiter sits just inside request observability, so a throttled request is still assigned a correlation id and counted in metrics, but is rejected before CSRF, static serving, or your handler do any work.
@@ -3477,13 +3783,23 @@ From outermost to innermost:
 
 1. Request observability (correlation id + timing, on by default)
 2. Rate limiter (if `rateLimit.requests > 0`)
-3. Custom middleware (from `middleware` config)
+3. GZip compression + security headers (production only)
 4. CORS middleware (if configured)
 5. CSRF middleware (if enabled)
-6. Vite proxy (dev mode)
-7. Static file serving
-8. Route hooks (from `routeMiddleware` config) — skipped for `HTTPEndpoint` classes and WebSocket handlers, which Starlette dispatches natively
-9. Page/API handler
+6. Static file serving
+7. **Custom middleware (from `middleware` config)**
+8. Plugin-contributed middleware
+9. Vite proxy (dev mode)
+10. Route hooks (from `routeMiddleware` config) — skipped for `HTTPEndpoint` classes and WebSocket handlers, which Starlette dispatches natively
+11. Page/API handler
+
+> **Custom middleware runs _inside_ CORS, CSRF, and static serving** — those
+> wrap it. Two consequences: a custom middleware **cannot** see or modify a CORS
+> or CSRF rejection response (the request was already rejected further out), and
+> it **never** observes static-asset requests (static serving responds and
+> returns before reaching it). The first middleware in your `middleware` list is
+> still the outermost *among your custom middleware*, but the whole custom group
+> sits inside the framework's security and static layers.
 
 ## Next steps
 
@@ -4035,6 +4351,8 @@ export default function Page() {
 }
 ```
 
+The value is substituted at build time into **both** the server (SSR) and client bundles, so it's safe to render directly into initial HTML — the server and client agree, with no hydration mismatch.
+
 **Server-only variables** (without the `PYXLE_PUBLIC_` prefix) are **never** exposed to the client. They are only available via `os.environ` in your Python code.
 
 ## `PYXLE_` config overrides
@@ -4078,6 +4396,20 @@ HTML. The default needs no configuration.
 The cache is active only for production serves (`pyxle serve`); `pyxle dev`
 never caches. The `redis` backend needs `pip install 'pyxle-framework[redis]'`.
 
+## Realtime broker
+
+These select the [WebSocket pub/sub broker](websockets.md#cross-worker-realtime-with-redis).
+The default in-process broker needs no configuration; switch to Redis for
+cross-worker delivery under `pyxle serve --workers N`.
+
+| Variable | Meaning |
+|----------|---------|
+| `PYXLE_REALTIME_BROKER` | `memory` (default, in-process) or `redis` (cross-worker) |
+| `PYXLE_REALTIME_REDIS_URL` | redis broker: connection URL (default `redis://localhost:6379`) |
+| `PYXLE_REALTIME_CHANNEL_PREFIX` | redis broker: channel namespace (default `pyxle:rt:`) |
+
+The `redis` broker needs `pip install 'pyxle-framework[redis]'`.
+
 ## Using environment variables in loaders
 
 ```python
@@ -4089,6 +4421,8 @@ async def load_page(request):
     # Use api_key to call an external service
     return {"data": "..."}
 ```
+
+> `.env` files are loaded by the Pyxle CLI at startup (`pyxle dev`/`serve`/`build`). Outside the CLI — e.g. a loader unit-tested in isolation, or `python app.py` — they are **not** auto-loaded; set the variables in the process environment yourself or call `pyxle.env.load_env_files()` first.
 
 ## `.gitignore` recommendations
 
@@ -4219,7 +4553,7 @@ When an error occurs, Pyxle walks up the directory tree from the page that faile
 
 The same `error.pyxl` is also a **client-side React error boundary**. The server renders the nearest `error.pyxl` when a loader or the initial render fails; once the page is interactive, that boundary keeps working in the browser. If a component throws while re-rendering — after a state update, during a client-side navigation, or on a hydration fault — the boundary catches it and renders the nearest `error.pyxl` in place, instead of React unmounting the page to a blank screen.
 
-It receives the same `error` prop on both sides (`message`, `statusCode`, `type`), so one `error.pyxl` renders identically whether the fault happened on the server or in the browser. The boundary is transparent until something throws, so it never affects hydration, and it resets on the next navigation. In `pyxle dev` the [error overlay](#dev-mode-error-overlay) still surfaces the full stack on top; in production the boundary is the user-facing fallback.
+It receives an `error` prop with the same keys on both sides (`message`, `statusCode`, `type`), so one `error.pyxl` renders consistently whether the fault happened on the server or in the browser. The *values* differ for a client-caught render fault: there is no HTTP status in the browser, so the client boundary always reports `statusCode: 500` and `type` = the JS error name, and never carries `data` (which is server-only). Keep `error.pyxl` tolerant of `statusCode` being `500` on the client. The boundary is transparent until something throws, so it never affects hydration, and it resets on the next navigation. In `pyxle dev` the [error overlay](#dev-mode-error-overlay) still surfaces the full stack on top; in production the boundary is the user-facing fallback.
 
 This catches *render* faults. An error thrown in an event handler or an `await` (e.g. a failed `fetch`) is not a render error — handle those where they occur (a `try/catch`, or surfacing an `ActionError` from `useAction`).
 
@@ -4241,6 +4575,17 @@ export default function NotFoundPage() {
 ```
 
 Like error boundaries, not-found pages follow directory scoping -- a `not-found.pyxl` in `pages/docs/` handles 404s within `/docs/*`.
+
+> **`not-found.pyxl` vs a loader 404.** `not-found.pyxl` fires only for a request whose path matches **no** route. A `LoaderError(status_code=404)` raised from a real route does **not** render `not-found.pyxl` — it renders the nearest `error.pyxl` with `error.statusCode === 404`. Branch on the status inside `error.pyxl` if you want a 404-specific message there:
+>
+> ```jsx
+> export default function ErrorPage({ error }) {
+>   if (error.statusCode === 404) return <h1>Not found</h1>;
+>   return <h1>Something went wrong</h1>;
+> }
+> ```
+
+`not-found.pyxl` is a **normal page**, not an error boundary: it receives **no** `error` prop, and it may declare its own `@server` loader (it gets that loader's props). Use `error.pyxl` when you need the `error` context; use `not-found.pyxl` for an unmatched-route landing page.
 
 ## Dev mode error overlay
 
@@ -4294,12 +4639,20 @@ Loads external scripts with configurable loading strategies:
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `src` | `string` | (required) | Script URL |
+| `src` | `string` | (required for external) | Script URL |
 | `strategy` | `string` | `"afterInteractive"` | Loading strategy |
 | `async` | `boolean` | `false` | Add `async` attribute |
 | `defer` | `boolean` | `false` | Add `defer` attribute |
-| `onLoad` | `function` | -- | Called when script loads |
-| `onError` | `function` | -- | Called on load failure |
+| `module` | `boolean` | `false` | Load as `type="module"` |
+| `noModule` | `boolean` | `false` | Add the `nomodule` attribute (legacy-browser fallback) |
+| `crossOrigin` | `string` | -- | `crossorigin` attribute |
+| `integrity` | `string` | -- | Subresource Integrity (SRI) hash |
+| `referrerPolicy` | `string` | -- | `referrerpolicy` attribute |
+| `onLoad` | `() => void` | -- | Called when script loads |
+| `onError` | `(error: Error) => void` | -- | Called on load failure; receives the `Error` |
+| `children` | `string` | -- | Inline script source, used when `src` is omitted |
+
+Inline scripts (`children`, no `src`) honour only `module`; the other props apply to external (`src`) scripts. See the [`<Script>` reference](../reference/client-api.md#script) for the full behaviour.
 
 ### Loading strategies
 
@@ -4502,7 +4855,11 @@ verify_cookie(token)                    # "user-42"
 verify_cookie("user-42.deadbeef")       # None  (bad signature → reject)
 ```
 
-The signature is a full HMAC-SHA256 digest, compared in constant time. The secret is read from the `PYXLE_SECRET_KEY` environment variable, or passed explicitly as `secret_key=`. Signing is meaningless without a secret, so a missing one raises `MissingSecretKeyError` rather than returning an unprotected value — it **fails closed**.
+The signature is a full HMAC-SHA256 digest, compared in constant time. The secret is read from the `PYXLE_SECRET_KEY` environment variable, or passed explicitly as `secret_key=`. Signing is meaningless without a secret, so a missing one raises `MissingSecretKeyError` rather than returning an unprotected value — it **fails closed**. Import the exception from `pyxle.security` (it is not re-exported from the top-level `pyxle` package):
+
+```python
+from pyxle.security import MissingSecretKeyError
+```
 
 Use `salt=` to namespace signatures by purpose, so a token signed for one flow can't be replayed in another even under the same secret:
 
@@ -4745,6 +5102,7 @@ on a Prometheus endpoint:
 
 ```
 $ curl http://localhost:8000/api/__pyxle/metrics
+# HELP pyxle_requests_total Total HTTP requests handled.
 # TYPE pyxle_requests_total counter
 pyxle_requests_total{worker="40123"} 1843
 # TYPE pyxle_cache_hit_ratio gauge
@@ -4753,6 +5111,8 @@ pyxle_cache_hit_ratio{worker="40123"} 0.92
 pyxle_render_duration_ms_bucket{worker="40123",le="50"} 1201
 ...
 ```
+
+The real output prepends a `# HELP <name> <description>` line before each `# TYPE` (elided above for brevity), and `worker` is the OS process id of the emitting worker.
 
 Guard it with a bearer token, and serve it on a custom path, if you like:
 
@@ -4940,7 +5300,9 @@ pyxle serve --host 0.0.0.0 --port 8000
 
 In production mode (`debug=false`) the server also compresses responses larger
 than 500 bytes with gzip automatically — no reverse-proxy configuration needed
-for that.
+for that. The gzip middleware is **streaming-aware** (it flushes the compressor
+per chunk), so [streaming SSR](streaming.md) still delivers the shell first
+behind gzip in production rather than buffering the whole response.
 
 ### Serve options
 
@@ -5021,7 +5383,7 @@ trade-off is that any **in-process** state is per-worker:
 | Feature | Per-worker behaviour | For cross-worker behaviour |
 |---------|----------------------|----------------------------|
 | [Page cache](caching.md) | Each worker has its own in-memory cache | Use the **Redis** backend (`PYXLE_PAGE_CACHE_BACKEND=redis`) — shared across workers and hosts |
-| [WebSocket pub/sub](websockets.md) | Broadcasts reach only clients on the same worker | Implement the `Broker` protocol against Redis/NATS |
+| [WebSocket pub/sub](websockets.md) | Messages reach only clients on the same worker | Use the **Redis** broker (`PYXLE_REALTIME_BROKER=redis`) — relays channels across workers and hosts |
 | [Metrics](observability.md) | `/metrics` reports that worker's numbers (with a `worker` label) | Aggregate at the Prometheus scraper |
 | [Background tasks](background-tasks.md) | `pyxle.tasks` queue is per-worker | Use a real job queue (Celery / ARQ / Dramatiq) |
 
@@ -5604,7 +5966,7 @@ Three concrete things, all generated for you on every `pyxle dev` / `pyxle build
 2. A full set of **`.d.ts` declarations** for every `pyxle/client` hook and component, so imports resolve to real types.
 3. The **`pyxle typecheck`** command, which runs `tsc --noEmit` over the generated client so you can gate CI on type errors.
 
-What it does **not** include is TypeScript *syntax* in the JSX block of a `.pyxl` file. The compiler emits the client component as `.jsx`, and esbuild (used by both the SSR runtime and Vite) loads it with its **JSX loader, not the TypeScript loader** — so type annotations, `interface`, generics, and `x as T` casts in a client block are not stripped and fail when the client bundle is built (see [Limitations](#limitations)). In short: the client block is plain JSX that gets type-*checked*, never type-*annotated*.
+What it does **not** include is TypeScript *syntax* in the JSX block of a `.pyxl` file. The compiler emits the client component as `.jsx`, and esbuild (used by both the SSR runtime and Vite) loads it with its **JSX loader, not the TypeScript loader** — so type annotations, `interface`, generics, and `x as T` casts in a client block aren't transpiled. Pyxle flags them at **compile time** with a clear error pointing at your `.pyxl` file, rather than letting them fail later in the bundler (see [Limitations](#limitations)). In short: the client block is plain JSX that gets type-*checked*, never type-*annotated*.
 
 ## Server-side types (Python)
 
@@ -5660,21 +6022,26 @@ The scaffolded config turns on strict mode and wires the import aliases Pyxle us
     "strict": true,
     "jsx": "react-jsx",
     "module": "ESNext",
-    "moduleResolution": "Node",
-    "allowJs": true,            // your pages are .jsx, checked against the .d.ts
+    "moduleResolution": "Bundler", // your code is bundled by Vite/esbuild
+    "allowJs": true,               // your pages are .jsx, checked against the .d.ts
     "skipLibCheck": true,
     "types": ["vite/client"],
-    "baseUrl": ".",
-    "paths": {
-      "/pages/*": ["pages/*"],
-      "/routes/*": ["routes/*"],
-      "pyxle/client": ["pyxle/client"],
-      "pyxle/client/*": ["pyxle/*"]
+    "paths": {                     // resolved relative to this tsconfig (no baseUrl)
+      "/pages/*": ["./pages/*"],
+      "/routes/*": ["./routes/*"],
+      "pyxle/client": ["./pyxle/client"],
+      "pyxle/client/*": ["./pyxle/*"]
     }
   },
   "include": ["./client-entry.js", "./pages/**/*.jsx", "./pyxle/**/*"]
 }
 ```
+
+Resolution is `"bundler"` (not the legacy `"node"`/`node10`) because your code is
+bundled by Vite + esbuild, not resolved by Node at runtime — and TypeScript 7.0
+deprecates `node10` resolution and `baseUrl` outright, so a current `tsc` would
+reject them. `paths` work without `baseUrl`: they resolve relative to the
+`tsconfig.json`.
 
 Two honest notes on coverage:
 
@@ -5693,7 +6060,7 @@ The [pyxle-langkit](editor-setup.md) language server runs a TypeScript language 
 
 TypeScript support today is **consumption-only**. The following are not yet available and are tracked for a later phase — they are roadmap items, not bugs:
 
-- **No TypeScript syntax in the client block.** The compiler emits `.jsx` and the bundlers use a JS loader, so `const x: number = 1`, `interface`, generics, and `as` casts aren't supported in a `.pyxl` JSX block — keep the client half plain JSX. (TS syntax currently fails when the bundle is built; a clearer compile-time error is on the roadmap.)
+- **No TypeScript syntax in the client block.** The compiler emits `.jsx` and the bundlers use a JSX loader, so `const x: number = 1`, `interface`, generics, and `as` casts aren't supported in a `.pyxl` JSX block — keep the client half plain JSX. Pyxle's compiler flags TypeScript syntax there with a clear, source-located error.
 - **No `.tsx` authoring.** You can't write the client half as full `.tsx`/TypeScript yet.
 - **No per-page loader-type generation.** Your loader's `data` arrives on the client as an untyped object — there's no generated `.d.ts` describing a specific loader's return shape.
 - **No OpenAPI → TypeScript client generation** from your action models.
@@ -6447,10 +6814,12 @@ The `pyxle` CLI manages Pyxle projects from scaffolding to production.
 
 | Flag | Description |
 |------|-------------|
-| `--version` | Print Pyxle version and exit |
+| `--version` | Show Pyxle version and exit |
 | `--log-format [console\|json]` | Output format (default: `console`) |
 | `--verbose` / `-v` | Show debug-level output |
 | `--quiet` / `-q` | Suppress informational output; show only warnings and errors |
+| `--install-completion` | Install shell completion for the current shell |
+| `--show-completion` | Print shell completion (to copy or customize) |
 
 ## `pyxle init`
 
@@ -6879,7 +7248,7 @@ Route-level hooks applied to specific route types.
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `cors.origins` | `string[]` | `[]` | Allowed origins. CORS is disabled if empty. |
-| `cors.methods` | `string[]` | `["GET","POST","PUT","PATCH","DELETE","OPTIONS"]` | Allowed HTTP methods |
+| `cors.methods` | `string[]` | `["GET","POST","PUT","PATCH","DELETE","OPTIONS"]` | Allowed HTTP methods. An empty or omitted list falls back to the six defaults — it is **not** a way to disallow every method. |
 | `cors.headers` | `string[]` | `[]` | Allowed request headers |
 | `cors.credentials` | `boolean` | `false` | Allow cookies and auth headers |
 | `cors.maxAge` | `integer` | `600` | Preflight cache duration (seconds) |
@@ -6941,7 +7310,7 @@ Each key is a route pattern; each value is the shared-cache lifetime in seconds:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `cache` | `object` | `{}` | Map of route pattern → shared-cache lifetime. Empty = no shared caching (every page stays `private, no-cache`). |
-| `cache."<pattern>"` | `integer` \| `{ "sMaxage": integer }` | -- | Lifetime in seconds (≥ 0) for the matched route. |
+| `cache."<pattern>"` | `integer` \| `{ "sMaxage": integer }` | -- | Lifetime in seconds (≥ 0) for the matched route. The object-form key is `sMaxage` (camelCase); `maxAge` is accepted as a legacy alias. |
 
 > **Turning it on at the edge.** These headers make a response *eligible* for shared caching, but some CDNs don't cache HTML by default. On Cloudflare, you must also add a Cache Rule ("Cache Everything") for the cached paths -- the headers alone are necessary but not sufficient. See [Deployment → CDN and edge caching](../guides/deployment.md#cdn-and-edge-caching).
 
@@ -6960,9 +7329,9 @@ Pyxle's client keeps an in-memory **navigation cache** so client-side navigation
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `navigation` | `object` | `{}` | Client navigation/prefetch cache settings. |
-| `navigation.defaultPrefetchTtl` | `integer` | `120` | Lifetime in seconds (≥ 0) that a prefetched or seeded page stays fresh in the client navigation cache, for routes **without** a `cache` entry. `0` disables navigation caching. |
+| `navigation.defaultPrefetchTtl` | `integer` | `120` | Lifetime in seconds (≥ 0) that a prefetched or seeded **static, loader-less** page stays fresh in the client navigation cache. `0` disables navigation caching for those pages. |
 
-A route listed in the [`cache`](#edge-caching) block **reuses its edge-cache TTL** as its navigation-cache lifetime, overriding `defaultPrefetchTtl` for that route -- so a page's client freshness matches how long a CDN would serve it. (Consequence: raising a route's `cache` TTL also lengthens its edge cache, so purge the CDN on deploy -- which you should do regardless.) After a mutation, the client router's `invalidate(href)` drops a cached entry so the next navigation refetches.
+A route listed in the [`cache`](#edge-caching) block **reuses its edge-cache TTL** as its navigation-cache lifetime, overriding `defaultPrefetchTtl` for that route -- so a page's client freshness matches how long a CDN would serve it. (Consequence: raising a route's `cache` TTL also lengthens its edge cache, so purge the CDN on deploy -- which you should do regardless.) A **dynamic page** -- a `@server` loader with no `cache` entry -- is **not** navigation-cached at all (it renders `private, no-cache`), so back/forward always refetches and `defaultPrefetchTtl` does not apply to it; add a `cache` entry to opt such a page into navigation caching. After a mutation, the client router's `invalidate(href)` drops a cached entry so the next navigation refetches.
 
 ## Rate limiting
 
@@ -6982,7 +7351,7 @@ A built-in [token-bucket](../guides/middleware.md#rate-limiting) limiter. **Disa
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `rateLimit.requests` | `integer` | `0` | Bucket capacity = max burst. `0` disables the limiter. |
-| `rateLimit.window` | `number` | `60` | Seconds for a full bucket to refill, so the sustained rate is `requests / window` per second. |
+| `rateLimit.window` | `number` | `60` | Seconds for a full bucket to refill, so the sustained rate is `requests / window` per second. Fractional seconds are allowed (the value is stored as a float). The JSON key is `window`. |
 | `rateLimit.exemptPaths` | `string[]` | `[]` | Paths skipped by the limiter, matched on segment boundaries (same rules as [`csrf.exemptPaths`](#csrf)). Use for health checks and metrics scrapes. |
 | `rateLimit.trustForwardedFor` | `boolean` | `false` | Key clients by the first `X-Forwarded-For` hop instead of the socket IP. **Only enable behind a trusted proxy** — a client can otherwise spoof the header to dodge the limit. |
 
@@ -7110,7 +7479,9 @@ Source: https://pyxle.dev/docs/reference/runtime-api
 
 # Runtime API Reference
 
-The `pyxle.runtime` module provides decorators and error classes used in `.pyxl` files. These are automatically available in the Python section of every `.pyxl` file -- you do not need to import them (the compiler injects the import).
+The `pyxle.runtime` module provides decorators and error classes used in `.pyxl` files. The compiler **auto-injects** a small set: the `@server` decorator, and — in any file that declares at least one `@action` — the `@action` decorator plus `ActionError` and `ValidationActionError`. You do not import those.
+
+Other `pyxle.runtime` symbols, including **`LoaderError`**, are **not** auto-injected — import them explicitly: `from pyxle.runtime import LoaderError`.
 
 ## `@server`
 
@@ -7481,7 +7852,7 @@ All client-side components and hooks are importable from `pyxle/client`:
 import {
   Head, Script, Image, ClientOnly,
   Form, useAction, useAuth, useWebSocket,
-  Link, navigate, prefetch, refresh, usePathname
+  Link, navigate, prefetch, refresh, invalidate, usePathname
 } from 'pyxle/client';
 ```
 
@@ -7532,7 +7903,8 @@ Loads external scripts with configurable loading strategies.
 | `integrity` | `string` | -- | Subresource Integrity (SRI) hash |
 | `referrerPolicy` | `string` | -- | `referrerpolicy` attribute |
 | `onLoad` | `() => void` | -- | Callback on successful load |
-| `onError` | `() => void` | -- | Callback on load failure |
+| `onError` | `(error: Error) => void` | -- | Callback on load failure; receives the `Error` |
+| `children` | `string` | -- | Inline script source, used when `src` is omitted |
 
 **Strategies:**
 
@@ -7542,7 +7914,9 @@ Loads external scripts with configurable loading strategies.
 | `"afterInteractive"` | Loaded after React hydration (default) |
 | `"lazyOnload"` | Loaded during browser idle time |
 
-**Behaviour:** Renders `null`. The SSR pipeline extracts `<Script>` declarations and handles loading according to the strategy.
+**Behaviour:** Renders `null`. For a **statically written** `<Script>` with a `src`, the SSR pipeline extracts the declaration at build time and the bootstrap loader honours its `strategy`. A `<Script>` rendered dynamically (conditionally, in a mapped list, or with a runtime `src`) is not seen by the compiler and is loaded by the runtime component on mount; `strategy="beforeInteractive"` is impossible in that case — it logs a `[Pyxle Script]` warning and degrades to `afterInteractive`.
+
+**Inline scripts** (`children` with no `src`) are appended to `<head>` on mount and honour only `module` (rendered as `type="module"`); `strategy`, `async`, `defer`, `noModule`, `crossOrigin`, `integrity`, `referrerPolicy`, and `onError` apply to external (`src`) scripts only, and `onLoad` fires synchronously after the inline element is inserted. For an inline script that must run **before** hydration, use a native `<script>` in a layout's `<Head>` (preserved verbatim) instead.
 
 ---
 
@@ -7568,15 +7942,19 @@ priority loading, layout-shift prevention, and a blur placeholder. See the
 | `sizes` | `string` | -- | `sizes` attribute — which srcset candidate the browser picks |
 | `loader` | `({src,width,quality}) => string` | -- | Builds optimized URLs per width; **enables a responsive `srcset`**. Without it, a plain `<img>` |
 | `quality` | `number` | -- | 1–100, passed to the `loader` |
-| `objectFit` | `string` | `cover` (under fill) | CSS `object-fit` |
+| `objectFit` | `string` | `cover` (under fill) | CSS `object-fit`. Applied whether or not `fill` is set; the `cover` default only kicks in under `fill` |
 | `priority` | `boolean` | `false` | Eager + `decoding="sync"` + `fetchpriority="high"` — use for the LCP image |
 | `lazy` | `boolean` | `true` | Native lazy loading (ignored when `priority`) |
 | `placeholder` | `string` | `"empty"` | `"blur"` shows a blur-up placeholder while loading |
 | `blurDataURL` | `string` | -- | Data URL used for the `placeholder="blur"` preview |
 | `placeholderColor` | `string` | `"#e5e5e5"` | Solid placeholder colour before the image loads |
 | `fallbackSrc` | `string` | -- | Image swapped in automatically if `src` fails to load |
+| `onLoad` | `(event) => void` | -- | Fires when the image loads. On a cache hit it receives a synthetic `{ nativeEvent, target, fromCache }` object rather than a React event |
+| `onError` | `(event) => void` | -- | Fires only **after** `fallbackSrc` (if set) has also failed |
 
 **Responsive images:** provide a `loader` (a CDN such as Cloudinary/imgix, or a build plugin) and `<Image>` emits a `srcset` across a device-size ladder. Without a loader it stays a plain `<img>` — resizing needs a real backend, so Pyxle never emits a fake srcset that re-downloads the full image. All additional props are forwarded to the `<img>`.
+
+**Behaviour:** `<Image>` always renders `data-pyxle-image-state="loading" | "loaded" | "error"` on the underlying `<img>`, so you can target it from CSS or end-to-end tests (e.g. `[data-pyxle-image-state="loading"]` to style the placeholder).
 
 ---
 
@@ -7625,7 +8003,7 @@ Progressive-enhancement form component for calling server actions.
 
 **Behaviour:**
 - With JavaScript: intercepts submit, serialises form data to JSON, POSTs to the action endpoint
-- Without JavaScript: falls back to a standard HTML form POST
+- Without JavaScript: falls back to a standard HTML form POST. The POST reaches the action and runs it, but action endpoints always return JSON, so a no-JS submit navigates to a page showing the raw JSON response (e.g. `{"ok":true,...}`) — there is no redirect or re-render. Full no-JS form flows that re-render the page are not yet supported; treat the no-JS path as a graceful-degradation safety net, not a primary UX.
 - Displays inline error messages on failure
 - For an action with a [Pydantic body model](../core-concepts/server-actions.md#validating-request-bodies-with-pydantic), a `422` passes the field map to `onError` so you can render messages next to inputs
 - Automatically resolves the action endpoint URL
@@ -7650,6 +8028,13 @@ Imported from `pyxle/client`. Renders an `<a>` tag that intercepts clicks for cl
 | `href` | `string` | -- | Target path (required) |
 | `prefetch` | `boolean` | `true` | Prefetch the target page's data and module before the click |
 | `replace` | `boolean` | `false` | Replace the current history entry instead of pushing |
+| `scroll` | `boolean \| 'preserve'` | -- | Scroll behaviour after navigation (`'preserve'` keeps the current scroll position) |
+| `shallow` | `boolean` | -- | Update the URL without re-running the loader |
+| `passHref` | `boolean` | -- | Pass `href` through to a custom child anchor |
+| `onClick` | `(event) => void` | -- | Called before navigation; calling `preventDefault()` cancels client-side nav |
+| `onMouseEnter` | `(event) => void` | -- | Called on hover (alongside prefetch) |
+
+All standard anchor attributes — `className`, `target`, `rel`, `style`, `key`, `aria-*`, and so on — are forwarded to the underlying `<a>`.
 
 **Behaviour:**
 - With `prefetch` enabled (the default), the target page's data (its `@server` loader) and component module are prefetched when the link scrolls into view (within 200px) or is hovered — before any click
@@ -7874,15 +8259,24 @@ function Chat({ room }) {
 
 ## Functions
 
-### `navigate(path)`
+### `navigate(path, options?)`
 
-Trigger client-side navigation programmatically.
+Trigger client-side navigation programmatically. Returns a `Promise<boolean>` that resolves `true` once the navigation completes, or `false` when there is no router or the target is not client-navigable (in which case it falls back to a full page load).
 
 ```jsx
 import { navigate } from 'pyxle/client';
 
-navigate('/dashboard');
+await navigate('/dashboard');
+await navigate('/dashboard', { replace: true, scroll: 'preserve' });
 ```
+
+**Options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `replace` | `boolean` | Replace the current history entry instead of pushing |
+| `scroll` | `boolean \| 'preserve'` | Scroll behaviour after navigation |
+| `shallow` | `boolean` | Update the URL without re-running the loader |
 
 ### `prefetch(path)`
 
@@ -7928,7 +8322,13 @@ async function handleDelete(id) {
 
 ### Navigation cache TTL
 
-Client-side loader payloads are cached per URL so back/forward navigation is instant while data stays reasonably fresh. A route listed in the `cache` block of `pyxle.config.json` reuses its edge-cache TTL as its navigation-cache lifetime; all other routes default to **2 minutes**. Tune the default with [`navigation.defaultPrefetchTtl`](configuration.md#navigation) (seconds) in `pyxle.config.json`:
+Client-side loader payloads are cached per URL so back/forward navigation is instant while data stays reasonably fresh. The lifetime for a route is resolved to mirror the server's real cacheability:
+
+- A route listed in the `cache` block of `pyxle.config.json` (or with a `CACHE` directive) reuses that **edge-cache TTL** as its navigation-cache lifetime.
+- A **dynamic page** — one with a `@server` loader but **no** declared cache lifetime — is **not** navigation-cached (TTL `0`). It renders `private, no-cache` and its data can change between requests (live updates, per-user content), so back/forward always refetches and a mutation shows immediately instead of being hidden behind a stale window.
+- A **static, loader-less page** falls back to the client default of **2 minutes**.
+
+So navigation caching for a loader page is **opt-in**: add a `cache` entry to give it a TTL. Tune the static default with [`navigation.defaultPrefetchTtl`](configuration.md#navigation) (seconds) in `pyxle.config.json`:
 
 ```json
 {
@@ -7938,18 +8338,28 @@ Client-side loader payloads are cached per URL so back/forward navigation is ins
 }
 ```
 
-Useful values:
+This default applies to **static, loader-less** routes only — dynamic loader pages without a `cache` entry are never navigation-cached regardless of this value. Useful values:
 
-- `0` — disable caching for routes without a `cache` entry; every navigation hits the server.
-- `120` (default) — keep prefetched and seeded payloads fresh for 2 minutes.
-- a large number — cache for the lifetime of the tab.
+- `0` — disable caching for static routes too; every navigation hits the server.
+- `120` (default) — keep static-page prefetched and seeded payloads fresh for 2 minutes.
+- a large number — cache static pages for the lifetime of the tab.
 
-As a runtime escape hatch, the default can also be overridden by setting a global (in milliseconds) before Pyxle's client runtime boots (e.g. in a `<Script strategy="beforeInteractive">` block) — note it does not affect routes with a `cache` entry:
+As a runtime escape hatch, the default can also be overridden by setting a global (in milliseconds) before Pyxle's client runtime boots — note it does not affect routes with a `cache` entry. Put it in a native inline `<script>` inside a layout's `<Head>` (head `<script>` content is preserved verbatim and runs before hydration). Do **not** use an inline `<Script>{...}` component for this — the compiler discards `<Script>` children and only injects scripts that have a `src`, so an inline `<Script>` runs on mount (after boot), too late to set this global:
 
 ```jsx
-<Script strategy="beforeInteractive">
-  {`window.__PYXLE_NAV_STALE_MS__ = 60000;`}  {/* 60s */}
-</Script>
+// pages/layout.pyxl
+import { Head } from 'pyxle/client';
+
+export default function RootLayout({ children }) {
+  return (
+    <>
+      <Head>
+        <script>{`window.__PYXLE_NAV_STALE_MS__ = 60000;`}</script>  {/* 60s */}
+      </Head>
+      {children}
+    </>
+  );
+}
 ```
 
 For per-mutation control, prefer [`invalidate(url)`](#invalidateurl) or the `x-pyxle-invalidate` response header over global TTL tuning.
@@ -8322,6 +8732,10 @@ All settings are optional — with none, you get SQLite at `./data/app.db`.
 | `url` | — | Full database URL (takes precedence over `path`). Supports `env:` indirection. |
 | `migrationsDir` | `"migrations"` | Directory of migration files, applied at startup. |
 | `waitForFileMs` | `0` | Milliseconds to wait for a SQLite file to appear before failing (useful when another process creates it). |
+| `autoTransactions` | `true` | Wrap each unsafe-method (POST/PUT/PATCH/DELETE) request's writes in one auto-commit transaction; set `false` to manage every transaction by hand. |
+| `orm` | — | Enable the SQLAlchemy ORM path, e.g. `{ "metadata": "app.models:Base", "pool": { ... } }`. Requires the `[sqlalchemy]` extra. See [The ORM path](#the-orm-path-sqlalchemy) below. |
+
+All of the above are keys inside the plugin's `settings` object (not at the config root).
 
 **Never commit credentials.** The `url` setting supports `env:` indirection — the committed config names an environment variable, the deploy environment supplies the secret:
 
@@ -8335,7 +8749,7 @@ All settings are optional — with none, you get SQLite at `./data/app.db`.
 
 Startup fails with a clear error if the named variable is unset, rather than silently falling back to SQLite.
 
-The plugin registers three services: `db.database` (the `Database`), `db.url` (the connection URL with credentials redacted), and — for SQLite — `db.path` (the resolved file path).
+The plugin registers three services: `db.database` (the `Database`), `db.url` (the connection URL with credentials redacted), and — for SQLite — `db.path` (the resolved file path, registered as a `pathlib.Path`). Note this is distinct from the `Database.path` property, which returns a redaction-safe `str`.
 
 ## Database URLs
 
@@ -8413,13 +8827,15 @@ With the plugin installed, every loader and action gets a lazy database handle o
 @server
 async def load(request):
     rows = await request.state.db.fetchall("SELECT * FROM posts ORDER BY id DESC")
-    return {"posts": rows}
+    return {"posts": [r.asdict() for r in rows]}
 
 @action
 async def create_post(request):
     await request.state.db.execute("INSERT INTO posts (title) VALUES (?)", (title,))
     return {"ok": True}   # committed automatically on success
 ```
+
+> Loader and action return values are serialized with `json.dumps`, so they must be plain JSON types. A `Row` is **not** JSON-serializable — convert it with `r.asdict()` (or `dict(r)`) before returning, as above. Returning raw `Row` objects raises a `TypeError` at render time.
 
 On an unsafe method (`POST`/`PUT`/`PATCH`/`DELETE`) the request's writes run inside **one transaction that commits when the action succeeds and rolls back when it fails** — where "fails" means the action raised `ActionError` (or any exception), which Pyxle turns into a non-2xx response. You never call `commit()`/`rollback()`, and a failed action never leaves a partial write behind. `GET`/`HEAD` run read-only.
 
@@ -8552,7 +8968,7 @@ Source: https://pyxle.dev/docs/plugins/pyxle-auth
 
 `pyxle-auth` is Pyxle's official authentication plugin: email + password accounts, sliding sessions, password-reset and email-verification flows, role-based access control, and scoped API tokens — wired into your app with one config entry. It never sends email and never renders UI; it gives you hardened primitives and stays out of your templates.
 
-> **Version 0.2.0.** Runs on [pyxle-db](pyxle-db.md) (SQLite, PostgreSQL, or MySQL — the full account lifecycle is tested against real servers in CI), or on any database layer satisfying the `DatabaseLike` contract.
+> **Version 0.3.0.** Runs on [pyxle-db](pyxle-db.md) (SQLite, PostgreSQL, or MySQL — the full account lifecycle is tested against real servers in CI), or on any database layer satisfying the `DatabaseLike` contract.
 
 ## Install
 
@@ -8581,7 +8997,6 @@ Protect a page with a guard in its `@server` loader:
 
 ```python
 # pages/dashboard.pyxl — Python section
-from pyxle.runtime import server
 from pyxle_auth import require_user_page
 
 
@@ -8663,15 +9078,34 @@ The middleware also serves the endpoints the client [`useAuth()`](../reference/c
 
 `/login` and `/signup` reuse `AuthService.sign_in` / `sign_up` — same rate limiting, same enumeration-safe errors — and map failures to status codes (`401` invalid credentials, `409` account exists, `422` weak password, `403` unverified email, `429` rate limited with `Retry-After`). They are state-changing POSTs, so the framework's CSRF protection applies; `useAuth` sends the token for you. Set `enableCredentialsApi: false` to turn them off and drive sign-in from your own `@action` instead (then call `useAuth().refresh()`); `/me` and `/logout` stay available.
 
+`useAuth()` returns the full auth surface:
+
+| Field | Type | Description |
+|---|---|---|
+| `user` | `object \| null` | The signed-in user, or `null`. |
+| `isAuthenticated` | `boolean` | Whether a user is signed in. |
+| `loading` | `boolean` | `true` while an auth request is in flight. |
+| `error` | `string \| null` | The last auth error message, or `null`. |
+| `login` | `({ email, password }) => Promise` | Sign in via `POST /auth/login`. |
+| `signup` | `({ email, password }) => Promise` | Create an account via `POST /auth/signup`. |
+| `logout` | `() => Promise` | Revoke the session and clear the cookie. |
+| `refresh` | `() => Promise` | Re-fetch `/auth/me` (call after driving sign-in from your own `@action`). |
+
 ```jsx
 // A whole auth UI, client-side:
 import { useAuth } from 'pyxle/client';
 
 function Account() {
-  const { user, isAuthenticated, login, logout } = useAuth();
-  return isAuthenticated
-    ? <button onClick={() => logout()}>Sign out {user.email}</button>
-    : <button onClick={() => login({ email, password })}>Sign in</button>;
+  const { user, isAuthenticated, login, signup, logout } = useAuth();
+  if (isAuthenticated) {
+    return <button onClick={() => logout()}>Sign out {user.email}</button>;
+  }
+  return (
+    <>
+      <button onClick={() => login({ email, password })}>Sign in</button>
+      <button onClick={() => signup({ email, password })}>Create account</button>
+    </>
+  );
 }
 ```
 
@@ -8939,7 +9373,9 @@ Two endpoints appear (sign with `PYXLE_AUTH_SECRET` / `PYXLE_SECRET_KEY`):
 > **CSRF:** these endpoints authenticate from the request body (not a cookie),
 > so they aren't CSRF-vulnerable — but the framework's CSRF middleware still
 > guards POSTs. Add `/auth/token` and `/auth/token/refresh` to
-> `csrf.exempt_paths` so non-browser clients can reach them.
+> `csrf.exemptPaths` (camelCase) so non-browser clients can reach them. A
+> snake-cased `exempt_paths` key is silently ignored, so the token endpoints
+> would keep rejecting requests.
 
 Resolve a bearer token in a loader or API route with the guards, which try
 **JWT then PAT** (and `authenticate` tries the **session** first):
@@ -12119,7 +12555,8 @@ the file watcher detects the change and rebuilds every route under
 that directory's subtree.
 
 A `layout.pyxl` looks like a regular page, but its component receives
-a `children` prop instead of `data`:
+a `children` prop, and a layout loader's data arrives on a separate
+`layoutData` prop (so it never collides with the page's own `data`):
 
 ```python
 # pages/layout.pyxl
@@ -12130,11 +12567,11 @@ async def load_root_layout(request):
 
 import React from 'react';
 
-export default function RootLayout({ data, children }) {
+export default function RootLayout({ children, layoutData }) {
     return (
         <html lang="en">
             <body>
-                <header>{data.appName}</header>
+                <header>{layoutData.appName}</header>
                 <main>{children}</main>
             </body>
         </html>
@@ -12143,9 +12580,14 @@ export default function RootLayout({ data, children }) {
 ```
 
 The layout *can* have its own `@server` loader — it runs in addition
-to the page's loader, and its data is available to the layout
-component via the `data` prop. (The page component still gets its own
-`data`.)
+to the page's loader, and its result is delivered to the layout
+component on the `layoutData` prop. (The page component still gets its
+own `data`.) For convenience the composed wrapper also aliases
+`layoutData` onto the layout's `data` prop, so a layout that
+destructures `data` keeps working — but `layoutData` is the canonical
+name and the one the reference apps use. Multiple ancestor layouts
+that each declare a loader are merged into one `layoutData` dict
+(on a key collision the outermost layout wins).
 
 ### Templates: layouts that don't persist
 
@@ -12199,9 +12641,11 @@ export default function ErrorBoundary({ error }) {
 }
 ```
 
-In dev mode, the error boundary also receives the Python traceback
-in `error.traceback` for debugging. In production this is omitted —
-production responses must not leak internal state.
+The `error` prop carries exactly `{ message, statusCode, type }`, plus
+an optional `data` field when a `LoaderError`/`ActionError` was raised
+with `data`. There is no `traceback` key — production responses must
+not leak internal state, and in production the `message` for an
+unexpected (non-author) fault is replaced with a generic string.
 
 The boundary discovery logic lives in
 `devserver/error_pages.py`.
@@ -12243,36 +12687,44 @@ pages/
         └── [id].py              →  /api/users/{id}
 ```
 
-An API route module exports an async function with a name matching
-the HTTP method:
+An API route module exports an `endpoint` callable. A single
+`endpoint` serves **all** HTTP methods — branch on `request.method`
+inside it. It receives a Starlette `Request` and must return a
+Starlette `Response` (e.g. `JSONResponse`):
 
 ```python
 # pages/api/health.py
-async def get(request):
-    return {"status": "ok"}
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
-async def post(request):
-    body = await request.json()
-    return {"received": body}
+
+async def endpoint(request: Request) -> JSONResponse:
+    if request.method == "POST":
+        body = await request.json()
+        return JSONResponse({"received": body})
+    return JSONResponse({"status": "ok"})
 ```
 
-The dev server inspects the module at registration time, finds the
-`get`, `post`, etc. functions, and registers a Starlette endpoint
-for each. There's no decorator — the function name *is* the contract.
+The dev server inspects the module at registration time and registers
+a single Starlette route for `endpoint`. There's no decorator and no
+`get`/`post`/`handle` method-name convention — the module-level
+`endpoint` attribute *is* the contract. A module that defines neither
+`endpoint`, a `websocket` callable, nor an `HTTPEndpoint` subclass
+raises an error at registration.
 
-If a single function should handle multiple methods, name it
-`handle` instead and Pyxle routes all methods to it:
+For a WebSocket route, export a module-scope `websocket` callable
+instead (or alongside `endpoint`):
 
 ```python
-async def handle(request):
-    if request.method == "GET":
-        return {"data": "..."}
-    elif request.method == "POST":
-        ...
+# pages/api/live.py
+async def websocket(ws):
+    await ws.accept()
+    ...
 ```
 
 API routes can use the same dynamic segment syntax as pages
-(`[id].py`, `[...slug].py`, etc.).
+(`[id].py`, `[...slug].py`, etc.); read params from
+`request.path_params`.
 
 ---
 
@@ -15449,7 +15901,7 @@ Node.js 18 or later. Node.js 20+ is recommended.
 
 ### Can I use TypeScript in `.pyxl` files?
 
-The JSX section supports JSX syntax. TypeScript type annotations are not directly supported in `.pyxl` files, but you can run `pyxle typecheck` to type-check the compiled JSX output if you have TypeScript installed.
+The JSX section is plain JSX — TypeScript *syntax* (type annotations, `interface`, generics, `as` casts) isn't supported there, and the compiler flags it with a clear, source-located error if you try. You still get typed editor support and a `pyxle typecheck` gate against the generated declarations. See the [TypeScript guide](guides/typescript.md) for the full picture.
 
 ### Can I import Python code in the JSX section?
 
@@ -15638,8 +16090,27 @@ Source: https://pyxle.dev/docs/changelog
 
 Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include breaking changes — those are called out explicitly here. To upgrade, run `pip install --upgrade pyxle-framework`.
 
-## Unreleased
+## 0.5.0 — 2026-06-18
 
+The depth release: caching/SSG/ISR, streaming SSR, realtime (WebSockets + a
+cross-worker Redis broker), Pydantic-validated actions, observability,
+background work, image optimization, and multi-worker serving — built,
+documented, and dogfooded on pyxle.dev. Still `0.x` (beta); the two behavior
+changes below are called out explicitly.
+
+- **Cross-worker realtime — a Redis pub/sub broker.** WebSocket channels (`pyxle.realtime.channel` / `room.publish`) now span worker processes and machines. The default `InProcessBroker` lives in one process, so under `pyxle serve --workers N` a client on one worker never saw messages published on another. Set `PYXLE_REALTIME_BROKER=redis` (with the `pyxle-framework[redis]` extra and `PYXLE_REALTIME_REDIS_URL`) and every worker relays through Redis: a message published on any worker reaches every subscriber on every worker, delivered once per connection. **No code change** — your handler's `channel(ws, "room")` / `room.publish(...)` are identical; only the broker behind `app.state.pyxle_broker` changes. The connection is pinged at startup (a bad URL fails loudly) and the listener reconnects automatically. The in-process broker remains the default and is correct for `pyxle dev` and single-worker serve. See [WebSockets → Cross-worker realtime with Redis](guides/websockets.md#cross-worker-realtime-with-redis).
+- **Fix: streaming SSR now survives production gzip.** Production serves enable gzip, and Starlette's stock `GZipMiddleware` buffers the whole streamed response (it never flushes the compressor between chunks), so a streamed `<Suspense>` page arrived all at once instead of shell-first — defeating streaming for every app, since browsers always send `Accept-Encoding: gzip`. Pyxle now ships a streaming-aware `StreamingGZipMiddleware` (from `pyxle.middleware`) that flushes the compressor after every chunk, so the shell's compressed bytes reach the browser immediately. Compression and streaming are both preserved under `pyxle serve`, no configuration needed. See [Streaming SSR → Streaming survives gzip](guides/streaming.md#streaming-survives-gzip-in-production).
+- **Fix: dynamic pages are no longer client-nav-cached with stale data.** The client navigation cache previously held every route's loader payload for the default window (2 minutes), so navigating away from and back to a **dynamic** page (a `@server` loader with no declared cache lifetime — e.g. a live feed) showed stale data until a hard refresh. The navigation-cache TTL now mirrors the server's real cacheability: a dynamic page (rendered `private, no-cache`) is **not** nav-cached (TTL `0`), so back/forward always refetches and a just-made mutation shows immediately. Pages opt into nav-caching via a `cache` entry; static, loader-less pages keep the 2-minute default. See [Caching → Client navigation cache](guides/caching.md#client-navigation-cache) and [Navigation cache TTL](reference/client-api.md#navigation-cache-ttl).
+- **Fix: `pyxle build --static` pre-renders pages whose loaders use a plugin.** Static pre-rendering ran page and layout loaders without an active plugin context, so any app that touched a plugin service in a loader — most commonly a layout loader calling `pyxle-db`'s `get_database()` — crashed with `No active plugin context` and pre-rendered **nothing** (0 pages). The static builder now stands up the same plugin context a request sees (loads the configured plugins and runs their startup, opening DB connections) around the pre-render, then tears it down — so plugin-backed loaders run at build time exactly as they do at request time, which is how static generation is meant to work (read your data source at build). See [Caching → Static pre-rendering](guides/caching.md#static-pre-rendering-pyxle-build-static).
+- **Changed (behavior): stricter validation of nested config blocks.** The `cors`, `csrf`, `observability`, and `routeMiddleware` blocks (and `styling` / the `starlette` & `vite` network blocks) now **reject unknown keys at boot** instead of silently ignoring them. A typo'd or mis-cased nested key — e.g. `csrf.cookieSamesite` instead of `cookieSameSite` — that booted before now fails loudly with a clear `Unknown keys in '<block>' block` error. This is a deliberate fail-loud fix: a silently-dropped key could leave a security-relevant default in place. Fix: correct the key name. See [Configuration](reference/configuration.md).
+- **Fix: `error.pyxl` no longer leaks internal error details in production.** When a loader or SSR render raised a non-author exception, the nearest `error.pyxl` boundary received the raw exception message (and the exception class name) as props — potentially a Node SSR stack trace or a filesystem path — which it could render to end users. In production the boundary now gets a generic `"An unexpected error occurred."` and a sanitized `ServerError` type; author-raised `LoaderError` / `ActionError` messages still pass through (they're meant to be shown). Dev keeps the real (secret-redacted) message. See [Error Handling](guides/error-handling.md).
+- **Fix: `import.meta.env.PYXLE_PUBLIC_*` is now substituted during SSR.** The Vite `define` for public env vars was applied only to the client bundle, so at server render the expression was `undefined` — any public env var rendered into the initial HTML caused a hydration mismatch / blank first paint. The SSR esbuild step now gets the same `define` (same keys, same quoting), so server and client agree. See [Environment variables → Client-side variables](guides/environment-variables.md).
+- **Fix: scaffold `.gitignore` no longer ignores `.env`.** A fresh `pyxle init` git-ignored `.env` even though the env-vars doc tells you to commit `.env` / `.env.development` / `.env.production` and ignore only the `.local` variants. The scaffold now matches the doc.
+- **Fix: `<Image>` emits a lowercase `fetchpriority` attribute.** The `priority` image rendered camelCase `fetchPriority`, which React 18.3.1 rejects with an unknown-prop warning on every such image. It now emits the valid lowercase HTML attribute.
+- **Fix: production gzip no longer prints `I/O operation on closed file`.** `StreamingGZipMiddleware` now closes its `GzipFile` + buffer deterministically on every path (small/already-encoded responses, and streams interrupted mid-flight), so the GC no longer finalizes an open compressor and the noisy `Exception ignored while finalizing file … I/O operation on closed file` stderr messages are gone.
+- **Fix: `pyxle typecheck` works out of the box on current TypeScript.** The generated `tsconfig.json` used `moduleResolution: "node10"` and `baseUrl`, both deprecated in TypeScript 7.0, so `tsc` failed with TS5107/TS5101 on a new-enough TypeScript. It now uses `"bundler"` resolution (correct for the Vite/esbuild pipeline) with tsconfig-relative `paths` and no `baseUrl`.
+- **Startup warning when a `BaseHTTPMiddleware` is paired with streaming routes.** A custom middleware subclassing Starlette's `BaseHTTPMiddleware` buffers the whole response, which breaks streaming SSR (a `<Suspense>` page would arrive all at once / raise `No response returned` on a mid-stream disconnect). Pyxle now logs a clear warning at startup naming the offending middleware class and pointing to the pure-ASGI pattern. See [Middleware](guides/middleware.md).
+- **Clear compile-time error for TypeScript syntax in a client block.** A `.pyxl` client block is plain JSX — type annotations (`const x: number`), `interface`, generics, and `as` casts aren't supported there. Previously such syntax slipped past the compiler (Babel parses it) and failed later in esbuild/Vite with a confusing message pointing into a generated `.pyxle-build` path. The compiler now detects it up front and raises a clear error pointing at your `.pyxl` source line: "TypeScript syntax (…) isn't supported in a .pyxl client block yet — keep the client half plain JSX." Detection is AST-based (any TS-only node), so valid JSX — ternaries, object literals, the `as` prop — is never flagged. See [TypeScript](guides/typescript.md).
 - **New guides: TypeScript and migrating from Flask/Django.** [TypeScript](guides/typescript.md) documents Pyxle's consumption-not-authoring model — the generated `tsconfig.json` and `.d.ts` declarations for every `pyxle/client` hook/component, the `pyxle typecheck` gate, and the honest limits (no `.tsx` authoring or per-page loader types yet). [Migrating from Flask or Django](guides/migration-from-flask-django.md) maps the concepts you know (routes, views, templates, forms, the ORM, middleware, config) to their Pyxle equivalents, with a frank list of what has no direct equivalent (admin, `url_for`, flash messages, a core ORM).
 - **`error.pyxl` is now a client-side error boundary too.** The server already renders the nearest `error.pyxl` when a loader or the initial render fails; now that same boundary keeps working in the browser. If a component throws while re-rendering — after a state update, during a client-side navigation, or on a hydration fault — Pyxle catches it and renders the nearest `error.pyxl` in place, instead of React unmounting the page to a blank screen. The boundary receives the **same** `error` prop (`message`, `statusCode`, `type`) on both sides, so one `error.pyxl` renders identically wherever the fault happened. It is transparent until something throws (so hydration is byte-for-byte unchanged) and resets on the next navigation; the nearest `error.pyxl` is resolved per route (closest-ancestor walk-up) and threaded to the client like the streaming `loading.pyxl` boundary. In `pyxle dev` the error overlay still surfaces the full stack on top; in production the boundary is the user-facing fallback. This catches *render* faults — an error in an event handler or an `await` is handled where it occurs (a `try/catch`, or an `ActionError` from `useAction`). See [Error Handling → Client-side errors](guides/error-handling.md#client-side-errors).
 - **Built-in rate limiting — `pyxle.middleware.RateLimitMiddleware`.** A dependency-free **token-bucket** limiter, enabled from `pyxle.config.json` with no code: `{"rateLimit": {"requests": 100, "window": 60}}`. Each client (keyed by remote IP, or the first `X-Forwarded-For` hop when `trustForwardedFor` is set behind a trusted proxy) gets a bucket of `requests` tokens that refills at `requests / window` per second — so a brief burst is allowed while the sustained rate is bounded, friendlier than a hard fixed window. Over-limit requests get `429 Too Many Requests` with a `Retry-After` header. `exemptPaths` skips health checks and metrics scrapes (segment-boundary matching, like `csrf.exemptPaths`). The limiter sits just inside request observability, so a throttled request still gets a correlation id and is counted, but is rejected before CSRF, static serving, or the handler do any work; the bucket store is bounded by an LRU cap so a flood of unique clients can't grow memory without bound. **Multi-worker caveat:** the store is in-memory and per-process, so under `pyxle serve --workers N` the effective global cap is `N × requests` — for one shared limit, rate-limit at your reverse proxy. Off by default (`requests: 0`). See [Middleware → Rate limiting](guides/middleware.md#rate-limiting) and [Security → Rate limiting](guides/security.md#rate-limiting).
@@ -15655,7 +16126,7 @@ Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include
 - **Fix: a server module that fails to import is no longer cached as a broken empty module.** If a page's compiled server module raised during its first import (e.g. a bad top-level `import`), the half-initialised module was left in `sys.modules`, so every later request for that page silently got an *empty* module instead of re-raising the real error. Failed imports are now evicted, so the error surfaces consistently on each request.
 - **WebSockets — page handlers, a client hook, and pub/sub.** A page `.pyxl` can now export a module-scope `async def websocket(ws)` and Pyxle serves a WebSocket route at the page's path, alongside its HTTP render — the same file handles both protocols, and dynamic segments (`pages/chat/[room].pyxl`) resolve into `ws.path_params`. Detection is by convention (the function name, not a decorator), matching how `pages/api/**` modules already expose a `websocket` callable. The new `pyxle.realtime` module ships a small pub/sub layer: `async with channel(ws, "room") as room: await room.publish(msg)` subscribes a connection to a named channel and broadcasts to everyone in it, with stale-connection pruning. Because Starlette runs HTTP middleware only for `http` scope, a WS handler gets **no** middleware — so `pyxle.realtime` also provides `authenticate_websocket(ws)` (resolve the pyxle-auth session from the handshake cookie) and `origin_allowed(ws, origins)` (the WS equivalent of CSRF). On the client, the generated `useWebSocket(path, options?)` hook gives `{ status, send, lastMessage, error }` with JSON parsing and exponential-backoff reconnect, and never opens a socket during SSR. **Multi-worker caveat (called out honestly):** the default in-process broker lives in one process, so under `pyxle serve --workers N` a message published on one worker isn't seen by clients on another — Pyxle logs a warning when it detects this, and the `Broker` protocol lets a Redis-backed broker drop in. See [WebSockets](guides/websockets.md).
 - **Streaming SSR for `<Suspense>` pages.** A page that wraps a slow part in a React 18 `<Suspense>` boundary now streams: Pyxle flushes the shell (everything outside the boundary) immediately for a fast time-to-first-byte, then streams each boundary's content in as it resolves. It's opt-in and zero-config — the compiler detects `<Suspense>` and only those pages stream; every other page keeps the buffered render byte-for-byte. The page hydrates exactly as before (the browser hydrates the same component), so no app changes are needed beyond adding the boundary. Streaming applies to dynamic, per-request pages only: a publicly cacheable route (`{"data", "revalidate"}` envelope, `CACHE` directive, or edge `cache` entry) still renders buffered so it can be stored and `ETag`'d, and a streamed response is always `private, no-cache`. The document head is flushed before the component renders, so a streamed page uses its static `HEAD` (a runtime-rendered `<Head>` lands too late — buffered pages are unaffected). A render error before the first byte falls back to the nearest `error.pyxl` rather than emitting a partial document. Built on the Node worker's new multi-frame `renderToPipeableStream` transport. See [Streaming SSR](guides/streaming.md).
-- **`loading.pyxl` route-level loading states.** A `loading.pyxl` file declares a loading component that wraps the whole route in `<Suspense fallback={<Loading/>}>` — streamed as the shell on the server and applied identically on the client so hydration matches. The nearest `loading.pyxl` wins (directory walk-up, like `error.pyxl`), and it composes with a page's own inner `<Suspense>`. Honest caveat: because the `@server` loader runs before render, the fallback only appears when the *render* suspends (a child using `React.lazy`, `use()`, or a thrown promise) — a page whose data comes entirely from its loader never suspends and streams at once. See [Streaming SSR → Route-level loading states](guides/streaming.md#route-level-loading-states-with-loadingpyxl).
+- **`loading.pyxl` route-level loading states.** A `loading.pyxl` file declares a loading component that wraps the whole route in `<Suspense fallback={<Loading/>}>` — streamed as the shell on the server and applied identically on the client so hydration matches. The nearest `loading.pyxl` wins (directory walk-up, like `error.pyxl`), and it composes with a page's own inner `<Suspense>`. Honest caveat: because the `@server` loader runs before render, the fallback only appears when the *render* suspends (a child using `React.lazy` or a thrown promise; Pyxle ships React 18.3.1, which has no `React.use`) — a page whose data comes entirely from its loader never suspends and streams at once. See [Streaming SSR → Route-level loading states](guides/streaming.md#route-level-loading-states-with-loadingpyxl).
 - **Server-side page caching with incremental regeneration.** A `@server` loader can now return a `{"data": ..., "revalidate": N}` envelope to cache its rendered HTML for `N` seconds — later requests are served from the cache without re-running the loader or the Node SSR render. A loader-less page can opt in the same way with a module-level `CACHE = {"revalidate": N}` directive. And `pyxle build --static` pre-renders every loader-less, non-dynamic page to HTML at build time and warms the cache from it on startup, so the first request after a deploy is a hit — no cold render. Once the window passes, the stale page is served instantly while a single background re-render refreshes it (incremental static regeneration — no thundering herd). Purge a route on demand from an action with `await cache.invalidate("/path")` (or `cache.invalidate_all()`). Routes already declared in the `pyxle.config.json` edge `cache` block are server-cached automatically under the same TTL. Cached responses carry a strong `ETag` (so conditional requests get a `304`) and an `x-pyxle-cache: HIT|STALE|MISS` header. The cache is enabled for `pyxle serve` (off in `pyxle dev`) and stores to a bounded in-memory backend by default, or to local disk or a shared Redis via `PYXLE_PAGE_CACHE_BACKEND` (Redis needs `pip install 'pyxle-framework[redis]'`). Only cache pages that render no per-user data — a cached render is shared with every visitor. See [Caching](guides/caching.md).
 
 ## 0.4.5

@@ -21,7 +21,7 @@
 
 - [Pyxle vs. other frameworks](https://pyxle.dev/docs/guides/comparison): Pyxle isn't the only way to build a full-stack app in Python, and it isn't the right tool for every job. This page is an honest map of the landscape — what each alternative is genuinely great at, and
 - [Migrating from Flask or Django](https://pyxle.dev/docs/guides/migration-from-flask-django): This guide maps the concepts you already know from **Flask** and **Django** to their Pyxle equivalents, so you can port an app a route at a time. It assumes you've read [Core Concepts](../core-concept
-- [Styling](https://pyxle.dev/docs/guides/styling): Pyxle ships with Tailwind CSS out of the box. The recommended way to load your stylesheets is to **import them from a JSX module** so Vite can compile, bundle, and content-hash them — exactly like it
+- [Styling](https://pyxle.dev/docs/guides/styling): Pyxle ships with Tailwind CSS configured in a fresh `pyxle init` project. The recommended way to load your stylesheets is to **import them from a JSX module** so Vite can compile, bundle, and content-
 - [Head Management](https://pyxle.dev/docs/guides/head-management): Pyxle offers two ways to control the document `<head>`: the `<Head>` component (**recommended**) and the `HEAD` Python variable. Both merge together with automatic deduplication, and either works — bu
 - [Caching](https://pyxle.dev/docs/guides/caching): By default a page's `@server` loader runs on **every request** and the page is rendered fresh each time. For pages whose content is the same for everyone and changes rarely — a marketing page, a docs
 - [Build Optimization](https://pyxle.dev/docs/guides/build-optimization): `pyxle build` produces a hashed, minified, code-split client bundle and a matching SSR shell. Most of the optimization is automatic; this guide covers what you get for free, how to inspect it, and how
@@ -46,7 +46,7 @@
 
 - [CLI Reference](https://pyxle.dev/docs/reference/cli): The `pyxle` CLI manages Pyxle projects from scaffolding to production.
 - [Configuration Reference](https://pyxle.dev/docs/reference/configuration): Pyxle is configured via `pyxle.config.json` in the project root. All fields are optional -- sensible defaults are used when omitted.
-- [Runtime API Reference](https://pyxle.dev/docs/reference/runtime-api): The `pyxle.runtime` module provides decorators and error classes used in `.pyxl` files. These are automatically available in the Python section of every `.pyxl` file -- you do not need to import them
+- [Runtime API Reference](https://pyxle.dev/docs/reference/runtime-api): The `pyxle.runtime` module provides decorators and error classes used in `.pyxl` files. The compiler **auto-injects** a small set: the `@server` decorator, and — in any file that declares at least one
 - [Client API Reference](https://pyxle.dev/docs/reference/client-api): All client-side components and hooks are importable from `pyxle/client`:
 - [Plugins API Reference](https://pyxle.dev/docs/reference/plugins-api): Every public symbol in `pyxle.plugins`, including the access helpers introduced alongside the plugin system.
 

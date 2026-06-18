@@ -1,0 +1,42 @@
+<svg width="1200" height="360" viewBox="0 0 1200 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A live signal waveform">
+  <defs>
+    <linearGradient id="sw-brand" x1="0" y1="180" x2="1200" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22d3ee"/>
+      <stop offset="0.5" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <radialGradient id="sw-glow" cx="0" cy="0" r="1" gradientTransform="translate(600 180) scale(620 240)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1d4ed8" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#08090d" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="sw-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" stroke="#ffffff" stroke-opacity="0.035" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="360" fill="#0c0e14"/>
+  <rect width="1200" height="360" fill="url(#sw-grid)"/>
+  <rect width="1200" height="360" fill="url(#sw-glow)"/>
+
+  <!-- baseline echo -->
+  <path d="M0 196 H210 L250 110 L312 286 L368 150 L398 196 H560 L598 150 L648 244 L690 196 H880 L918 168 L960 224 L996 196 H1200"
+        stroke="#3b82f6" stroke-opacity="0.18" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- main trace -->
+  <path d="M0 180 H210 L250 86 L312 274 L368 128 L398 180 H560 L598 128 L648 232 L690 180 H880 L918 150 L960 214 L996 180 H1200"
+        stroke="url(#sw-brand)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- the live cursor -->
+  <circle cx="996" cy="180" r="6.5" fill="#22d3ee"/>
+  <circle cx="996" cy="180" r="15" fill="#22d3ee" fill-opacity="0.22"/>
+  <circle cx="996" cy="180" r="26" fill="#22d3ee" fill-opacity="0.08"/>
+
+  <!-- node ticks -->
+  <g fill="#38bdf8">
+    <circle cx="210" cy="180" r="3"/>
+    <circle cx="398" cy="180" r="3"/>
+    <circle cx="560" cy="180" r="3"/>
+    <circle cx="690" cy="180" r="3"/>
+    <circle cx="880" cy="180" r="3"/>
+  </g>
+</svg>
