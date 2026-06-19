@@ -19,6 +19,29 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DOCS_SRC = join(__dirname, "..", "..", "pyxle", "docs");
 const OUT_DIR = join(__dirname, "..", "public", "docs-data");
 
+// The framework's own version, read from its pyproject.toml. We inject this into
+// the docs at build time so the "Current version:" badge can never drift from the
+// released version again (it used to be hand-edited and went stale across releases).
+const PYXLE_VERSION = (() => {
+  try {
+    const pp = readFileSync(join(__dirname, "..", "..", "pyxle", "pyproject.toml"), "utf-8");
+    const m = pp.match(/^version\s*=\s*["']([^"']+)["']/m);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+})();
+
+// Auto-sync any "**Current version:** X.Y.Z" badge to the real framework version,
+// and substitute the `{{PYXLE_VERSION}}` token if a doc uses it. Leaves every other
+// version mention (changelog history, "Pyxle 0.4.0 added …") untouched.
+function syncVersion(md) {
+  if (!PYXLE_VERSION) return md;
+  return md
+    .replace(/(\*\*Current version:\*\*\s*)\d+\.\d+\.\d+/g, `$1${PYXLE_VERSION}`)
+    .replace(/\{\{PYXLE_VERSION\}\}/g, PYXLE_VERSION);
+}
+
 // ── Navigation structure (matches docs/README.md ordering) ──────────
 
 const NAV_STRUCTURE = [
@@ -533,7 +556,7 @@ function build() {
         continue;
       }
 
-      const md = readFileSync(filePath, "utf-8");
+      const md = syncVersion(readFileSync(filePath, "utf-8"));
       const title = extractTitle(md);
       const description = extractDescription(md);
       const { html, toc, outboundLinks } = processMarkdown(md, filePath, srcUrlByAbsPath);
