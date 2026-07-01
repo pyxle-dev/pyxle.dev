@@ -57,7 +57,7 @@ const ERAS = [
     {
         n: '02',
         id: 'depth-release',
-        eyebrow: 'Just printed',
+        eyebrow: 'Recently printed',
         title: 'v0.5 — the depth release.',
         lead: 'One wave that takes Pyxle from "renders pages" to "runs production apps": caching, streaming, realtime, validation, observability, background work, and image optimization — built, documented, and dogfooded on this site.',
         status: 'shipped',
@@ -75,6 +75,18 @@ const ERAS = [
     },
     {
         n: '03',
+        id: 'ai-accessibility',
+        eyebrow: 'Just printed',
+        title: 'v0.6 — your app, in Markdown.',
+        lead: 'The AI tools your readers already work in want text, not HTML. One flag, and every page of a Pyxle app serves a clean Markdown twin — built, documented, and dogfooded on this very site.',
+        status: 'shipped',
+        items: [
+            ['Every page is also Markdown', 'Enable the llms feature and any page answers at its URL with .md appended — or to an Accept: text/markdown request. Where the Markdown comes from is yours: a co-located .md file, a to_markdown handler in the page, or one llms.py for a whole route subtree, with a wrap_markdown hook to frame every page for the agent reading it.', 'v0.6'],
+            ['llms.txt, discovery & agent search', 'A generated /llms.txt index, Link and X-Llms-Txt discovery headers on every response, and on this site a /api/docs-search endpoint that returns matching pages as Markdown links. This page has a .md twin; so does every doc.', 'v0.6'],
+        ],
+    },
+    {
+        n: '04',
         id: 'in-motion',
         eyebrow: 'On the press',
         title: 'In motion right now.',
@@ -86,7 +98,7 @@ const ERAS = [
         ],
     },
     {
-        n: '04',
+        n: '05',
         id: 'ahead',
         eyebrow: 'The next pull',
         title: 'Where this is going.',

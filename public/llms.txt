@@ -4,90 +4,91 @@
 
 ## Getting Started
 
-- [Introduction](https://pyxle.dev/docs/getting-started/introduction): Pyxle is a Python-first full-stack web framework that brings the Next.js developer experience to the Python ecosystem. You write your server logic in Python, your UI in React, and ship them together i
-- [Installation](https://pyxle.dev/docs/getting-started/installation): Pyxle requires:
-- [Quick Start](https://pyxle.dev/docs/getting-started/quick-start): Create a working Pyxle app in under 5 minutes.
-- [Project Structure](https://pyxle.dev/docs/getting-started/project-structure): After running `pyxle init my-app`, you get this file tree:
+- [Introduction](https://pyxle.dev/docs/getting-started/introduction.md): Pyxle is a Python-first full-stack web framework that brings the Next.js developer experience to the Python ecosystem. You write your server logic in Python, your UI in React, and ship them together i
+- [Installation](https://pyxle.dev/docs/getting-started/installation.md): Pyxle requires:
+- [Quick Start](https://pyxle.dev/docs/getting-started/quick-start.md): Create a working Pyxle app in under 5 minutes.
+- [Project Structure](https://pyxle.dev/docs/getting-started/project-structure.md): After running `pyxle init my-app`, you get this file tree:
 
 ## Core Concepts
 
-- [.pyxl Files](https://pyxle.dev/docs/core-concepts/pyxl-files): A `.pyxl` file is the fundamental building block of a Pyxle application. It combines Python server logic with a React component in a single file -- your data fetching and your UI live together.
-- [Routing](https://pyxle.dev/docs/core-concepts/routing): Pyxle uses **file-based routing**. The file structure inside your `pages/` directory determines the URL routes of your application. No router configuration is needed.
-- [Data Loading](https://pyxle.dev/docs/core-concepts/data-loading): Pyxle uses `@server` decorated functions to load data on the server before rendering a page. The loader runs on every request, fetches whatever the page needs, and passes the result as props to the Re
-- [Server Actions](https://pyxle.dev/docs/core-concepts/server-actions): Server actions let your React components call Python functions on the server. They are the mutation counterpart to `@server` loaders -- loaders read data, actions write data.
-- [Layouts](https://pyxle.dev/docs/core-concepts/layouts): Layouts wrap pages in shared UI -- navigation bars, sidebars, footers, and other elements that persist across page navigations.
+- [.pyxl Files](https://pyxle.dev/docs/core-concepts/pyxl-files.md): A `.pyxl` file is the fundamental building block of a Pyxle application. It combines Python server logic with a React component in a single file -- your data fetching and your UI live together.
+- [Routing](https://pyxle.dev/docs/core-concepts/routing.md): Pyxle uses **file-based routing**. The file structure inside your `pages/` directory determines the URL routes of your application. No router configuration is needed.
+- [Data Loading](https://pyxle.dev/docs/core-concepts/data-loading.md): Pyxle uses `@server` decorated functions to load data on the server before rendering a page. The loader runs on every request, fetches whatever the page needs, and passes the result as props to the Re
+- [Server Actions](https://pyxle.dev/docs/core-concepts/server-actions.md): Server actions let your React components call Python functions on the server. They are the mutation counterpart to `@server` loaders -- loaders read data, actions write data.
+- [Layouts](https://pyxle.dev/docs/core-concepts/layouts.md): Layouts wrap pages in shared UI -- navigation bars, sidebars, footers, and other elements that persist across page navigations.
 
 ## Guides
 
-- [Pyxle vs. other frameworks](https://pyxle.dev/docs/guides/comparison): Pyxle isn't the only way to build a full-stack app in Python, and it isn't the right tool for every job. This page is an honest map of the landscape — what each alternative is genuinely great at, and
-- [Migrating from Flask or Django](https://pyxle.dev/docs/guides/migration-from-flask-django): This guide maps the concepts you already know from **Flask** and **Django** to their Pyxle equivalents, so you can port an app a route at a time. It assumes you've read [Core Concepts](../core-concept
-- [Styling](https://pyxle.dev/docs/guides/styling): Pyxle ships with Tailwind CSS configured in a fresh `pyxle init` project. The recommended way to load your stylesheets is to **import them from a JSX module** so Vite can compile, bundle, and content-
-- [Head Management](https://pyxle.dev/docs/guides/head-management): Pyxle offers two ways to control the document `<head>`: the `<Head>` component (**recommended**) and the `HEAD` Python variable. Both merge together with automatic deduplication, and either works — bu
-- [Caching](https://pyxle.dev/docs/guides/caching): By default a page's `@server` loader runs on **every request** and the page is rendered fresh each time. For pages whose content is the same for everyone and changes rarely — a marketing page, a docs
-- [Build Optimization](https://pyxle.dev/docs/guides/build-optimization): `pyxle build` produces a hashed, minified, code-split client bundle and a matching SSR shell. Most of the optimization is automatic; this guide covers what you get for free, how to inspect it, and how
-- [Streaming SSR](https://pyxle.dev/docs/guides/streaming): By default Pyxle renders a page to its complete HTML string and then sends it. For a page with a slow part — a section that waits on a third-party API, a heavy below-the-fold widget — the visitor star
-- [WebSockets](https://pyxle.dev/docs/guides/websockets): A Pyxle page can serve a **WebSocket** alongside its HTML. Add a module-level `async def websocket(ws)` to a page's Python section and Pyxle registers a WebSocket route at the page's path — the same f
-- [API Routes](https://pyxle.dev/docs/guides/api-routes): Files under `pages/api/` are API endpoints. They are plain Python files (not `.pyxl`) that handle HTTP requests and return JSON or other responses.
-- [Background Tasks](https://pyxle.dev/docs/guides/background-tasks): Some work shouldn't make the user wait: sending a welcome email, emitting a webhook, warming a cache. Pyxle gives you two ways to run it off the request's critical path — pick by *when* the work shoul
-- [Middleware](https://pyxle.dev/docs/guides/middleware): Pyxle supports two levels of middleware: **application-level middleware** that wraps every request, and **route-level hooks** that run only for specific route types.
-- [Plugins](https://pyxle.dev/docs/guides/plugins): Pyxle plugins are reusable pieces of functionality — database layers, auth systems, storage adapters — that a host app composes via `pyxle.config.json` rather than hand-wiring in its entry point. The
-- [Environment Variables](https://pyxle.dev/docs/guides/environment-variables): Pyxle loads environment variables from `.env` files and supports special prefixes for configuration overrides and client-side injection.
-- [Error Handling](https://pyxle.dev/docs/guides/error-handling): Pyxle provides structured error handling through error exceptions, error boundaries, and not-found pages.
-- [Client Components](https://pyxle.dev/docs/guides/client-components): Pyxle provides built-in React components and hooks importable from `pyxle/client`.
-- [Security](https://pyxle.dev/docs/guides/security): Pyxle includes CSRF protection, CORS support, and HEAD element sanitisation out of the box.
-- [Observability](https://pyxle.dev/docs/guides/observability): Pyxle gives every request a **correlation id** and measures how long it takes — on by default, with no setup. Both are cheap enough (a `uuid4` and two `perf_counter` reads, no I/O) to run on every req
-- [Deployment](https://pyxle.dev/docs/guides/deployment): Deploy a Pyxle application with `pyxle build` to compile assets and `pyxle serve` to run in production.
-- [Editor setup](https://pyxle.dev/docs/guides/editor-setup): Pyxle Language Tools brings first-class IDE support to `.pyxl` files — syntax highlighting, diagnostics, completions, hover documentation, go-to-definition, and formatting. Everything works out of the
-- [TypeScript](https://pyxle.dev/docs/guides/typescript): Pyxle gives you typed editor support and an opt-in type-check gate **without** asking you to write TypeScript in your `.pyxl` files. The model is **consumption, not authoring**: your server code is ty
-- [Pyxle for AI coding agents](https://pyxle.dev/docs/guides/for-ai-agents): Copilot, whatever you use — can read, write, debug, and ship real full-stack features with a tiny fraction of the context, files, tools, and languages that traditional frameworks demand. One file per
-- [Migrating from .pyx to .pyxl](https://pyxle.dev/docs/guides/migration-pyx-to-pyxl): Pyxle's file extension has changed from `.pyx` to `.pyxl`. This guide explains why and how to update your project.
+- [Pyxle vs. other frameworks](https://pyxle.dev/docs/guides/comparison.md): Pyxle isn't the only way to build a full-stack app in Python, and it isn't the right tool for every job. This page is an honest map of the landscape — what each alternative is genuinely great at, and
+- [Migrating from Flask or Django](https://pyxle.dev/docs/guides/migration-from-flask-django.md): This guide maps the concepts you already know from **Flask** and **Django** to their Pyxle equivalents, so you can port an app a route at a time. It assumes you've read [Core Concepts](../core-concept
+- [Styling](https://pyxle.dev/docs/guides/styling.md): Pyxle ships with Tailwind CSS configured in a fresh `pyxle init` project. The recommended way to load your stylesheets is to **import them from a JSX module** so Vite can compile, bundle, and content-
+- [Head Management](https://pyxle.dev/docs/guides/head-management.md): Pyxle offers two ways to control the document `<head>`: the `<Head>` component (**recommended**) and the `HEAD` Python variable. Both merge together with automatic deduplication, and either works — bu
+- [Caching](https://pyxle.dev/docs/guides/caching.md): By default a page's `@server` loader runs on **every request** and the page is rendered fresh each time. For pages whose content is the same for everyone and changes rarely — a marketing page, a docs
+- [Build Optimization](https://pyxle.dev/docs/guides/build-optimization.md): `pyxle build` produces a hashed, minified, code-split client bundle and a matching SSR shell. Most of the optimization is automatic; this guide covers what you get for free, how to inspect it, and how
+- [Streaming SSR](https://pyxle.dev/docs/guides/streaming.md): By default Pyxle renders a page to its complete HTML string and then sends it. For a page with a slow part — a section that waits on a third-party API, a heavy below-the-fold widget — the visitor star
+- [WebSockets](https://pyxle.dev/docs/guides/websockets.md): A Pyxle page can serve a **WebSocket** alongside its HTML. Add a module-level `async def websocket(ws)` to a page's Python section and Pyxle registers a WebSocket route at the page's path — the same f
+- [API Routes](https://pyxle.dev/docs/guides/api-routes.md): Files under `pages/api/` are API endpoints. They are plain Python files (not `.pyxl`) that handle HTTP requests and return JSON or other responses.
+- [Background Tasks](https://pyxle.dev/docs/guides/background-tasks.md): Some work shouldn't make the user wait: sending a welcome email, emitting a webhook, warming a cache. Pyxle gives you two ways to run it off the request's critical path — pick by *when* the work shoul
+- [Middleware](https://pyxle.dev/docs/guides/middleware.md): Pyxle supports two levels of middleware: **application-level middleware** that wraps every request, and **route-level hooks** that run only for specific route types.
+- [Plugins](https://pyxle.dev/docs/guides/plugins.md): Pyxle plugins are reusable pieces of functionality — database layers, auth systems, storage adapters — that a host app composes via `pyxle.config.json` rather than hand-wiring in its entry point. The
+- [Environment Variables](https://pyxle.dev/docs/guides/environment-variables.md): Pyxle loads environment variables from `.env` files and supports special prefixes for configuration overrides and client-side injection.
+- [Error Handling](https://pyxle.dev/docs/guides/error-handling.md): Pyxle provides structured error handling through error exceptions, error boundaries, and not-found pages.
+- [Client Components](https://pyxle.dev/docs/guides/client-components.md): Pyxle provides built-in React components and hooks importable from `pyxle/client`.
+- [Security](https://pyxle.dev/docs/guides/security.md): Pyxle includes CSRF protection, CORS support, and HEAD element sanitisation out of the box.
+- [Observability](https://pyxle.dev/docs/guides/observability.md): Pyxle gives every request a **correlation id** and measures how long it takes — on by default, with no setup. Both are cheap enough (a `uuid4` and two `perf_counter` reads, no I/O) to run on every req
+- [Deployment](https://pyxle.dev/docs/guides/deployment.md): Deploy a Pyxle application with `pyxle build` to compile assets and `pyxle serve` to run in production.
+- [Editor setup](https://pyxle.dev/docs/guides/editor-setup.md): Pyxle Language Tools brings first-class IDE support to `.pyxl` files — syntax highlighting, diagnostics, completions, hover documentation, go-to-definition, and formatting. Everything works out of the
+- [TypeScript](https://pyxle.dev/docs/guides/typescript.md): Pyxle gives you typed editor support and an opt-in type-check gate **without** asking you to write TypeScript in your `.pyxl` files. The model is **consumption, not authoring**: your server code is ty
+- [Pyxle for AI coding agents](https://pyxle.dev/docs/guides/for-ai-agents.md): Copilot, whatever you use — can read, write, debug, and ship real full-stack features with a tiny fraction of the context, files, tools, and languages that traditional frameworks demand. One file per
+- [AI accessibility — your app in Markdown](https://pyxle.dev/docs/guides/llms.md): Every page of a Pyxle app can serve a clean **Markdown** rendition of itself — so AI assistants and coding agents (Claude, ChatGPT, Cursor, Copilot, Perplexity) read your app as text instead of scrapi
+- [Migrating from .pyx to .pyxl](https://pyxle.dev/docs/guides/migration-pyx-to-pyxl.md): Pyxle's file extension has changed from `.pyx` to `.pyxl`. This guide explains why and how to update your project.
 
 ## Reference
 
-- [CLI Reference](https://pyxle.dev/docs/reference/cli): The `pyxle` CLI manages Pyxle projects from scaffolding to production.
-- [Configuration Reference](https://pyxle.dev/docs/reference/configuration): Pyxle is configured via `pyxle.config.json` in the project root. All fields are optional -- sensible defaults are used when omitted.
-- [Runtime API Reference](https://pyxle.dev/docs/reference/runtime-api): The `pyxle.runtime` module provides decorators and error classes used in `.pyxl` files. The compiler **auto-injects** a small set: the `@server` decorator, and — in any file that declares at least one
-- [Client API Reference](https://pyxle.dev/docs/reference/client-api): All client-side components and hooks are importable from `pyxle/client`:
-- [Plugins API Reference](https://pyxle.dev/docs/reference/plugins-api): Every public symbol in `pyxle.plugins`, including the access helpers introduced alongside the plugin system.
+- [CLI Reference](https://pyxle.dev/docs/reference/cli.md): The `pyxle` CLI manages Pyxle projects from scaffolding to production.
+- [Configuration Reference](https://pyxle.dev/docs/reference/configuration.md): Pyxle is configured via `pyxle.config.json` in the project root. All fields are optional -- sensible defaults are used when omitted.
+- [Runtime API Reference](https://pyxle.dev/docs/reference/runtime-api.md): The `pyxle.runtime` module provides decorators and error classes used in `.pyxl` files. The compiler **auto-injects** a small set: the `@server` decorator, and — in any file that declares at least one
+- [Client API Reference](https://pyxle.dev/docs/reference/client-api.md): All client-side components and hooks are importable from `pyxle/client`:
+- [Plugins API Reference](https://pyxle.dev/docs/reference/plugins-api.md): Every public symbol in `pyxle.plugins`, including the access helpers introduced alongside the plugin system.
 
 ## Plugins
 
-- [pyxle-db](https://pyxle.dev/docs/plugins/pyxle-db): `pyxle-db` is Pyxle's official database plugin over **SQLite, PostgreSQL, and MySQL**. It offers two first-class paths: an **explicit-SQL** API (portable placeholders, a uniform `Row` type, checksum-t
-- [pyxle-auth](https://pyxle.dev/docs/plugins/pyxle-auth): `pyxle-auth` is Pyxle's official authentication plugin: email + password accounts, sliding sessions, password-reset and email-verification flows, role-based access control, and scoped API tokens — wir
-- [pyxle-mail](https://pyxle.dev/docs/plugins/pyxle-mail): `pyxle-mail` is Pyxle's official email plugin: one `mail.service` your loaders, actions, and API routes call as `await mail.send(...)`, delivered over SMTP, [Resend](https://resend.com), or any backen
-- [Plugin Standards](https://pyxle.dev/docs/plugins/standards): The bar a plugin must clear to be listed in the [pyxle.dev plugin directory](/plugins). It exists so that anything a Pyxle user installs from the directory behaves the way the official plugins do — pr
-- [Plugin Ideas](https://pyxle.dev/docs/plugins/ideas): Capabilities the ecosystem needs, scoped to what the plugin API supports **today** — services and middleware (see [the plugins guide](../guides/plugins.md); page contribution is [Phase B, in RFC](rfc-
-- [RFC: Plugin Routes & Pages (Phase B)](https://pyxle.dev/docs/plugins/rfc-plugin-pages): Phase A (shipped, stable) lets a plugin run lifecycle hooks, register named services, and contribute ASGI **middleware** — see the [plugins guide](../guides/plugins.md). What it cannot do is own a URL
+- [pyxle-db](https://pyxle.dev/docs/plugins/pyxle-db.md): `pyxle-db` is Pyxle's official database plugin over **SQLite, PostgreSQL, and MySQL**. It offers two first-class paths: an **explicit-SQL** API (portable placeholders, a uniform `Row` type, checksum-t
+- [pyxle-auth](https://pyxle.dev/docs/plugins/pyxle-auth.md): `pyxle-auth` is Pyxle's official authentication plugin: email- **or** username-based password accounts, sliding sessions, password-reset and email-verification flows, role-based access control, and sc
+- [pyxle-mail](https://pyxle.dev/docs/plugins/pyxle-mail.md): `pyxle-mail` is Pyxle's official email plugin: one `mail.service` your loaders, actions, and API routes call as `await mail.send(...)`, delivered over SMTP, [Resend](https://resend.com), or any backen
+- [Plugin Standards](https://pyxle.dev/docs/plugins/standards.md): The bar a plugin must clear to be listed in the [pyxle.dev plugin directory](/plugins). It exists so that anything a Pyxle user installs from the directory behaves the way the official plugins do — pr
+- [Plugin Ideas](https://pyxle.dev/docs/plugins/ideas.md): Capabilities the ecosystem needs, scoped to what the plugin API supports **today** — services and middleware (see [the plugins guide](../guides/plugins.md); page contribution is [Phase B, in RFC](rfc-
+- [RFC: Plugin Routes & Pages (Phase B)](https://pyxle.dev/docs/plugins/rfc-plugin-pages.md): Phase A (shipped, stable) lets a plugin run lifecycle hooks, register named services, and contribute ASGI **middleware** — see the [plugins guide](../guides/plugins.md). What it cannot do is own a URL
 
 ## Architecture
 
-- [Pyxle Architecture](https://pyxle.dev/docs/architecture/README): Welcome. This section is the **architecture handbook** — a guided tour of how Pyxle is built on the inside, written for everyone from "I just installed Pyxle yesterday" to "I want to send a PR that to
-- [Overview — A request, end to end](https://pyxle.dev/docs/architecture/overview): This is the one doc to read first. We're going to follow a single HTTP request all the way from `localhost:8000/` to your browser, naming every component it touches and every transformation it goes th
-- [The .pyxl file format](https://pyxle.dev/docs/architecture/pyxl-files): A Pyxle page is a single file with two languages in it: Python and JSX. This doc explains *why* that file exists, *what's actually in it*, and
-- [The parser](https://pyxle.dev/docs/architecture/parser): The honest answer is: by **parsing**. The Pyxle parser feeds the source to Python's `ast.parse` and uses the structure of the result — and the structure of the failure when parsing fails — to find the
-- [The compiler](https://pyxle.dev/docs/architecture/compiler): The compiler is the bridge between the parser and the rest of the framework. The parser produces an in-memory `PyxParseResult`; the compiler turns that result into **three files on disk** that the dev
-- [Routing](https://pyxle.dev/docs/architecture/routing): Pyxle uses **file-based routing**: the path of a `.pyxl` file inside your `pages/` directory *is* its URL. There is no `@app.route("/")` decorator. There is no router config file. There is no list of
-- [The dev server](https://pyxle.dev/docs/architecture/dev-server): `pyxle dev` is the command you'll spend the most time with. It runs a Starlette ASGI app on port 8000, a Vite subprocess on port 5173, an SSR worker pool, an incremental compiler, a file watcher, and
-- [Server-side rendering](https://pyxle.dev/docs/architecture/ssr): Server-side rendering (SSR) is the process of turning a `PageRoute` and an HTTP request into an HTML response. It's the part of the framework that runs on every page load — so it has to be fast, robus
-- [Build and serve](https://pyxle.dev/docs/architecture/build-and-serve): `pyxle dev` is what you run during development. `pyxle build` and `pyxle serve` are what you run for production. They share most of their code with the dev server but make a few important changes:
-- [The runtime](https://pyxle.dev/docs/architecture/runtime): The "runtime" of Pyxle is the **smallest module in the framework**. It contains two decorators (`@server` and `@action`), two exception classes (`LoaderError` and `ActionError`), and one small helper
-- [The CLI](https://pyxle.dev/docs/architecture/cli): `pyxle` is the command-line entry point users actually type. It's a
+- [Pyxle Architecture](https://pyxle.dev/docs/architecture/README.md): Welcome. This section is the **architecture handbook** — a guided tour of how Pyxle is built on the inside, written for everyone from "I just installed Pyxle yesterday" to "I want to send a PR that to
+- [Overview — A request, end to end](https://pyxle.dev/docs/architecture/overview.md): This is the one doc to read first. We're going to follow a single HTTP request all the way from `localhost:8000/` to your browser, naming every component it touches and every transformation it goes th
+- [The .pyxl file format](https://pyxle.dev/docs/architecture/pyxl-files.md): A Pyxle page is a single file with two languages in it: Python and JSX. This doc explains *why* that file exists, *what's actually in it*, and
+- [The parser](https://pyxle.dev/docs/architecture/parser.md): The honest answer is: by **parsing**. The Pyxle parser feeds the source to Python's `ast.parse` and uses the structure of the result — and the structure of the failure when parsing fails — to find the
+- [The compiler](https://pyxle.dev/docs/architecture/compiler.md): The compiler is the bridge between the parser and the rest of the framework. The parser produces an in-memory `PyxParseResult`; the compiler turns that result into **three files on disk** that the dev
+- [Routing](https://pyxle.dev/docs/architecture/routing.md): Pyxle uses **file-based routing**: the path of a `.pyxl` file inside your `pages/` directory *is* its URL. There is no `@app.route("/")` decorator. There is no router config file. There is no list of
+- [The dev server](https://pyxle.dev/docs/architecture/dev-server.md): `pyxle dev` is the command you'll spend the most time with. It runs a Starlette ASGI app on port 8000, a Vite subprocess on port 5173, an SSR worker pool, an incremental compiler, a file watcher, and
+- [Server-side rendering](https://pyxle.dev/docs/architecture/ssr.md): Server-side rendering (SSR) is the process of turning a `PageRoute` and an HTTP request into an HTML response. It's the part of the framework that runs on every page load — so it has to be fast, robus
+- [Build and serve](https://pyxle.dev/docs/architecture/build-and-serve.md): `pyxle dev` is what you run during development. `pyxle build` and `pyxle serve` are what you run for production. They share most of their code with the dev server but make a few important changes:
+- [The runtime](https://pyxle.dev/docs/architecture/runtime.md): The "runtime" of Pyxle is the **smallest module in the framework**. It contains two decorators (`@server` and `@action`), two exception classes (`LoaderError` and `ActionError`), and one small helper
+- [The CLI](https://pyxle.dev/docs/architecture/cli.md): `pyxle` is the command-line entry point users actually type. It's a
 
 ## Advanced
 
-- [SSR Pipeline](https://pyxle.dev/docs/advanced/ssr-pipeline): This document explains how Pyxle renders pages on the server. Understanding the SSR pipeline is useful for debugging render issues and optimising performance.
-- [Compiler Internals](https://pyxle.dev/docs/advanced/compiler-internals): The Pyxle compiler transforms `.pyxl` files into separate Python and JSX artifacts. This document explains how the compilation process works.
+- [SSR Pipeline](https://pyxle.dev/docs/advanced/ssr-pipeline.md): This document explains how Pyxle renders pages on the server. Understanding the SSR pipeline is useful for debugging render issues and optimising performance.
+- [Compiler Internals](https://pyxle.dev/docs/advanced/compiler-internals.md): The Pyxle compiler transforms `.pyxl` files into separate Python and JSX artifacts. This document explains how the compilation process works.
 
 ## FAQ
 
-- [Frequently Asked Questions](https://pyxle.dev/docs/faq): Pyxle is a Python-first full-stack web framework. It combines Python server logic with React components in `.pyxl` files, providing file-based routing, server-side rendering, and a development experie
+- [Frequently Asked Questions](https://pyxle.dev/docs/faq.md): Pyxle is a Python-first full-stack web framework. It combines Python server logic with React components in `.pyxl` files, providing file-based routing, server-side rendering, and a development experie
 
 ## Changelog
 
-- [Changelog](https://pyxle.dev/docs/changelog): Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include breaking changes — those are called out explicitly here. To upgrade, run `pip install --upgrade pyxle-framework`.
+- [Changelog](https://pyxle.dev/docs/changelog.md): Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include breaking changes — those are called out explicitly here. To upgrade, run `pip install --upgrade pyxle-framework`.
 
 ## More
 
-- [Plugin directory](https://pyxle.dev/plugins): official and community plugins
-- [Benchmarks & methodology](https://pyxle.dev/benchmarks): reproducible performance numbers
-- [Interactive playground](https://pyxle.dev/playground): run Pyxle in the browser
+- [Plugin directory](https://pyxle.dev/plugins.md): official and community plugins
+- [Benchmarks & methodology](https://pyxle.dev/benchmarks.md): reproducible performance numbers
+- [Interactive playground](https://pyxle.dev/playground.md): run Pyxle in the browser

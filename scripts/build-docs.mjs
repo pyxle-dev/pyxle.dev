@@ -18,6 +18,7 @@ import { createHash } from "crypto";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DOCS_SRC = join(__dirname, "..", "..", "pyxle", "docs");
 const OUT_DIR = join(__dirname, "..", "public", "docs-data");
+const SITE_URL = "https://pyxle.dev";
 
 // The framework's own version, read from its pyproject.toml. We inject this into
 // the docs at build time so the "Current version:" badge can never drift from the
@@ -91,6 +92,7 @@ const NAV_STRUCTURE = [
       { file: "guides/editor-setup.md", slug: "editor-setup" },
       { file: "guides/typescript.md", slug: "typescript" },
       { file: "guides/for-ai-agents.md", slug: "for-ai-agents" },
+      { file: "guides/llms.md", slug: "llms" },
       { file: "guides/migration-pyx-to-pyxl.md", slug: "migration-pyx-to-pyxl" },
     ],
   },
@@ -194,6 +196,7 @@ const SEARCH_KEYWORDS = {
   "guides/editor-setup": ["editor", "vscode", "vs code", "lsp", "syntax highlighting", "ide"],
   "guides/typescript": ["typescript", "ts", "types", "tsconfig", "d.ts", "type definitions", "typecheck", "tsc", "type checking", "intellisense", "tsx", "strict", "generics"],
   "guides/for-ai-agents": ["ai", "agents", "claude", "cursor", "copilot", "llm", "coding agent"],
+  "guides/llms": ["llms", "llms.txt", "markdown", "md", "ai accessibility", "ai-friendly", "to_markdown", "accept text/markdown", "llms-full.txt", "agent friendly docs", "context"],
   "reference/cli": ["cli", "commands", "pyxle dev", "pyxle build", "pyxle serve", "terminal"],
   "reference/configuration": ["config", "configuration", "pyxle.config.json", "settings", "options"],
   "reference/runtime-api": ["runtime", "@server", "@action", "loadererror", "actionerror", "decorators"],
@@ -305,6 +308,56 @@ function collectPageAnchors(md) {
 function resolveMdLinkAbs(sourceAbsPath, linkHref) {
   const cleanHref = linkHref.replace(/[#?].*$/, ""); // strip anchor and query
   return resolve(dirname(sourceAbsPath), cleanHref);
+}
+
+/**
+ * Rewrite a single link href for the AI/agent markdown output: internal doc
+ * links become absolute `.md` URLs so an agent following them lands on clean
+ * markdown, not HTML. Returns the new href, or `null` to leave the link as-is
+ * (same-page anchors, external links, unresolved targets).
+ */
+function rewriteAgentHref(href, sourceAbsPath, srcUrlByAbsPath) {
+  if (href.startsWith("#")) return null; // same-page anchor
+  if (/^(https?:|\/\/|mailto:|tel:)/i.test(href)) return null; // external
+
+  // Internal relative `.md` link → absolute `/docs/<url>.md`.
+  const mdMatch = href.match(/^([^#?]+)\.md(#[^?]*)?$/);
+  if (mdMatch) {
+    const anchor = mdMatch[2] || "";
+    const publishedUrl = srcUrlByAbsPath.get(resolveMdLinkAbs(sourceAbsPath, `${mdMatch[1]}.md`));
+    return publishedUrl ? `${SITE_URL}/docs/${publishedUrl}.md${anchor}` : null;
+  }
+
+  // Root-relative link to a known site page (/benchmarks, /plugins…) → `.md`.
+  const [pathOnly, anchor = ""] = href.split(/(#.*)$/);
+  const sitePath = (pathOnly || "").replace(/\/$/, "") || "/";
+  if (href.startsWith("/") && SITE_PAGES.some((p) => p.path === sitePath)) {
+    const mdPath = sitePath === "/" ? "/index" : sitePath;
+    return `${SITE_URL}${mdPath}.md${anchor}`;
+  }
+  return null;
+}
+
+/**
+ * Rewrite internal links in raw markdown to absolute `.md` URLs, for the
+ * agent-facing `.md` export. Fenced code blocks are left untouched so code
+ * samples are never mangled. Images (`![…]`) are left as-is.
+ */
+function rewriteAgentLinks(md, sourceAbsPath, srcUrlByAbsPath) {
+  return md
+    .split(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g)
+    .map((part, i) => {
+      if (i % 2 === 1) return part; // fenced code block
+      return part.replace(
+        /(!?)\[([^\]]*)\]\(([^)\s]+)(\s+"[^"]*")?\)/g,
+        (whole, bang, text, href, title) => {
+          if (bang) return whole; // image
+          const next = rewriteAgentHref(href, sourceAbsPath, srcUrlByAbsPath);
+          return next === null ? whole : `[${text}](${next}${title || ""})`;
+        }
+      );
+    })
+    .join("");
 }
 
 /** Add IDs to headings, extract TOC entries, and collect outbound .md links. */
@@ -561,6 +614,10 @@ function build() {
       const description = extractDescription(md);
       const { html, toc, outboundLinks } = processMarkdown(md, filePath, srcUrlByAbsPath);
       const searchText = extractSearchText(md);
+      // Agent-facing markdown: internal doc links rewritten to absolute `.md`
+      // URLs (used for the served `<page>.md`, the "Copy page" button, and the
+      // llms-full.txt corpus, so links resolve wherever the markdown travels).
+      const agentMd = rewriteAgentLinks(md, filePath, srcUrlByAbsPath);
 
       // Validate every link this file emits so no rendered docs link 404s:
       //   • bad-internal — not a relative `.md` link → rejected outright.
@@ -640,8 +697,8 @@ function build() {
         ? section.slug
         : `${section.slug}/${item.slug}`;
 
-      // Page JSON (include raw markdown for "Copy page" feature)
-      const pageData = { title, description, html, toc, path: pagePath, markdown: md };
+      // Page JSON (include agent markdown for "Copy page" + the `.md` endpoint)
+      const pageData = { title, description, html, toc, path: pagePath, markdown: agentMd };
       const outPath = section.flat
         ? join(OUT_DIR, `${section.slug}.json`)
         : join(OUT_DIR, section.slug, `${item.slug}.json`);
@@ -671,7 +728,7 @@ function build() {
       manifest.pages[pagePath] = { title, category: section.category };
 
       // For llms.txt / llms-full.txt (llmstxt.org — AI-readable site map).
-      llmsPages.push({ title, description, category: section.category, path: pagePath, markdown: md });
+      llmsPages.push({ title, description, category: section.category, path: pagePath, markdown: agentMd });
 
       console.log(`  OK: ${pagePath} — "${title}"`);
     }
@@ -700,7 +757,6 @@ function build() {
   // source of truth for every URL that churns (the docs catch-all), so
   // the sitemap can never drift from the site again. Hand-edits to
   // public/sitemap.xml will be overwritten by the next docs build.
-  const SITE_URL = "https://pyxle.dev";
   const STATIC_PAGES = SITE_PAGES;
   const CATEGORY_PRIORITY = {
     "getting-started": "0.9",
@@ -747,16 +803,16 @@ function build() {
     llms.push(`## ${section.category}`, ``);
     for (const p of pages) {
       const note = oneLine(p.description);
-      llms.push(`- [${p.title}](${SITE_URL}/docs/${p.path})${note ? `: ${note}` : ""}`);
+      llms.push(`- [${p.title}](${SITE_URL}/docs/${p.path}.md)${note ? `: ${note}` : ""}`);
     }
     llms.push(``);
   }
   llms.push(
     `## More`,
     ``,
-    `- [Plugin directory](${SITE_URL}/plugins): official and community plugins`,
-    `- [Benchmarks & methodology](${SITE_URL}/benchmarks): reproducible performance numbers`,
-    `- [Interactive playground](${SITE_URL}/playground): run Pyxle in the browser`,
+    `- [Plugin directory](${SITE_URL}/plugins.md): official and community plugins`,
+    `- [Benchmarks & methodology](${SITE_URL}/benchmarks.md): reproducible performance numbers`,
+    `- [Interactive playground](${SITE_URL}/playground.md): run Pyxle in the browser`,
     ``
   );
   writeFileSync(join(PUBLIC_DIR, "llms.txt"), llms.join("\n"));
@@ -773,7 +829,7 @@ function build() {
     ``,
   ];
   for (const p of llmsPages) {
-    full.push(`Source: ${SITE_URL}/docs/${p.path}`, ``, p.markdown.trim(), ``, `---`, ``);
+    full.push(`Source: ${SITE_URL}/docs/${p.path}.md`, ``, p.markdown.trim(), ``, `---`, ``);
   }
   writeFileSync(join(PUBLIC_DIR, "llms-full.txt"), full.join("\n"));
 

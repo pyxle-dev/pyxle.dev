@@ -25,5 +25,8 @@
       "/api/unsubscribe",
       "/api/resend-webhook"
     ]
+  },
+  "llms": {
+    "enabled": true
   }
 }
