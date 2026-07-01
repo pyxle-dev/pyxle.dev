@@ -630,16 +630,14 @@ function CopyPageDropdown({ page }) {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [open]);
 
-    const pageUrl = typeof window !== 'undefined'
-        ? `https://pyxle.dev/docs/${page.path}`
-        : `https://pyxle.dev/docs/${page.path}`;
-
-    const docsBaseUrl = 'https://pyxle.dev/docs';
+    // Point AI assistants at the clean Markdown rendition (.md), not the HTML page.
+    const mdUrl = `https://pyxle.dev/docs/${page.path}.md`;
 
     const aiPrompt = encodeURIComponent(
-        `Read ${pageUrl} carefully so I can ask questions about it.\n\n` +
+        `Read ${mdUrl} carefully so I can ask questions about it.\n\n` +
         `Pyxle is a new Python-first full-stack framework, so you likely lack training data on it. ` +
-        `If you need additional context about any Pyxle concept, read the relevant pages at ${docsBaseUrl}.`
+        `Every page is available as Markdown by appending .md to its URL; the docs index is ` +
+        `https://pyxle.dev/llms.txt and you can search with https://pyxle.dev/api/docs-search?q=YOUR+QUERY.`
     );
 
     const copyMarkdown = useCallback(() => {

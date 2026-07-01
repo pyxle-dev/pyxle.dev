@@ -161,8 +161,9 @@ const HERO_CONTENTS = [
     ['03', 'In the box', 'in-the-box'],
     ['04', 'The numbers', 'numbers'],
     ['05', 'For the agents', 'agents'],
-    ['06', 'In the wild', 'demos'],
-    ['07', 'Start', 'start'],
+    ['06', 'As Markdown', 'markdown'],
+    ['07', 'In the wild', 'demos'],
+    ['08', 'Start', 'start'],
 ];
 
 /* Fragment navigation no-ops on sections with content-visibility:auto
@@ -587,7 +588,71 @@ function ForAgents() {
 }
 
 
-/* ── 06 · In the wild (live specimens) ───────────────────────────── */
+/* ── 06 · As Markdown (readable by machines) ─────────────────────── */
+
+function ReadableAsMarkdown() {
+    return (
+        <GpSection n="06" id="markdown">
+            <div className="grid gap-12 lg:grid-cols-12">
+                <div className="order-1 min-w-0 lg:col-span-6">
+                    <GpHead
+                        n="06"
+                        eyebrow="Markdown, built in"
+                        title="Every page is also Markdown."
+                        lead="Your readers increasingly arrive with an AI in the loop — and it wants text, not your HTML. Flip one flag and every page serves a clean Markdown twin: append .md to any URL, or send Accept: text/markdown. This page included."
+                    />
+                    <div data-reveal="none" className="my-9 max-w-xl">
+                        <span className="gp-rule-x block h-px bg-rule" aria-hidden="true" />
+                        <p className="py-5 font-display text-[1.5rem] font-[460] leading-snug tracking-[-0.01em] text-ink sm:text-[1.75rem]">
+                            “Append{' '}
+                            <code className="font-mono text-[0.82em] text-acct">.md</code>. Read the page.”
+                        </p>
+                        <span className="gp-rule-x block h-px bg-rule" style={{ ['--rule-delay']: '120ms' }} aria-hidden="true" />
+                    </div>
+                    <p data-reveal className="max-w-[58ch] text-pretty text-base leading-[1.7] text-ink2">
+                        You decide where each page's Markdown comes from — a co-located{' '}
+                        <code className="text-[0.9em] text-acct">.md</code> file, a{' '}
+                        <code className="text-[0.9em] text-acct">to_markdown</code> handler, or one{' '}
+                        <code className="text-[0.9em] text-acct">llms.py</code> for a whole section. An{' '}
+                        <code className="text-[0.9em] text-acct">llms.txt</code> index and discovery
+                        headers come free — it is how a developer pastes your docs into Claude or
+                        Cursor and gets clean context, not tag soup.
+                    </p>
+                    <p data-reveal className="mt-7">
+                        <EditorialLink href="/docs/guides/llms">How it works →</EditorialLink>
+                    </p>
+                </div>
+
+                <div className="order-2 min-w-0 lg:col-span-6">
+                    <div data-reveal style={{ ['--reveal-delay']: '100ms' }}>
+                        <Plate
+                            label="terminal"
+                            caption={<>Fig. 5 — any URL, plus <span className="text-ink">.md</span>. Turned on with one line: <span className="text-ink">"llms": true</span>.</>}
+                        >
+                            <pre className="duotone overflow-x-auto p-5 font-mono text-[12.5px] leading-[1.9]">
+                                <code>
+                                    <span className="sh-cmd">$</span> <span className="sh-fn">curl</span> pyxle.dev/docs/routing<span className="sh-kw">.md</span>{'\n'}
+                                    <span className="sh-cmt">&gt; Markdown rendition of /docs/routing,</span>{'\n'}
+                                    <span className="sh-cmt">&gt; served for agents. Index: /llms.txt</span>{'\n'}
+                                    {'\n'}
+                                    <span className="sh-kw"># Routing</span>{'\n'}
+                                    {'\n'}
+                                    {'Pyxle uses '}<span className="sh-str">**file-based routing**</span>{'. The'}{'\n'}
+                                    {'structure of your '}<span className="sh-str">`pages/`</span>{' directory is'}{'\n'}
+                                    {'your URL routes — no router config,'}{'\n'}
+                                    {'no tag soup, just the words.'}
+                                </code>
+                            </pre>
+                        </Plate>
+                    </div>
+                </div>
+            </div>
+        </GpSection>
+    );
+}
+
+
+/* ── 07 · In the wild (live specimens) ───────────────────────────── */
 
 const DEMOS = [
     { name: 'Flux', tagline: 'SaaS analytics', href: 'https://flux.pyxle.app', kind: 'chart' },
@@ -691,10 +756,10 @@ function FeaturedPulse() {
 
 function InTheWild() {
     return (
-        <GpSection n="06" id="demos">
+        <GpSection n="07" id="demos">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <GpHead
-                    n="06"
+                    n="07"
                     eyebrow="In the wild"
                     title="Built with Pyxle, running live."
                     lead="One reference app that uses every feature, plus a few small specimens — each a handful of .pyxl files, deployed the boring way. Open the source next to the live app; the whole feature really is in one file."
@@ -738,7 +803,7 @@ function InTheWild() {
 }
 
 
-/* ── 07 · Start (a recipe) + the newsletter coda ─────────────────── */
+/* ── 08 · Start (a recipe) + the newsletter coda ─────────────────── */
 
 const RECIPE = [
     ['pip install pyxle-framework', 'installs the compiler, server, and CLI'],
@@ -865,9 +930,9 @@ function GetStarted() {
     }, []);
 
     return (
-        <GpSection n="07" id="start">
+        <GpSection n="08" id="start">
             <GpHead
-                n="07"
+                n="08"
                 eyebrow="Start"
                 title="Four commands. The fourth is a running app."
             />
@@ -1014,6 +1079,7 @@ export default function Page({ data }) {
                 <TheIndex />
                 <TheNumbers />
                 <ForAgents />
+                <ReadableAsMarkdown />
                 <InTheWild />
                 <GetStarted />
             </main>

@@ -36,6 +36,7 @@
   <url><loc>https://pyxle.dev/docs/guides/editor-setup</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/typescript</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/for-ai-agents</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/llms</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/migration-pyx-to-pyxl</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/reference/cli</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/reference/configuration</loc><priority>0.7</priority></url>
