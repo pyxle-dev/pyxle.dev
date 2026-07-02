@@ -47,7 +47,7 @@
 
 - [CLI Reference](https://pyxle.dev/docs/reference/cli.md): The `pyxle` CLI manages Pyxle projects from scaffolding to production.
 - [Configuration Reference](https://pyxle.dev/docs/reference/configuration.md): Pyxle is configured via `pyxle.config.json` in the project root. All fields are optional -- sensible defaults are used when omitted.
-- [Runtime API Reference](https://pyxle.dev/docs/reference/runtime-api.md): The `pyxle.runtime` module provides decorators and error classes used in `.pyxl` files. The compiler **auto-injects** a small set: the `@server` decorator, and — in any file that declares at least one
+- [Runtime API Reference](https://pyxle.dev/docs/reference/runtime-api.md): The `pyxle.runtime` module provides decorators and error classes used in `.pyxl` files. The compiler **auto-injects** the ones you use in the idiomatic patterns, so you rarely import from `pyxle.runti
 - [Client API Reference](https://pyxle.dev/docs/reference/client-api.md): All client-side components and hooks are importable from `pyxle/client`:
 - [Plugins API Reference](https://pyxle.dev/docs/reference/plugins-api.md): Every public symbol in `pyxle.plugins`, including the access helpers introduced alongside the plugin system.
 

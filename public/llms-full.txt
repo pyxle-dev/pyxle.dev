@@ -12,7 +12,7 @@ Source: https://pyxle.dev/docs/getting-started/introduction.md
 
 Pyxle is a Python-first full-stack web framework that brings the Next.js developer experience to the Python ecosystem. You write your server logic in Python, your UI in React, and ship them together in a single `.pyxl` file — no separate API layer, no second service, no glue code between them.
 
-**Current version:** 0.6.0 (beta)
+**Current version:** 0.6.1 (beta)
 
 ## One file, two languages
 
@@ -7249,6 +7249,7 @@ pyxle install [directory] [options]
 | `directory` | `.` | Project directory |
 | `--python` / `--no-python` | `true` | Install Python deps via `pip` |
 | `--node` / `--no-node` | `true` | Install Node deps via `npm` |
+| `--break-system-packages` | `false` | Pass `--break-system-packages` to `pip`, for externally-managed (PEP 668) environments without a virtualenv. Use with care. |
 
 **Examples:**
 
@@ -7256,7 +7257,10 @@ pyxle install [directory] [options]
 pyxle install
 pyxle install --no-python    # Node only
 pyxle install ./my-app
+pyxle install --break-system-packages   # PEP 668 system Python, no venv
 ```
+
+Outside a virtualenv, `pyxle install` warns about PEP 668 ("externally-managed-environment") and recommends creating a venv first; pass `--break-system-packages` to install anyway.
 
 ## `pyxle dev`
 
@@ -7361,7 +7365,11 @@ sizing guidance.
 
 ## `pyxle check`
 
-Validate `.pyxl` syntax, configuration, and dependencies.
+Validate `.pyxl` files, configuration, and dependencies without starting the server. Each `.pyxl` file is checked at three levels:
+
+- **Python syntax** (via `ast`) and Pyxle structural rules (loader/action shape, `HEAD`, …).
+- **Python semantics** (via pyflakes): undefined names — e.g. a symbol you `raise` but never imported — unused imports, redefinitions. Compiler-injected runtime names (`server`, `action`, `LoaderError`, `ActionError`, …) are recognized, so the idiomatic patterns never read as undefined.
+- **JSX syntax** (via Babel): unclosed tags/expressions, mismatched braces, TypeScript in a client block, and **duplicate `export default`** (which Babel accepts but the build rejects).
 
 ```bash
 pyxle check [directory] [options]
@@ -7899,9 +7907,12 @@ Source: https://pyxle.dev/docs/reference/runtime-api.md
 
 # Runtime API Reference
 
-The `pyxle.runtime` module provides decorators and error classes used in `.pyxl` files. The compiler **auto-injects** a small set: the `@server` decorator, and — in any file that declares at least one `@action` — the `@action` decorator plus `ActionError` and `ValidationActionError`. You do not import those.
+The `pyxle.runtime` module provides decorators and error classes used in `.pyxl` files. The compiler **auto-injects** the ones you use in the idiomatic patterns, so you rarely import from `pyxle.runtime` at all:
 
-Other `pyxle.runtime` symbols, including **`LoaderError`**, are **not** auto-injected — import them explicitly: `from pyxle.runtime import LoaderError`.
+- a file with a `@server` loader gets `server` and **`LoaderError`**;
+- a file with an `@action` gets `action`, **`ActionError`**, **`ValidationActionError`**, and **`invalidate_routes`**.
+
+So `raise LoaderError(...)` / `raise ActionError(...)` work without an import. You can still import any of them explicitly (a name you define or import yourself always takes precedence over the auto-injection). `pyxle check` reports any name you genuinely left undefined.
 
 ## `@server`
 
@@ -7988,11 +7999,9 @@ Requires the `[pydantic]` extra (`pip install "pyxle-framework[pydantic]"`). On 
 
 ## `LoaderError`
 
-Exception class for structured loader errors. Triggers the nearest `error.pyxl` boundary.
+Exception class for structured loader errors. Triggers the nearest `error.pyxl` boundary. Auto-injected in any file with a `@server` loader — no import needed.
 
 ```python
-from pyxle.runtime import LoaderError
-
 @server
 async def load_page(request):
     raise LoaderError("Not found", status_code=404, data={"id": 42})
@@ -8295,13 +8304,11 @@ The callable receives the loader's return value. Must return a string or list of
 
 ## Explicit imports
 
-While the compiler auto-injects `@server` and `@action`, you can also import explicitly:
+The compiler auto-injects the names you use in the idiomatic patterns (see the top of this page), so you usually import nothing. You can still import any of them explicitly — useful for type checking and IDE support, and a name you import or define yourself always takes precedence over the auto-injection:
 
 ```python
-from pyxle.runtime import server, action, LoaderError, ActionError, ValidationActionError
+from pyxle.runtime import server, action, LoaderError, ActionError, ValidationActionError, invalidate_routes
 ```
-
-This is useful for type checking and IDE support.
 
 ---
 
@@ -16589,6 +16596,16 @@ Source: https://pyxle.dev/docs/changelog.md
 # Changelog
 
 Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include breaking changes — those are called out explicitly here. To upgrade, run `pip install --upgrade pyxle-framework`.
+
+## 0.6.1 — 2026-07-01
+
+A sharper `pyxle check` — the edit → check → fix loop now catches classes of mistake it used to wave through.
+
+- **`pyxle check` gained a semantic layer.** Beyond Python syntax, it now runs pyflakes over the Python section and reports **undefined names** — e.g. a handler that `raise`s a symbol it never imported — plus unused imports and redefinitions. Compiler-injected runtime names are recognized, so the idiomatic decorators and error classes never read as undefined.
+- **Duplicate `export default` is now caught.** `@babel/parser` accepts two default exports even though the build (esbuild) rejects them — so a build-breaking mistake used to pass `check` and only fail later, pointing into a generated path. It's now flagged at check time, at the real source line.
+- **JSX error lines are now accurate.** A JSX syntax error was always reported at the first line of the JSX section; it now points at the actual line. Babel's misleading "Unterminated regular expression" (its lexer's guess for an unclosed `{ }`) also carries a plain-language hint about the real cause.
+- **`LoaderError` and `invalidate_routes` are now auto-injected**, matching `ActionError` / `ValidationActionError`. `raise LoaderError(...)` in a loader just works with no import — closing an inconsistency where the action-side equivalent already did. A name you import or define yourself still takes precedence. See [Runtime API](https://pyxle.dev/docs/reference/runtime-api.md).
+- **`pyxle install --break-system-packages`.** For externally-managed (PEP 668) Python environments without a virtualenv, `pyxle install` now offers the flag and points to it in the no-venv warning. See [CLI → pyxle install](https://pyxle.dev/docs/reference/cli.md#pyxle-install).
 
 ## 0.6.0 — 2026-07-01
 
