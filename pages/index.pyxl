@@ -631,8 +631,8 @@ function ReadableAsMarkdown() {
                         >
                             <pre className="duotone overflow-x-auto p-5 font-mono text-[12.5px] leading-[1.9]">
                                 <code>
-                                    <span className="sh-cmd">$</span> <span className="sh-fn">curl</span> pyxle.dev/docs/routing<span className="sh-kw">.md</span>{'\n'}
-                                    <span className="sh-cmt">&gt; Markdown rendition of /docs/routing,</span>{'\n'}
+                                    <span className="sh-cmd">$</span> <span className="sh-fn">curl</span> pyxle.dev/docs/core-concepts/routing<span className="sh-kw">.md</span>{'\n'}
+                                    <span className="sh-cmt">&gt; Markdown rendition of that page,</span>{'\n'}
                                     <span className="sh-cmt">&gt; served for agents. Index: /llms.txt</span>{'\n'}
                                     {'\n'}
                                     <span className="sh-kw"># Routing</span>{'\n'}
