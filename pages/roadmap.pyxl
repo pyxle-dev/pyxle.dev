@@ -76,7 +76,7 @@ const ERAS = [
     {
         n: '03',
         id: 'ai-accessibility',
-        eyebrow: 'Just printed',
+        eyebrow: 'Last edition',
         title: 'v0.6 — your app, in Markdown.',
         lead: 'The AI tools your readers already work in want text, not HTML. One flag, and every page of a Pyxle app serves a clean Markdown twin — built, documented, and dogfooded on this very site.',
         status: 'shipped',
@@ -87,6 +87,21 @@ const ERAS = [
     },
     {
         n: '04',
+        id: 'hardened-run',
+        eyebrow: 'Just printed',
+        title: 'v0.7 — the hardened run.',
+        lead: 'A release forged by testing: every feature verified end to end before the presses rolled. New projects get a modern stack and a say in what they ship; the dev server got calm, fast, and honest.',
+        status: 'shipped',
+        items: [
+            ['A modern stack, chosen at init', 'React 19 and Vite 7 in every new project, and pyxle init now asks — arrow-key prompts for Tailwind CSS (opt-in: decline it and plain CSS + CSS Modules are first-class), shadcn/ui, and your import alias. pyxle init . scaffolds into the directory you are already in.', 'v0.7'],
+            ['Streaming SSR, concurrently', 'Streaming pages used to render one visitor at a time — each first byte waited for the previous stream to finish. SSR workers now interleave renders, with per-request state isolated by AsyncLocalStorage so tokens and head tags can never cross visitors, and pyxle serve auto-sizes its worker pool.', 'v0.7'],
+            ['A calmer dev server', 'Curated output by default with --verbose for the firehose, your server logs forwarded to the browser console, build failures on the overlay, no more hot-reload loops, public/ served live the way Next.js does it, and dev.watch/dev.ignore when you need more.', 'v0.7'],
+            ['shadcn/ui, end to end', 'The scaffold pre-wires components.json and the @/ alias — resolved by Vite and the SSR runtime alike — and ESM-first dependency resolution keeps CommonJS-built libraries like lucide-react from tripping the server render.', 'v0.7'],
+            ['Hardened under inspection', 'Per-app CSRF cookies (two dev servers stop fighting), multipart uploads through CSRF, RFC-9110 Markdown negotiation, error.pyxl under layouts with loaders, a pyxle check that passes out of the box — each one verified end to end, then shipped.', 'v0.7'],
+        ],
+    },
+    {
+        n: '05',
         id: 'in-motion',
         eyebrow: 'On the press',
         title: 'In motion right now.',
@@ -98,7 +113,7 @@ const ERAS = [
         ],
     },
     {
-        n: '05',
+        n: '06',
         id: 'ahead',
         eyebrow: 'The next pull',
         title: 'Where this is going.',

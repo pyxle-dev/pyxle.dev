@@ -12,7 +12,9 @@ Source: https://pyxle.dev/docs/getting-started/introduction.md
 
 Pyxle is a Python-first full-stack web framework that brings the Next.js developer experience to the Python ecosystem. You write your server logic in Python, your UI in React, and ship them together in a single `.pyxl` file — no separate API layer, no second service, no glue code between them.
 
-**Current version:** 0.6.1 (beta)
+**Status:** beta (`0.x`) — see the [changelog](https://pyxle.dev/docs/changelog.md) for the current release.
+
+> **Prerequisites:** Python **3.10+** (3.12 recommended) and **Node.js 20.19+** with npm — Pyxle drives Vite and React under the hood. See [Installation](https://pyxle.dev/docs/getting-started/installation.md).
 
 ## One file, two languages
 
@@ -38,7 +40,7 @@ The loader's return value *is* the component's `data` prop. There's no `fetch`, 
 ## Why Pyxle
 
 - **No API plumbing.** A `@server` loader feeds props straight into your component; an `@action` is an endpoint you call with `useAction` instead of hand-writing `fetch` + a route.
-- **Real React.** `npm install` any React library and use it directly — Pyxle renders genuine React 18 with server-side rendering and hydration, not a Python wrapper around a component library.
+- **Real React.** `npm install` any React library and use it directly — Pyxle renders genuine React 19 with server-side rendering and hydration, not a Python wrapper around a component library.
 - **Convention over configuration.** File-based routing, automatic SSR, and zero config for the common cases. Run `pyxle init` and you're shipping.
 - **Batteries includable.** Official plugins for [database](https://pyxle.dev/docs/plugins/pyxle-db.md), [auth](https://pyxle.dev/docs/plugins/pyxle-auth.md), and [email](https://pyxle.dev/docs/plugins/pyxle-mail.md), plus hooks for middleware, edge caching, and your own integrations.
 - **AI-first DX.** Predictable patterns, strong types, and clear errors make Pyxle one of the easiest frameworks for an AI coding agent to ship a whole feature in a single pass. See [Pyxle for AI coding agents](https://pyxle.dev/docs/guides/for-ai-agents.md).
@@ -72,15 +74,15 @@ Source: https://pyxle.dev/docs/getting-started/installation.md
 Pyxle requires:
 
 - **Python 3.10+** (3.12 recommended)
-- **Node.js 18+** (for Vite, React, and SSR)
+- **Node.js 20.19+** (for Vite 7, React 19, and SSR). Node 18 is end-of-life and no longer supported.
 - **npm** (ships with Node.js)
 
 Verify your setup:
 
 ```bash
 python --version   # Python 3.10 or later
-node --version     # v18 or later
-npm --version      # 9 or later
+node --version     # v20.19 or later
+npm --version      # 10 or later
 ```
 
 ## Install Pyxle
@@ -117,8 +119,9 @@ The `pyxle` package includes:
 | `pyxle.config` | Configuration loading and validation |
 | Starlette | ASGI web server (installed as a dependency) |
 | Uvicorn | ASGI server runner (installed as a dependency) |
+| `pyxle-langkit` | Language toolkit powering `pyxle check`'s JSX validation (installed as a dependency) |
 
-Node.js dependencies (React, Vite, Tailwind) are installed per-project via `npm install` -- they are **not** global.
+Node.js dependencies (React 19, Vite 7, and — if you opt in — Tailwind CSS v4) are installed per-project via `npm install` -- they are **not** global.
 
 ## Next steps
 
@@ -138,7 +141,42 @@ Create a working Pyxle app in under 5 minutes.
 pyxle init my-app
 ```
 
+`pyxle init` is **interactive** — it asks a few questions and generates a project tailored to your answers:
+
+```
+◆ Use Tailwind CSS?                          › No / Yes   (↑/↓ + Enter)
+◆ Add shadcn/ui components?                  › No / Yes   (only when Tailwind is on)
+◆ Customize the default import alias (@/*)?  › No / Yes
+```
+
+Each question is an arrow-key selection with the default highlighted — press
+Enter to accept it.
+
+- **Tailwind CSS** — opt in to Tailwind v4, wired straight into Vite (no `postcss.config`, no separate watcher). Decline it and you get a clean baseline where plain CSS **and** CSS Modules work out of the box.
+- **shadcn/ui** — sets up [shadcn/ui](https://ui.shadcn.com) (implies Tailwind), so `npx shadcn@latest add button` just works.
+- **Import alias** — the shorthand for absolute imports of your own modules: `import { Button } from '@/components/ui/button'` instead of a brittle `../../` path. `@/*` is the convention (and what shadcn expects); almost everyone keeps it, so the value input only appears if you choose to customize.
+
 This creates a `my-app/` directory with a complete starter project.
+
+### Non-interactive (CI / scripts)
+
+When stdin isn't a terminal, `pyxle init` never blocks on a prompt — it uses flags and defaults. Drive it explicitly:
+
+```bash
+pyxle init my-app --yes                      # accept all defaults (no Tailwind)
+pyxle init my-app --tailwind --no-shadcn     # Tailwind, no shadcn
+pyxle init my-app --shadcn                   # shadcn (implies Tailwind)
+pyxle init my-app --import-alias '~/*'       # custom alias
+```
+
+### Scaffold into the current directory
+
+Already made the directory (or ran `git init`)? Scaffold in place with `.` — the project name is derived from the directory name:
+
+```bash
+mkdir my-app && cd my-app
+pyxle init .            # requires an empty directory (or pass --force)
+```
 
 ## 2. Install dependencies
 
@@ -162,9 +200,20 @@ npm install
 pyxle dev
 ```
 
+The console prints a short summary — the local URL, the Vite URL, the route count, and how long startup took — then stays quiet unless something needs your attention:
+
+```
+✅ Pyxle dev server ready in 512 ms
+ℹ️    Local:   http://127.0.0.1:8000
+ℹ️    Vite:    http://127.0.0.1:5173
+ℹ️    Routes:  1 page(s), 1 API route(s)
+```
+
 Open [http://localhost:8000](http://localhost:8000) in your browser. You should see the Pyxle starter page — a centered card showing the framework version, server time, and a link to edit `pages/index.pyxl`.
 
-Tailwind compiles automatically because the scaffold ships with `postcss.config.cjs` — PostCSS runs as part of the Vite pipeline, so there's nothing separate to start.
+Each edit you save prints one concise `Rebuilt … in X ms` line. Your server-side `logging` output also streams to the **browser** devtools console (prefixed `[pyxle:server]`) so you can follow loaders and actions without switching windows. Need the full picture — raw Vite logs and debug internals? Run `pyxle dev --verbose`. See the [CLI reference](https://pyxle.dev/docs/reference/cli.md#pyxle-dev) for details.
+
+CSS just works: Vite compiles every stylesheet you import — plain CSS, CSS Modules, and (if you enabled it) Tailwind v4 via the `@tailwindcss/vite` plugin — with hot reload. There's nothing separate to start. See the [Styling guide](https://pyxle.dev/docs/guides/styling.md).
 
 ## What just happened?
 
@@ -206,11 +255,15 @@ This prints the route table derived from your `pages/` directory:
 ℹ️  Routes for my-app/
 
   Pages:
-  ▶️  /  — pages/index.pyxl  [loader=load_home]
+  ▶️  / — index.pyxl  [loader=load_home]
 
   API Routes:
-  ▶️  /api/pulse  — pages/api/pulse.py
+  ▶️  /api/pulse — api/pulse.py
+
+✅ 2 route(s) found
 ```
+
+Paths are shown relative to `pages/`.
 
 ## 6. Validate your project
 
@@ -218,7 +271,12 @@ This prints the route table derived from your `pages/` directory:
 pyxle check
 ```
 
-This validates `.pyxl` syntax, checks your config file, and reports any issues.
+This validates your `.pyxl` files — Python syntax, JSX, and semantic issues like undefined names — plus your config file, and reports any problems it finds. Everything Python-side ships with `pip install pyxle-framework`, and the JSX pass runs on the Node.js install you already have from step 1 — so on a fresh project you should see:
+
+```
+ℹ️  Checked 2 .pyxl file(s) in my-app/
+✅ All checks passed
+```
 
 ## Next steps
 
@@ -232,30 +290,38 @@ Source: https://pyxle.dev/docs/getting-started/project-structure.md
 
 # Project Structure
 
-After running `pyxle init my-app`, you get this file tree:
+`pyxle init` is interactive — the exact files depend on your answers. A default
+project (no Tailwind) looks like this:
 
 ```
 my-app/
   pages/
     api/
       pulse.py            # Example API route
+    components/
+      Badge.jsx           # Example component using a CSS Module
+      Badge.module.css    # Locally-scoped, hashed class names
     styles/
-      tailwind.css        # Tailwind CSS input file
-    index.pyxl             # Home page (Python + React)
-    layout.pyxl            # Root layout wrapper (React only)
+      app.css             # Global CSS (imported from index.pyxl)
+    index.pyxl            # Home page (Python + React)
+    layout.pyxl           # Root layout wrapper (React only)
   public/
     branding/             # SVG logos and assets
-    styles/
-      tailwind.css        # Compiled Tailwind output (pre-built in scaffold)
     favicon.ico
   AGENTS.md               # Conventions guide for AI coding agents
+  jsconfig.json           # Import alias (@/*) + editor hints
+  vite.config.js          # Re-exports Pyxle's generated Vite config
   package.json            # Node.js dependencies and scripts
   pyxle.config.json       # Framework configuration
   requirements.txt        # Python dependencies
-  tailwind.config.cjs     # Tailwind CSS configuration
-  postcss.config.cjs      # PostCSS configuration
+  .env.local              # Generated dev secret (PYXLE_SECRET_KEY) — gitignored
   .gitignore
 ```
+
+Opting into **Tailwind** replaces `pages/styles/app.css` with an
+`@import "tailwindcss";` entry (and drops the CSS-Module example) — there are no
+`tailwind.config` or `postcss.config` files. Opting into **shadcn/ui** adds
+`components.json` and `lib/utils.js`. See [Styling](https://pyxle.dev/docs/guides/styling.md).
 
 ## Key directories
 
@@ -383,28 +449,28 @@ Defines Node.js dependencies and npm scripts:
 
 | Script | Purpose |
 |--------|---------|
-| `npm run dev` | Start Vite dev server (used internally by `pyxle dev`) |
-| `npm run build` | Bundle with Vite (used by `pyxle build`); Tailwind is compiled in-pipeline via PostCSS |
+| `npm run dev` | Alias for `pyxle dev` |
+| `npm run build` | Alias for `pyxle build` |
 
-Tailwind is wired through PostCSS (see `postcss.config.cjs`), so Vite
-handles CSS on both `dev` and `build` without a separate script. If you
-want a standalone Tailwind watcher anyway, see
-[Styling guide → Standalone Tailwind](https://pyxle.dev/docs/guides/styling.md).
+It also declares `"engines": { "node": ">=20.19" }` (Vite 7's floor). Vite
+compiles CSS on both `pyxle dev` and `pyxle build` — including Tailwind v4 via
+the `@tailwindcss/vite` plugin when you opt into it — so there's no separate CSS
+script. See [Styling](https://pyxle.dev/docs/guides/styling.md).
 
-### `tailwind.config.cjs`
+### `.env.local`
 
-Tailwind CSS configuration. The scaffold configures it to scan your `pages/` directory for class names:
+Every scaffold generates a `.env.local` with a unique `PYXLE_SECRET_KEY` for
+development (it signs the CSRF tokens). The file is gitignored — never commit
+it; set a real secret in your production environment instead. See
+[Environment Variables](https://pyxle.dev/docs/guides/environment-variables.md).
 
-```javascript
-module.exports = {
-  content: [
-    './pages/**/*.{pyxl,js,jsx,ts,tsx}',
-    './.pyxle-build/client/pages/**/*.{js,jsx,ts,tsx}',
-  ],
-  theme: { extend: {} },
-  plugins: [],
-};
-```
+### `jsconfig.json` and `vite.config.js`
+
+`jsconfig.json` declares the import alias (default `@/*`) so `@/lib/utils`
+resolves from anywhere; Pyxle wires the same alias into both the Vite build and
+the SSR runtime. `vite.config.js` re-exports Pyxle's generated config so the
+wider Vite ecosystem (shadcn/ui, editor plugins) finds a config at the project
+root — you normally never edit it.
 
 ## Next steps
 
@@ -1339,7 +1405,7 @@ curl -X POST http://localhost:8000/api/__actions/blog/new/create_post \
   -d '{"title": "Hello"}'
 ```
 
-CSRF protection is on by default, so a raw `curl` like this is rejected with `403` unless you either exempt the action path in [`pyxle.config.json`](https://pyxle.dev/docs/reference/configuration.md#csrf) (`"csrf": { "exemptPaths": ["/api/__actions/"] }`) or send a valid `X-CSRF-Token` header matching the `pyxle-csrf` cookie.
+CSRF protection is on by default, so a raw `curl` like this is rejected with `403` unless you either exempt the action path in [`pyxle.config.json`](https://pyxle.dev/docs/reference/configuration.md#csrf) (`"csrf": { "exemptPaths": ["/api/__actions/"] }`) or send a valid `X-CSRF-Token` header matching the CSRF cookie (`pyxle-csrf-<port>` by default, e.g. `pyxle-csrf-8000` — see [Security](https://pyxle.dev/docs/guides/security.md#csrf-protection)).
 
 ## CSRF protection
 
@@ -1546,7 +1612,7 @@ When Pyxle compiles your pages, it:
 
 ## Next steps
 
-- Style your layouts with Tailwind: [Styling](https://pyxle.dev/docs/guides/styling.md)
+- Style your layouts (plain CSS, CSS Modules, or opt-in Tailwind): [Styling](https://pyxle.dev/docs/guides/styling.md)
 - Add navigation between pages: [Client Components](https://pyxle.dev/docs/guides/client-components.md)
 
 ---
@@ -1722,7 +1788,7 @@ There is no Python template engine in Pyxle. Jinja and the Django Template Langu
 | `{% include %}` | a React component you import |
 | `{% static 'x.css' %}` | import the CSS from JSX (Vite hashes it) or reference `public/` at `/x.css` |
 
-This is real React 18, server-rendered and hydrated — not a string-templating layer. Page `<title>`/meta come from the `HEAD` variable or the `<Head>` component, not a `{% block title %}`. See [.pyxl files](https://pyxle.dev/docs/core-concepts/pyxl-files.md), [Layouts](https://pyxle.dev/docs/core-concepts/layouts.md), and [Head management](https://pyxle.dev/docs/guides/head-management.md).
+This is real React 19, server-rendered and hydrated — not a string-templating layer. Page `<title>`/meta come from the `HEAD` variable or the `<Head>` component, not a `{% block title %}`. See [.pyxl files](https://pyxle.dev/docs/core-concepts/pyxl-files.md), [Layouts](https://pyxle.dev/docs/core-concepts/layouts.md), and [Head management](https://pyxle.dev/docs/guides/head-management.md).
 
 ## Forms and mutations
 
@@ -1812,7 +1878,7 @@ Middleware is ASGI/Starlette, not WSGI. See [Middleware](https://pyxle.dev/docs/
 
 ## Static files and styling
 
-`public/` is served at the root URL (`public/favicon.ico` → `/favicon.ico`) — no `collectstatic`, no `{% static %}`. App CSS/JS is better **imported from JSX** so Vite bundles and content-hashes it; `pyxle build` produces hashed assets and a manifest. Tailwind works out of the box. See [Styling](https://pyxle.dev/docs/guides/styling.md).
+`public/` is served at the root URL (`public/favicon.ico` → `/favicon.ico`) — no `collectstatic`, no `{% static %}`. App CSS/JS is better **imported from JSX** so Vite bundles and content-hashes it; `pyxle build` produces hashed assets and a manifest. Plain CSS and CSS Modules work out of the box; Tailwind v4 is one prompt away at `pyxle init`. See [Styling](https://pyxle.dev/docs/guides/styling.md).
 
 ## Background work and signals
 
@@ -1853,285 +1919,296 @@ Source: https://pyxle.dev/docs/guides/styling.md
 
 # Styling
 
-Pyxle ships with Tailwind CSS configured in a fresh `pyxle init` project. The
-recommended way to load your stylesheets is to **import them from a JSX module**
-so Vite can compile, bundle, and content-hash them — exactly like it does for
-JavaScript modules. This means you never have to hand-bump a `?v=N` query string
-after a deploy to invalidate stale browser caches.
+Pyxle delegates all CSS to **Vite**. Import a stylesheet from a JSX module and
+Vite compiles, bundles, hot-reloads (in dev), and content-hashes it (in build)
+— exactly like it does for JavaScript. You never hand-bump a `?v=N` query
+string to bust a cache, and there's no separate CSS build step to run.
 
-> **Prerequisite: a project-root `postcss.config.*` is required for Tailwind.**
-> Vite compiles your CSS through PostCSS, and it only loads the Tailwind plugin
-> when it discovers a `postcss.config.{cjs,js,mjs,ts}` at the project root. The
-> scaffold ships this file, so a fresh project works immediately — but a
-> **hand-built or upgraded project with no `postcss.config.*` silently fails**:
-> the raw `@tailwind base/components/utilities` directives are inlined uncompiled
-> and the page renders **unstyled, with no error**. If your Tailwind classes do
-> nothing, check for this file first.
+Three things work out of the box in **every** project, with or without Tailwind:
 
-## Recommended: Vite-managed CSS (auto-hashed)
+- **Plain CSS** — `import './styles/app.css'`
+- **CSS Modules** — `import styles from './Badge.module.css'` (locally scoped, hashed class names)
+- **Any npm CSS** — `import 'highlight.js/styles/github-dark.css'`
 
-When your project has a `postcss.config.{cjs,js,mjs,ts}` file alongside the
-Tailwind config, Pyxle delegates CSS processing to Vite + PostCSS. The
-standalone Tailwind CLI watcher is automatically skipped (you'll see a clear
-log line on dev server start), and any CSS file you import from a JSX module
-flows through PostCSS, gets a content hash, and is listed in the Vite
-manifest under your page entry.
+Tailwind CSS is **opt-in** — choose it at `pyxle init` (or add it later).
 
-The SSR template reads that manifest on every request and emits
+## The default: plain CSS + CSS Modules
 
-```html
-<link rel="stylesheet" href="/client/dist/assets/style-DEADBEEF.css" />
-```
-
-automatically. The hash changes only when the CSS source changes, so users
-with old caches always see the latest styles after a deploy.
-
-### Setup
-
-A new Pyxle project has everything wired by default. If you're upgrading an
-existing project, here's the full setup:
-
-**1. Add `postcss.config.cjs` to your project root:**
-
-```javascript
-module.exports = {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-};
-```
-
-**2. Make sure `tailwindcss`, `autoprefixer`, and `postcss` are in `devDependencies`:**
-
-```bash
-npm install --save-dev tailwindcss autoprefixer postcss
-```
-
-(The `postcss.config.cjs` above references `tailwindcss: {}`, so all three must be installed.)
-
-**3. Import your stylesheet from a JSX module.** The cleanest place is the
-root `pages/layout.pyxl` so every route picks it up via the layout wrapper:
+A project scaffolded **without** Tailwind ships a plain-CSS baseline. The
+starter imports a global stylesheet and demonstrates a CSS Module:
 
 ```jsx
-import './styles/tailwind.css';
-import React from 'react';
+// pages/index.pyxl (JSX section)
+import './styles/app.css';          // global CSS — applies everywhere it's imported
+import Badge from './components/Badge.jsx';
+```
 
-export default function RootLayout({ children }) {
-  return <div className="min-h-screen">{children}</div>;
+```jsx
+// pages/components/Badge.jsx
+import styles from './Badge.module.css';   // CSS Module — class names are scoped + hashed
+
+export default function Badge({ children }) {
+  return <span className={styles.badge}>{children}</span>;
 }
 ```
 
-**4. Delete any manual `<link rel="stylesheet" href="/styles/tailwind.css" />`
-tags from your `<Head>` blocks.** Vite owns the link now.
+CSS Module class names are **deterministic and identical on the server and the
+client**, so the server-rendered HTML and the hydrated React tree always agree
+— no hydration mismatch. In a production build each stylesheet becomes a
+content-hashed asset (`Badge-C9bn1NFT.css`) that the SSR template links
+automatically.
 
-**5. (Optional) remove the now-inert `dev:css` and `build:css` scripts from
-`package.json`.** Only relevant when upgrading an older project that defined
-them — the current scaffold's `package.json` ships just `dev`/`build`/`lint`,
-so a fresh project has nothing to remove. When PostCSS is configured, Pyxle
-skips the standalone watcher, so those scripts never run on their own anyway.
+## Tailwind CSS (opt-in, v4, Vite-native)
 
-### Verifying the setup
-
-Start the dev server:
+Enable Tailwind when you scaffold:
 
 ```bash
-pyxle dev
+pyxle init my-app --tailwind
+# or answer "y" to "Use Tailwind CSS?" in the interactive prompt
 ```
 
-You should see a log line like:
+That gives you Tailwind **v4**, wired directly into Vite via the
+[`@tailwindcss/vite`](https://tailwindcss.com/docs/installation/using-vite)
+plugin. There is **no `tailwind.config.js`, no `postcss.config.js`, and no
+standalone `tailwindcss --watch` process** — Tailwind runs inside Vite's normal
+CSS pipeline, so it hot-reloads in dev and is hashed in build like any other
+stylesheet.
 
+The entire Tailwind setup is a single CSS entry:
+
+```css
+/* pages/styles/app.css */
+@import "tailwindcss";
 ```
-ℹ️  Detected postcss.config.cjs — skipping standalone Tailwind watcher;
-   CSS will be processed and hashed by Vite via PostCSS.
+
+imported once from a JSX module (the scaffold imports it from
+`pages/index.pyxl`). Use utility classes anywhere:
+
+```jsx
+<main className="flex min-h-screen items-center justify-center bg-slate-50">
+  <h1 className="text-2xl font-semibold tracking-tight">Hello</h1>
+</main>
 ```
 
-Open the page in your browser. Tailwind classes work as before. In dev mode
-Vite serves the CSS through its own runtime (with HMR), so changes hot-reload
-instantly. There's a brief flash of unstyled content on the very first paint
-in dev — this is a Vite quirk and does **not** happen in production builds.
+Tailwind v4 auto-detects your content — it scans the files Vite processes, so
+there's no `content` glob to maintain. Customise your theme with `@theme` in the
+same CSS file; see the [Tailwind v4 docs](https://tailwindcss.com/docs).
 
-For production:
+### Adding Tailwind to an existing project
+
+If you scaffolded without Tailwind and want it later:
 
 ```bash
-pyxle build
+npm install -D tailwindcss @tailwindcss/vite
 ```
 
-Inspect `dist/page-manifest.json` and you'll see each route's `client.css`
-array pointing at content-hashed assets:
+Pyxle detects `@tailwindcss/vite` in your `package.json` and adds the plugin to
+the Vite config it generates. Then replace your CSS entry's contents with
+`@import "tailwindcss";` (keep any custom rules below it) and restart `pyxle dev`.
 
-```json
-{
-  "/": {
-    "client": {
-      "file": "dist/assets/index-DEADBEEF.js",
-      "css": ["dist/assets/index-CAFEBABE.css"]
-    }
-  }
-}
-```
+## shadcn/ui
 
-Two consecutive builds with no source changes produce the **same** hash. A
-build after editing `tailwind.css` (or any source it depends on) produces a
-**different** hash. Cache-busting is automatic.
+Enable it at scaffold time (`pyxle init --shadcn`, which implies Tailwind). See
+the [Third-party packages guide](https://pyxle.dev/docs/guides/third-party-packages.md#shadcnui) for the full,
+verified `npx shadcn@latest add` walkthrough.
 
-### Tailwind config
+## Using another CSS library
 
-The Tailwind config still lives at `tailwind.config.cjs` (or `.js`, `.ts`,
-`.mjs`). PostCSS calls it during compilation, so your `content` globs still
-control which files Tailwind scans for class names:
-
-```javascript
-module.exports = {
-  content: ['./pages/**/*.{pyxl,jsx,js,tsx,ts}'],
-  darkMode: 'class',
-  theme: {
-    extend: {},
-  },
-  plugins: [
-    require('@tailwindcss/forms'),
-    require('@tailwindcss/typography'),
-  ],
-};
-```
-
-### Dark mode
-
-The scaffold includes a theme toggle script that reads from `localStorage`
-and respects `prefers-color-scheme`. Toggle the `dark` class on `<html>` to
-switch themes:
+Any CSS or CSS-in-JS library that works with React 19 and SSR works with Pyxle.
+Install it with npm and import it in your JSX section — Vite handles the rest.
 
 ```jsx
-function toggleTheme() {
-  document.documentElement.classList.toggle('dark');
-}
-```
-
-Use Tailwind's `dark:` modifier for dark-mode styles:
-
-```jsx
-<div className="bg-white dark:bg-slate-900 text-black dark:text-white">
-  Content
-</div>
-```
-
-## Importing CSS from any JSX module
-
-The same pattern works for any CSS file, not just Tailwind. Component-scoped
-stylesheets, third-party CSS modules, or vanilla CSS files all work:
-
-```jsx
-import './hero.css';
+// A third-party stylesheet:
 import 'highlight.js/styles/github-dark.css';
-import React from 'react';
 
-export default function Hero() {
-  return <section className="hero">…</section>;
-}
+// A UI kit's styles:
+import 'some-ui-kit/dist/style.css';
 ```
 
-Vite resolves the specifier relative to the importer, runs it through
-PostCSS, hashes the output, and lists it under the page's manifest entry.
-The SSR template emits a `<link>` for every CSS file the page transitively
-imports.
+CSS-in-JS libraries (styled-components, Emotion, etc.) install the same way —
+`npm install` and import in the JSX section. Pick libraries with SSR support so
+server- and client-rendered markup match.
 
-## Global stylesheets (config-driven)
+## Legacy Tailwind v3 projects
 
-For CSS that should be **inlined** on every page (no separate request, no
-hashing — embedded directly in the SSR HTML), register it in `pyxle.config.json`:
+Projects that hand-wired Tailwind v3 — a `tailwind.config.*` at the root, a
+`build:css` npm script, and a compiled stylesheet in `public/` — keep working:
+`pyxle dev` starts the standalone Tailwind watcher when it detects that shape,
+and `pyxle build` runs the declared `build:css` script. Two things to know:
+
+- Files under `public/` are served live from disk and are never part of the
+  rebuild watch, so the compiled CSS updating in place never triggers reloads —
+  refresh the browser to pick it up.
+- The Tailwind v3 CLI's `--watch` mode can skip its initial write when its
+  output is piped (non-TTY). If styles look missing under a process manager,
+  run the build script once manually — or better, migrate to the v4 setup
+  above (`@tailwindcss/vite`), which has neither issue.
+
+## Global stylesheets (config-driven, inlined)
+
+For CSS that should be **inlined** on every page (embedded in the SSR HTML, no
+separate request), register it in `pyxle.config.json`:
 
 ```json
 {
   "styling": {
-    "globalStyles": [
-      "styles/reset.css",
-      "styles/typography.css"
-    ]
+    "globalStyles": ["styles/reset.css", "styles/typography.css"]
   }
 }
 ```
 
-Paths are relative to the project root. Global styles are loaded in order
-and inlined as `<style>` tags, so they work even before JavaScript loads.
-Use this for tiny critical CSS — for anything substantial, prefer the
-JSX-import path so Vite can hash and cache it properly.
+Paths are relative to the project root; styles are inlined as `<style>` tags in
+order, so they apply before JavaScript loads. Use this for tiny critical CSS —
+for anything substantial prefer the JSX-import path so Vite can hash and cache
+it.
 
 ## Global scripts
 
-Register JavaScript files loaded on every page:
+Register JavaScript loaded on every page:
 
 ```json
 {
   "styling": {
-    "globalScripts": [
-      "scripts/analytics.js"
-    ]
+    "globalScripts": ["scripts/analytics.js"]
   }
 }
 ```
-
-## Legacy: standalone Tailwind CLI watcher
-
-If you don't want Vite-managed CSS (e.g. you're integrating with an external
-build pipeline), you can use the standalone Tailwind CLI watcher instead.
-**Skip the `postcss.config.*` file** — its presence is what tells Pyxle to
-defer to Vite — and add the watcher scripts to `package.json`:
-
-> **The legacy watcher does not compile JSX-imported CSS.** It writes a separate
-> compiled file (e.g. `public/styles/tailwind.css`) that you must link manually
-> (below). A stylesheet you `import './styles/tailwind.css'` from a JSX module is
-> **not** processed by this watcher — without a `postcss.config.*`, that import
-> is inlined with its `@tailwind` directives uncompiled, so the page renders
-> unstyled. Use this path only when you link the watcher's output by hand and do
-> **not** rely on JSX CSS imports.
-
-```json
-{
-  "scripts": {
-    "dev:css": "tailwindcss -i ./pages/styles/tailwind.css -o ./public/styles/tailwind.css --watch",
-    "build:css": "tailwindcss -i ./pages/styles/tailwind.css -o ./public/styles/tailwind.css --minify"
-  }
-}
-```
-
-`pyxle dev` will auto-start the watcher whenever it detects a Tailwind
-config and no PostCSS config. You can disable it explicitly with:
-
-```bash
-pyxle dev --no-tailwind
-```
-
-Then link the compiled output manually:
-
-```jsx
-import { Head } from 'pyxle/client';
-
-export default function Layout({ children }) {
-  return (
-    <>
-      <Head>
-        <link rel="stylesheet" href="/styles/tailwind.css" />
-      </Head>
-      {children}
-    </>
-  );
-}
-```
-
-Trade-off: this path has **no automatic cache-busting**. If you deploy a CSS
-change and a user has the old file cached, they'll see stale styles until
-their cache expires. Workarounds (`?v=N` query strings, hand-rolled
-fingerprints) are inevitable. The Vite-managed path avoids all of this.
-
-## CSS-in-JS
-
-Any CSS-in-JS library that works with React 18 and SSR should work with
-Pyxle. Install it via npm and import it in your JSX section.
 
 ## Next steps
 
 - Manage document head elements: [Head Management](https://pyxle.dev/docs/guides/head-management.md)
 - Add scripts with loading strategies: [Client Components](https://pyxle.dev/docs/guides/client-components.md)
+- Install packages and set up shadcn/ui: [Third-party packages](https://pyxle.dev/docs/guides/third-party-packages.md)
+
+---
+
+Source: https://pyxle.dev/docs/guides/third-party-packages.md
+
+# Third-party packages
+
+A Pyxle project has **two** dependency sets: Python packages (used by your
+`@server` loaders, `@action` mutations, and `pages/api/*.py` endpoints) and Node
+packages (used by your React/JSX components). Add to whichever side you need.
+
+## Python packages (pip)
+
+Add the package to `requirements.txt` and install:
+
+```bash
+echo "pydantic>=2" >> requirements.txt
+pip install -r requirements.txt
+```
+
+Import it in the **Python** section of a `.pyxl` file (above the first JS
+`import`) or in a `pages/api/*.py` module:
+
+```python
+from pydantic import BaseModel
+```
+
+## Node packages (npm)
+
+Install with npm and import it in the **JSX** section of a `.pyxl` file:
+
+```bash
+npm install zustand
+```
+
+```jsx
+import { create } from 'zustand';
+```
+
+Vite bundles it for the browser and Pyxle's SSR runtime bundles it for the
+server, so most packages "just work" on both. Prefer packages with **SSR
+support** (they render the same markup on the server and client) — a
+browser-only package should be used inside a `useEffect`, an event handler, or a
+`<ClientOnly>` boundary. See [Client Components](https://pyxle.dev/docs/guides/client-components.md).
+
+Run both installers at once with `pyxle install`.
+
+### CommonJS packages and SSR
+
+The server render bundles your page as an ES module, with React provided by the
+runtime rather than bundled in. Pyxle resolves dependencies **ESM-first** (it
+prefers a package's `module`/ESM entry over its CommonJS `main`), so libraries
+that ship both — including `lucide-react` and most of the shadcn/ui ecosystem —
+render on the server with no extra configuration.
+
+A package that ships **only** CommonJS and calls `require('react')` internally
+can't be linked into the ES-module server bundle. If one does, the server
+render fails with an actionable error that names the package's `require(...)`
+and your page file, and suggests the fix: use a version that ships an ES module,
+or render that part of the page client-only with `<ClientOnly>` so it never runs
+during the server render.
+
+### The import alias
+
+`pyxle init` sets up an import alias (default `@/*`) in `jsconfig.json`, and
+Pyxle wires the same alias into the Vite config **and** the SSR runtime. So
+`@/lib/format` resolves to `lib/format.js` from anywhere, on both server and
+client:
+
+```jsx
+import { formatDate } from '@/lib/format';
+```
+
+## shadcn/ui
+
+[shadcn/ui](https://ui.shadcn.com) is a collection of components you copy into
+your project (not an installed dependency). Enable it when you scaffold:
+
+```bash
+pyxle init my-app --shadcn        # implies Tailwind
+# or answer "y" to the shadcn prompt in interactive init
+```
+
+The scaffold pre-configures everything shadcn needs — `components.json`,
+`jsconfig.json` (the `@` alias), `lib/utils.js`, and a Tailwind v4 stylesheet
+with the shadcn theme tokens — so you **don't** need to run `shadcn init`. Add
+components directly:
+
+```bash
+cd my-app
+npm install
+npx shadcn@latest add button
+```
+
+This drops `components/ui/button.jsx` into your project (JavaScript, not
+TypeScript). Import it via the alias and use it in any page:
+
+```jsx
+// pages/index.pyxl (JSX section)
+import { Button } from '@/components/ui/button';
+
+export default function Home() {
+  return <Button>Click me</Button>;
+}
+```
+
+`pyxle build` bundles it for production and it renders server-side like any
+other component.
+
+> **Verified flow.** The steps above were verified end to end on Node 22 with
+> `shadcn@latest`: scaffold with `--shadcn` → `npm install` → `npx shadcn@latest
+> add button` → import via `@/components/ui/button` → `pyxle build` +
+> `pyxle serve`. Because the scaffold ships a ready `components.json`, running
+> `shadcn init` is unnecessary — it would only offer to overwrite the config the
+> scaffold already wrote.
+
+### Adding shadcn to an existing project
+
+If you scaffolded without it, enable Tailwind first (see
+[Styling](https://pyxle.dev/docs/guides/styling.md#adding-tailwind-to-an-existing-project)), then create a
+`components.json` at your project root (`npx shadcn@latest init` can generate it
+in **JavaScript** mode — answer *no* to TypeScript), pointing its
+`tailwind.css` at your CSS entry (`pages/styles/app.css`) and its aliases at
+your import alias.
+
+## Next steps
+
+- Styling and Tailwind: [Styling](https://pyxle.dev/docs/guides/styling.md)
+- Browser-only libraries: [Client Components](https://pyxle.dev/docs/guides/client-components.md)
+- Validate action bodies with Pydantic: [Server Actions](https://pyxle.dev/docs/core-concepts/server-actions.md)
 
 ---
 
@@ -2768,7 +2845,7 @@ heavy below-the-fold widget — the visitor stares at a blank screen until the
 in as they become ready. Time-to-first-byte drops to the time it takes to
 render the shell instead of the whole page.
 
-Streaming is built on React 18's `renderToPipeableStream` and is **opt-in**: a
+Streaming is built on React's `renderToPipeableStream` and is **opt-in**: a
 page streams only when it uses a `<Suspense>` boundary. Every other page keeps
 the buffered render, unchanged.
 
@@ -2809,16 +2886,16 @@ streamable — there's no configuration and no flag to set. A page with no
 > `<Boundary>` — compiles fine but is **not** marked streamable and renders
 > buffered, with no warning.
 
-`<Suspense>` works the way it does in any React 18 app: a child suspends by
+`<Suspense>` works the way it does in any React app: a child suspends by
 throwing a promise (via `React.lazy` or your own promise-throwing data source),
 and React shows the `fallback` until it resolves. Pyxle's `@server` loader still
 runs first and passes its result as `data` props, exactly as for a buffered page
 — streaming governs how the **rendered** page is delivered, not how the loader
 runs.
 
-> Pyxle ships React 18.3.1, which does **not** have `React.use` — that hook is
-> React 19 only. Don't reach for `use(promise)` to suspend; use `React.lazy` (the
-> zero-effort mechanism) or a hand-thrown promise.
+> Pyxle ships **React 19**, so the `use(promise)` hook is available if you prefer
+> it. `React.lazy` remains the zero-effort way to make a subtree suspend and
+> stream.
 
 ## Route-level loading states with `loading.pyxl`
 
@@ -2867,7 +2944,7 @@ is updated before the fallback renders, so a fallback's `<Head>` is ignored.
 ## Hydration
 
 Nothing changes about hydration. The browser hydrates the same component it
-always did; React 18 reconciles the streamed markup (including the parts that
+always did; React reconciles the streamed markup (including the parts that
 arrived after the shell) natively. A streaming page is hydrated exactly like a
 buffered one.
 
@@ -2885,6 +2962,22 @@ after the full ~600 ms a buffered render would wait. The slower the boundary,
 the bigger the win; a page with no slow boundary gains nothing, which is exactly
 why streaming is opt-in.
 
+### Concurrent streams don't queue
+
+Overlapping requests to a streaming page render **concurrently**, even against a
+single SSR worker. A streaming render spends almost all of its wall-clock time
+idle — awaiting your `@server` loader and each `<Suspense>` boundary — and the
+worker interleaves those idle windows across requests. Four visitors hitting the
+same slow streaming page all get their shell's first byte in tens of
+milliseconds; none waits for the others' boundaries to resolve first.
+
+Each render is fully isolated: its pathname, CSRF token, `<Head>` tags, and
+styles are scoped to that request, so interleaving never bleeds one visitor's
+page into another's. Adding SSR **processes** (`--ssr-workers`, auto-sized by
+default under `pyxle serve`) adds CPU-parallel throughput on top; the in-worker
+concurrency handles the idle-wait overlap. See
+[Deployment → SSR workers](https://pyxle.dev/docs/guides/deployment.md#ssr-workers).
+
 ## When a page does **not** stream
 
 Streaming is deliberately narrow. A page falls back to the buffered render when:
@@ -2898,9 +2991,12 @@ Streaming is deliberately narrow. A page falls back to the buffered render when:
   render buffered. Streaming helps the dynamic, per-request pages that *can't*
   be cached.
 - **The server is running without an SSR worker pool.** Streaming needs the
-  pool's multi-frame transport. Both `pyxle dev` and `pyxle serve` run the pool
-  by default (`--ssr-workers 1`), so streaming works in development too; only
-  `--ssr-workers 0` (per-request subprocess mode) disables it.
+  pool's multi-frame transport. `pyxle serve` auto-sizes the pool by default and
+  `pyxle dev` runs a single worker, so streaming works out of the box in both.
+  The only way to lose it is `pyxle dev --ssr-workers 0`, which selects the
+  per-request subprocess renderer (no pool, no streaming). Under `pyxle serve`,
+  `--ssr-workers 0` means *auto-size* (one worker per CPU, capped at 4), not
+  subprocess mode — so it keeps streaming.
 
 A streamed response is always `Cache-Control: private, no-cache` — it is a
 per-request render and is never shared between visitors.
@@ -2967,6 +3063,12 @@ over HTTP and a live connection over WS.
 
 from pyxle.realtime import channel
 
+
+@server
+async def load(request):
+    return {"room": request.path_params["room"]}
+
+
 async def websocket(ws):
     await ws.accept()
     room = ws.path_params["room"]
@@ -2980,8 +3082,8 @@ async def websocket(ws):
 import React from 'react';
 import { useWebSocket } from 'pyxle/client';
 
-export default function Chat() {
-  const { status, send, lastMessage } = useWebSocket(window.location.pathname);
+export default function Chat({ data }) {
+  const { status, send, lastMessage } = useWebSocket(`/chat/${data.room}`);
   // …render the chat UI…
 }
 ```
@@ -2989,6 +3091,14 @@ export default function Chat() {
 Open `/chat/lobby` and you get the page; the client hook upgrades the **same
 path** to a WebSocket. Two browsers in `/chat/lobby` exchange messages in real
 time; `/chat/general` is a separate room.
+
+> **Derive the path from props, not `window`.** The component renders on the
+> server first, and the hook's *arguments* are evaluated during that render —
+> only the connection waits for the browser. Reaching for a browser global at
+> render scope (`useWebSocket(window.location.pathname)`) therefore crashes SSR
+> with `window is not defined`. Build the path from route data instead, as
+> above: the loader returns the dynamic segment and the component templates it
+> into the same path the page was served from.
 
 ## The `websocket` handler
 
@@ -3169,8 +3279,10 @@ async def websocket(ws):
 ## The `useWebSocket()` client hook
 
 `useWebSocket(path, options?)` connects from the browser with auto-reconnect,
-JSON parsing, and connection state. It **never connects during SSR** and
-reconnects with exponential backoff (capped, with jitter).
+JSON parsing, and connection state. It **never connects during SSR** — though
+its arguments are still evaluated there, so derive `path` from props or loader
+data, never from `window` — and reconnects with exponential backoff (capped,
+with jitter).
 
 ```jsx
 import { useWebSocket } from 'pyxle/client';
@@ -4419,6 +4531,17 @@ cross-worker delivery under `pyxle serve --workers N`.
 
 The `redis` broker needs `pip install 'pyxle-framework[redis]'`.
 
+## SSR rendering
+
+These tune the [server-side rendering](https://pyxle.dev/docs/guides/streaming.md) worker pool. The
+number of SSR **processes** is set with `pyxle serve --ssr-workers` (auto-sized
+by default); this variable tunes how many renders each of those processes runs
+concurrently.
+
+| Variable | Meaning |
+|----------|---------|
+| `PYXLE_SSR_WORKER_CONCURRENCY` | Max renders one SSR worker process handles concurrently (default `16`). Because streaming renders are mostly idle (awaiting loaders / `<Suspense>`), one worker interleaves many of them; raise this only for workloads dominated by slow, I/O-bound loaders |
+
 ## Using environment variables in loaders
 
 ```python
@@ -4779,14 +4902,27 @@ CSRF (Cross-Site Request Forgery) protection is **enabled by default** using a d
 
 ### How it works
 
-1. Pyxle sets a `pyxle-csrf` cookie on every response
+1. Pyxle sets a CSRF cookie on every response. The default name is **namespaced by the app's bind port** — `pyxle-csrf-8000` for an app serving on port 8000
 2. State-changing requests (`POST`, `PUT`, `PATCH`, `DELETE`) must echo the cookie value back, either in the `x-csrf-token` header or — for form-encoded submissions, such as a `<Form>` post before hydration — in a hidden `_csrf_token` form field
 3. The framework validates that the submitted token matches the cookie using constant-time comparison
 4. If they do not match, a `403 Forbidden` response is returned
 
 The `<Form>` component and `useAction` hook handle this automatically.
 
-Pyxle buffers at most 1 MB of a form-encoded body to find `_csrf_token`. A larger `application/x-www-form-urlencoded` or `multipart/form-data` body that doesn't carry the header token is rejected with `413` — for large uploads, send the token via the `x-csrf-token` header instead.
+### Why the cookie name carries the port
+
+Browsers scope cookies to a **host, not a host+port**. With a fixed cookie name, two Pyxle apps on the same host — say two dev servers on `127.0.0.1:8000` and `127.0.0.1:8001` — would keep overwriting each other's token, and every action in the other app would fail with `403 CSRF token mismatch`. Namespacing the default name with the bind port (read from the ASGI connection scope) gives each app its own cookie. The bind port is stable per app in development *and* behind a production reverse proxy, where the public port (443) differs from the bind port but never varies per request.
+
+Set `csrf.cookieName` to pin an explicit name instead — do this if you serve the same app from multiple ports and want one shared token, or if your production setup pre-renders pages with `pyxle build` and then serves them on a *different* port than `pyxle.config.json` declares (the pre-baked pages embed the cookie name). The same applies if you run the ASGI app over a **unix socket** (e.g. raw `uvicorn --uds`): with no bind port to namespace by, pin `cookieName` explicitly so the middleware and rendered pages always agree.
+
+Upgrading from an older Pyxle: a leftover `pyxle-csrf` cookie is simply ignored — the token re-issues under the namespaced name on the next page load. No action needed.
+
+### Form bodies and uploads
+
+Pyxle never buffers an unbounded request body to find `_csrf_token`:
+
+- `application/x-www-form-urlencoded` bodies are buffered up to 1 MiB; a larger body without the header token is rejected with `413`.
+- `multipart/form-data` bodies are **stream-parsed only until the `_csrf_token` field is found** — file parts after the token are passed through to your handler untouched, never buffered by the CSRF layer. `<Form>` renders the hidden token field first, so an upload of any size works out of the box. The scan is capped at 1 MiB of pre-token data; if the field hasn't appeared by then (or isn't present at all), the request is rejected with `403` and a message telling you to send the token in the `x-csrf-token` header or move `_csrf_token` before the file fields.
 
 ### Configuration
 
@@ -4794,7 +4930,7 @@ Pyxle buffers at most 1 MB of a form-encoded body to find `_csrf_token`. A large
 {
   "csrf": {
     "enabled": true,
-    "cookieName": "pyxle-csrf",
+    "cookieName": "my-app-csrf",
     "headerName": "x-csrf-token",
     "cookieSecure": false,
     "cookieSameSite": "lax",
@@ -4806,7 +4942,7 @@ Pyxle buffers at most 1 MB of a form-encoded body to find `_csrf_token`. A large
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `enabled` | `boolean` | `true` | Enable/disable CSRF |
-| `cookieName` | `string` | `"pyxle-csrf"` | Cookie name |
+| `cookieName` | `string` | auto: `"pyxle-csrf-<port>"` | Cookie name; unset → namespaced by the bind port (see above) |
 | `headerName` | `string` | `"x-csrf-token"` | Header name |
 | `cookieSecure` | `boolean` | `false` | Set `Secure` flag (enable in production with HTTPS) |
 | `cookieSameSite` | `string` | `"lax"` | `SameSite` attribute (`"strict"`, `"lax"`, or `"none"`) |
@@ -4832,12 +4968,18 @@ Or with the object form:
 
 ### Token validation for custom fetch calls
 
-If you make `POST` requests outside of `<Form>` or `useAction`, read the CSRF token from the cookie and include it as a header:
+If you make `POST` requests outside of `<Form>` or `useAction`, read the CSRF token from the cookie and include it as a header. Don't hardcode the cookie name — the default is port-namespaced, so resolve it from the `window.__PYXLE_CSRF_COOKIE__` global Pyxle injects into every page:
 
 ```javascript
 function getCsrfToken() {
-  const match = document.cookie.match(/pyxle-csrf=([^;]+)/);
-  return match ? match[1] : '';
+  const cookieName = window.__PYXLE_CSRF_COOKIE__ ?? 'pyxle-csrf';
+  for (const part of document.cookie.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq !== -1 && part.slice(0, eq).trim() === cookieName) {
+      return decodeURIComponent(part.slice(eq + 1));
+    }
+  }
+  return '';
 }
 
 await fetch('/api/data', {
@@ -4850,7 +4992,7 @@ await fetch('/api/data', {
 });
 ```
 
-If you've customised `csrf.cookieName` or `csrf.headerName`, use your configured names instead — Pyxle also injects non-default names into every page as `window.__PYXLE_CSRF_COOKIE__` and `window.__PYXLE_CSRF_HEADER__`, so custom code can read those globals (falling back to `pyxle-csrf` / `x-csrf-token`) rather than hardcoding.
+A customised `csrf.headerName` is exposed the same way, as `window.__PYXLE_CSRF_HEADER__` (falling back to `x-csrf-token`). The globals always carry the *effective* names — including the auto port-namespaced cookie name, which client code cannot derive itself behind a reverse proxy.
 
 ## Signed cookies and tokens
 
@@ -5284,7 +5426,7 @@ pyxle build
 This:
 
 1. Compiles all `.pyxl` files into Python and JSX modules
-2. Runs `npm run build` — Vite bundles JS and processes CSS through PostCSS (Tailwind is compiled in-pipeline when `postcss.config.cjs` is present, which is the scaffold default)
+2. Runs a Vite production build — bundling JS and compiling every imported stylesheet (plain CSS, CSS Modules, and Tailwind v4 via the `@tailwindcss/vite` plugin when enabled) into content-hashed assets
 3. Outputs production artifacts to the `dist/` directory
 
 ### Build options
@@ -5320,7 +5462,7 @@ behind gzip in production rather than buffering the whole response.
 | `--host` | `127.0.0.1` | Bind address |
 | `--port` | `8000` | Port number |
 | `--workers` / `-w` | `1` | Server worker processes — one per CPU core ([multi-core](#multi-core-worker-processes)) |
-| `--ssr-workers` | `1` | Persistent Node.js SSR processes, **per server worker** (`0` = auto-size to CPU cores, capped at 4) |
+| `--ssr-workers` | `auto` | Persistent Node.js SSR processes, **per server worker** (`0`/`auto` = size to CPU cores, capped at 4). `pyxle serve` defaults to auto; pass a number to pin it |
 | `--dist-dir` | `dist/` | Directory with production artifacts |
 | `--skip-build` | `false` | Skip running build first |
 | `--serve-static/--no-serve-static` | `true` | Serve static assets directly (disable when a CDN hosts them) |
@@ -5362,25 +5504,43 @@ don't set them yourself.
 ### SSR workers
 
 Server-side rendering runs in persistent Node.js processes that stay warm
-between requests:
+between requests. `pyxle serve` **auto-sizes** the pool by default — the pool
+grows to the machine's CPU count, capped at 4, per server worker — so you don't
+have to think about it for most deployments:
 
 ```bash
-pyxle serve --ssr-workers 2
+pyxle serve                 # auto-sized SSR pool (default)
+pyxle serve --ssr-workers 2 # pin the pool to exactly 2 processes per server worker
 ```
 
 `--ssr-workers` applies **per server worker**, so the total number of Node.js
-render processes is `workers × ssr-workers`. For an SSR-heavy app,
-`--workers $(nproc) --ssr-workers 1` is a good starting point — scale
-`--ssr-workers` up only if profiling shows render queueing. Passing `0`
+render processes is `workers × ssr-workers`. Passing `0` (or omitting the flag)
 auto-sizes the pool to the machine's CPU count (capped at 4) per server worker.
+
+#### Concurrency within a worker
+
+Each SSR worker handles **many renders concurrently**, not one at a time. This
+matters most for [streaming SSR](https://pyxle.dev/docs/guides/streaming.md): a streaming render spends almost
+all of its wall-clock time idle, awaiting loader promises and `<Suspense>`
+boundaries. The worker interleaves those idle windows, so overlapping requests
+to a streaming page all start rendering immediately instead of queueing behind
+each other. Per-request state (pathname, CSRF token, `<Head>` tags, styles) is
+isolated per render, so interleaving never mixes one visitor's page into
+another's.
+
+The in-worker concurrency cap defaults to 16 in-flight renders and is tunable
+with the `PYXLE_SSR_WORKER_CONCURRENCY` environment variable — raise it only for
+a workload dominated by slow, I/O-bound loaders where renders sit idle waiting
+on the network. Because the cap governs *idle* concurrency, adding SSR
+**processes** (`--ssr-workers`) is what adds CPU-parallel render throughput.
 
 ### Sizing guidance
 
 | Workload | Suggestion |
 |----------|------------|
 | API-heavy, little SSR | `--workers $(nproc)` |
-| SSR-heavy pages | `--workers $(nproc) --ssr-workers 1`, raise SSR workers if renders queue |
-| Small VPS (1–2 cores) | Defaults (`--workers 1`) are fine |
+| SSR-heavy / streaming pages | Defaults are fine — the auto-sized pool renders concurrently. Raise `--ssr-workers` only if CPU-bound renders queue |
+| Small VPS (1–2 cores) | Defaults (`--workers 1`, auto SSR pool) are fine |
 | Memory-constrained | Each worker is a full process — reduce `--workers` before reducing `--ssr-workers` |
 
 ### Per-worker state (multi-worker caveats)
@@ -5705,17 +5865,10 @@ The extension is also available on the
 ### 2. Install the language server
 
 The VS Code extension is a thin client — the actual intelligence comes from
-the `pyxle-langserver` process. Install it alongside your project:
-
-```bash
-pip install pyxle-langkit
-```
-
-Or install it as an optional extra with the framework:
-
-```bash
-pip install pyxle-framework[langkit]
-```
+the `pyxle-langserver` process. As of 0.7.0 it ships with the framework itself —
+if you've run `pip install pyxle-framework`, `pyxle-langserver` is already in
+your environment. (On older framework versions, `pip install pyxle-langkit`
+installs it separately.)
 
 That's it. Open any `.pyxl` file and you'll see the **✓ Pyxle** indicator
 in the status bar when the language server connects.
@@ -5860,7 +6013,7 @@ pyxle-langkit format pages/index.pyxl --check
 Add to your CI pipeline to catch issues before merge:
 
 ```bash
-pip install pyxle-langkit
+pip install pyxle-framework  # pyxle-langkit ships with it
 pyxle-langkit lint pages/*.pyxl
 ```
 
@@ -5925,7 +6078,7 @@ for a future release.
 ### "pyxle-langserver: command not found"
 
 The language server isn't on your PATH. Either:
-- Install globally: `pip install pyxle-langkit`
+- Install it (ships with the framework): `pip install pyxle-framework` — or standalone: `pip install pyxle-langkit`
 - Or set the full path in VS Code settings:
   `"pyxle.langserver.command": "/path/to/venv/bin/pyxle-langserver"`
 
@@ -6078,12 +6231,12 @@ reject them. `paths` work without `baseUrl`: they resolve relative to the
 
 Two honest notes on coverage:
 
-- `checkJs` is **not** enabled, so your own page JSX isn't deeply type-checked on its own. The real value is that **misuse of the typed framework imports is caught** — wrong props on `<Image>`, a bad `useAction` call, etc.
+- `checkJs` is **not** enabled, so your own page JSX — including how it calls the typed framework imports — isn't type-checked yet: `tsc` skips the bodies of `.jsx` files unless `checkJs` is on. What the gate verifies today is the framework surface itself (the generated declarations, config, and path wiring) plus any TypeScript sources you add. Checking page JSX against the framework types (wrong `<Image>` props, a bad `useAction` call) requires `checkJs` + React types and is planned — see [The road to a fully-typed Pyxle](https://pyxle.dev/docs/guides/fully-typed-pyxle.md).
 - `include` covers `./pages/**/*.jsx` but not `./routes/**/*.jsx`, so files under a `routes/` source root currently fall outside the type-check glob.
 
 ## `pyxle typecheck`
 
-`pyxle typecheck` compiles your `.pyxl` files to `.jsx` and runs `tsc --noEmit` against the generated `tsconfig.json`, surfacing any type errors against the framework declarations. It looks for `tsc` in your local `node_modules/.bin`, then globally, then via `npx`, so install `typescript` (locally is recommended) to use it. It's the recommended CI gate for catching framework-API misuse. See the [CLI reference](https://pyxle.dev/docs/reference/cli.md).
+`pyxle typecheck` compiles your `.pyxl` files to `.jsx` and runs `tsc --noEmit` against the generated `tsconfig.json`, surfacing any type errors against the framework declarations. It looks for `tsc` in your local `node_modules/.bin`, then globally — TypeScript must actually be installed (locally is recommended: `npm install --save-dev typescript`); if it isn't, the command fails fast with that instruction rather than invoking anything. It's a useful CI gate for the generated client project and any TypeScript you add — see the honest scope note above for what it does and doesn't check today. See the [CLI reference](https://pyxle.dev/docs/reference/cli.md).
 
 ## Editor setup
 
@@ -6099,13 +6252,146 @@ TypeScript support today is **consumption-only**. The following are not yet avai
 - **No OpenAPI → TypeScript client generation** from your action models.
 - **No single `pyxle/client.d.ts` barrel.** Types are per-module plus `index.d.ts`; the `pyxle/client.js` barrel itself resolves as plain JS via `allowJs`.
 
-These are tracked for a later phase. The strict `tsconfig` scaffold and the framework `.d.ts` set are delivered today; loader-type generation and `.tsx` authoring remain pending.
+These are tracked for a later phase. The strict `tsconfig` scaffold and the framework `.d.ts` set are delivered today; loader-type generation and `.tsx` authoring remain pending. For the full picture of where the type story is heading — authoring your client in TypeScript and forwarding Python types to the client — see [The road to a fully-typed Pyxle](https://pyxle.dev/docs/guides/fully-typed-pyxle.md).
 
 ## Next steps
 
+- Where this is heading: [The road to a fully-typed Pyxle](https://pyxle.dev/docs/guides/fully-typed-pyxle.md)
 - Configure your editor: [Editor setup](https://pyxle.dev/docs/guides/editor-setup.md)
 - Validate action inputs with types: [Server actions](https://pyxle.dev/docs/core-concepts/server-actions.md#validating-request-bodies-with-pydantic)
 - CLI reference for `pyxle typecheck`: [CLI](https://pyxle.dev/docs/reference/cli.md)
+
+---
+
+Source: https://pyxle.dev/docs/guides/fully-typed-pyxle.md
+
+# The road to a fully-typed Pyxle
+
+> **Status: roadmap.** This page describes where Pyxle's type story is going, not
+> a feature that ships today. For what's available now — typed editor support,
+> generated declarations, and the `pyxle typecheck` gate — see the
+> [TypeScript guide](https://pyxle.dev/docs/guides/typescript.md). Nothing here changes the fact that **JavaScript
+> is fully first-class today**: every npm package works in a `.pyxl` JSX block, and
+> nothing is blocked.
+
+Pyxle is Python-first. That is a deliberate choice, not a limitation — but it
+raises an obvious question for anyone who has felt the pull of end-to-end types
+in a TypeScript stack: *if my server is Python and my client is React, where do
+my types come from?*
+
+This is our answer, and the direction we are building toward.
+
+## The vision: one source of truth, typed across the boundary
+
+In a Pyxle app the shape of your data is **defined once, in Python** — a loader
+returns a Pydantic model, a dataclass, a `TypedDict`, or an annotated `dict`; an
+`@action` accepts a validated body. The endgame is that this shape **flows to the
+client as a real type**, so the `data` your component receives is typed *from the
+Python that produced it*, and a mismatch is caught before the page ever renders.
+
+```
+@server loader returns  User          ──▶  component receives  data: User
+@action accepts         CreatePost    ──▶  useAction is typed to CreatePost
+```
+
+No hand-written client interfaces to keep in sync. No duplicated shapes drifting
+apart. Python stays the single source of truth, and the type crosses the
+Python↔React boundary with it. That is the thing a Python-first full-stack
+framework is uniquely positioned to offer — and it's what "a fully-typed Pyxle"
+means.
+
+## What's already true today
+
+This isn't a green field. The framework already understands the boundary the
+type bridge will cross:
+
+- **`pyxle check`** catches undefined names and semantic mistakes in your `.pyxl`
+  files before they run.
+- **`pyxle typecheck`** generates a full set of `.d.ts` declarations for the
+  `pyxle/client` runtime and type-checks your client against them with `tsc` —
+  so the framework surface is already typed in your editor and gateable in CI.
+- **`@action` bodies validate against Pydantic models** at runtime today, and
+  `pyxle openapi` emits an OpenAPI 3.1 schema straight from those models. The
+  server already treats your Python types as the contract.
+- **The compiler extracts loader and action metadata** at build time. The
+  information the type bridge needs to reason about is already on the table.
+
+So the direction below isn't a rewrite — it's connecting foundations that are
+already in place.
+
+## Where it's going
+
+Two pieces, in roughly this order:
+
+1. **Author your client in TypeScript.** Write the JSX half of a `.pyxl` file in
+   TSX — annotations, `interface`, generics — with full editor intelligence.
+   (Today the client block is plain JSX that gets type-*checked* but not
+   type-*annotated*; this lifts that restriction.)
+
+2. **Forward Python types to the client.** Derive a TypeScript type from a
+   loader's or action's Python return/parameter type and thread it into the
+   component's props, kept in sync automatically as your Python changes. This is
+   the differentiator, and the harder half — it's where most of the design work
+   lives.
+
+We're describing the *direction*, not committing to a specific mechanism yet.
+The right inference strategy, code-generation approach, and editor integration
+are exactly what a dedicated design pass will settle — and we'd rather ship that
+properly than nail a half-answer to a page.
+
+## Principles we're holding to
+
+- **Python is the source of truth.** Types are *derived* from your Python, never
+  hand-duplicated on the client.
+- **TypeScript is opt-in, not a tax.** JavaScript stays fully first-class. A JS
+  Pyxle app is a real, supported Pyxle app — today and after this lands.
+- **No lock-in and no magic.** Generated types are inspectable; nothing hides
+  behavior — in keeping with Pyxle's "no magic" design principle.
+- **Honest tooling.** A green type-check will mean what it says.
+
+## A taste of what it should feel like
+
+*Illustrative — this is the target ergonomics, not current syntax.*
+
+```python
+# posts/[slug].pyxl
+
+class Post(BaseModel):
+    slug: str
+    title: str
+    body: str
+
+@server
+async def load(request) -> Post:          # Python defines the shape, once
+    return await db.get_post(request.path_params["slug"])
+```
+
+```tsx
+// same file, client half — the type comes from the loader, for free
+export default function PostPage({ data }: { data: Post }) {
+  //                                          ^^^^ derived from the Python above
+  return <article><h1>{data.title}</h1>{/* data.tital → caught before render */}</article>
+}
+```
+
+The point isn't the syntax — it's that `Post` was written **once, in Python**,
+and the client got it for free.
+
+## Status and how to follow along
+
+This is **planned**, not scheduled — we're deliberately not attaching a version
+or date to it, because the design pass comes first and we won't pre-commit to a
+mechanism we haven't validated. What you can rely on in the meantime:
+
+- JavaScript is fully supported, with no capability or package gaps.
+- The typed-editor-support and `pyxle typecheck` features on the
+  [TypeScript guide](https://pyxle.dev/docs/guides/typescript.md) are here today.
+- When the type bridge lands, it will be **additive** — it won't break your JS
+  app.
+
+If typed end-to-end data is the thing that would make Pyxle a yes for you, this
+page is our commitment that it's where we're headed — and that we intend to do
+it right.
 
 ---
 
@@ -6789,7 +7075,7 @@ Every page of a Pyxle app can serve a clean **Markdown** rendition of itself —
 That single line gives you:
 
 - **Per-page Markdown** at each URL with `.md` appended — `/docs/routing` → `/docs/routing.md`.
-- **Content negotiation** — the *same* URL returns Markdown to any request that sends `Accept: text/markdown`. Browsers never send it, so humans are unaffected.
+- **Content negotiation** — the *same* URL returns Markdown to any request whose `Accept` header asks for `text/markdown`, negotiated with proper [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110#section-12.5.1) q-values. Browsers never send it, so humans are unaffected.
 - **An `/llms.txt` index** — the [llms.txt](https://llmstxt.org/) convention: a Markdown map of your site.
 - **Discovery headers** on every response — `Link: </llms.txt>; rel="llms-txt"` and `X-Llms-Txt: /llms.txt` — so an agent finds the index without parsing HTML.
 
@@ -6910,6 +7196,8 @@ Returning `None` **declines** and defers to the next ancestor (and ultimately to
 
 If nothing above resolves and you've set `"autoConvert": true`, Pyxle renders the page and converts its HTML to Markdown with a small, **dependency-free** converter. It's **off by default** and deliberately best-effort: headings, paragraphs, lists, links, emphasis, and code survive; layout chrome, tables, and rich components may not. Treat it as "something is better than a redirect" — prefer an authored `.md` or a handler for anything you care about.
 
+Converted pages keep agents **on the Markdown channel**: internal links to other pages are rewritten to their `.md` renditions — `[About](/about)` becomes `[About](/about.md)`, with query strings and fragments preserved (`/about?x=1#y` → `/about.md?x=1#y`). External URLs, `mailto:`/`tel:` links, `/api/` routes, asset paths with a file extension, and links already ending in `.md` are left untouched. See [`html_to_markdown`](#ctxrender_html-post-processing-the-rendered-page) for the same behavior in your own handlers.
+
 ### The redirect fallback
 
 With the feature on but no Markdown source and `autoConvert` off, `/<page>.md` returns a **`307` redirect** to `/<page>`. An agent that guesses a `.md` URL lands on the real page instead of a 404.
@@ -6957,8 +7245,10 @@ from pyxle.devserver.llms import html_to_markdown   # the built-in converter
 
 async def to_markdown(ctx):
     html = await ctx.render_html()
-    return html_to_markdown(html)          # roughly what autoConvert does, but on your terms
+    return html_to_markdown(html)          # what autoConvert does, but on your terms
 ```
+
+`html_to_markdown` rewrites internal page links to their `.md` renditions by default (exactly like [autoConvert](#autoconvert-the-lossy-fallback)); pass `rewrite_links=False` to keep every `href` verbatim.
 
 It's lazy and potentially expensive (a full SSR pass), so only call it when you need it. When you want the page's *data* rather than its rendered HTML, reach for `ctx.run_loader()` instead — it's much cheaper.
 
@@ -7000,7 +7290,7 @@ def wrap_markdown(ctx, markdown):
     return f"{header}\n{markdown}"
 ```
 
-Because it runs on Markdown from *every* source (co-located files, `to_markdown` handlers, `autoConvert`), the framing is defined **once** and applied everywhere. Return `None` to leave the Markdown untouched. And because it's applied at serve time — not baked into your source — your `/llms-full.txt` corpus and the raw `.md` files stay clean.
+Because it runs on Markdown from *every* source (co-located files, `to_markdown` handlers, `autoConvert`), the framing is defined **once** and applied everywhere — and it always receives the *final* resolved Markdown, so `autoConvert` output arrives with its internal links already rewritten to `.md`. Return `None` to leave the Markdown untouched. And because it's applied at serve time — not baked into your source — your `/llms-full.txt` corpus and the raw `.md` files stay clean.
 
 ---
 
@@ -7010,7 +7300,12 @@ Because it runs on Markdown from *every* source (co-located files, `to_markdown`
 
 1. a **static `public/llms.txt`** (served by the static-asset layer before anything else) — full manual control;
 2. a **`llms_txt`** function in the root `pages/llms.py` — generate it dynamically;
-3. a **generated** default: an `H1` plus a `## Pages` list linking every concrete (non-parameterised) page's `.md`.
+3. a **generated** default: an `H1` plus a `## Pages` list of every concrete (non-parameterised) page.
+
+The generated default is precise about what it advertises:
+
+- **Links are absolute**, derived from the request's scheme and host (`https://example.com/about.md`) — so the index still points home when it's saved to disk or pasted into a chat. Behind a reverse proxy, run uvicorn with proxy-header support (`pyxle serve` does) so the advertised origin is the public one.
+- **A page is linked at its `.md` URL only when that URL actually serves Markdown.** Each page is checked against the same [resolution ladder](#how-a-pages-markdown-is-resolved) `.md` requests use: a co-located `.md` file, a page-local `to_markdown`, or an ancestor `llms.py` handler qualifies it — and with `autoConvert` on, every page qualifies. A page with no source is listed at its **canonical HTML URL** instead, so the index never advertises a `.md` link that would just redirect.
 
 For a site with dynamic content — docs, a blog, a catalog — the generated default can't enumerate your dynamic routes, so provide a `llms_txt` hook:
 
@@ -7041,8 +7336,29 @@ Each entry in `ctx.pages` is an **`LlmsPageInfo`** — `path` (e.g. `/about`), `
 
 Beyond the `.md` URLs, two things make the feature work for agents that don't append `.md`:
 
-- **`Accept: text/markdown` negotiation.** A request to the *canonical* URL (`/docs/routing`) that includes `text/markdown` in its `Accept` header gets the Markdown, resolved through the exact same ladder. Browsers never send that header, so this is invisible to human visitors. The response carries `Vary: Accept` so shared caches key on it correctly.
+- **`Accept: text/markdown` negotiation.** A request to the *canonical* URL (`/docs/routing`) whose `Accept` header prefers `text/markdown` gets the Markdown, resolved through the exact same ladder. Browsers never ask for it, so this is invisible to human visitors. The response carries `Vary: Accept` so shared caches key on it correctly.
 - **Discovery headers.** Every response advertises the index: `Link: </llms.txt>; rel="llms-txt"` and `X-Llms-Txt: /llms.txt`. An agent can find your `llms.txt` from any page without parsing the body.
+
+### Negotiation rules
+
+The `Accept` header is negotiated per [RFC 9110 §12.5.1](https://www.rfc-editor.org/rfc/rfc9110#section-12.5.1). Markdown is served when **both** hold:
+
+1. `text/markdown` appears as an **exact media type** with `q > 0`. Matching is by type/subtype token, case-insensitive — never by substring — and wildcards (`*/*`, `text/*`) never select Markdown, so ordinary browser headers keep getting HTML.
+2. Its q-weight is **at least** the effective weight of `text/html` (which *does* pick up wildcard ranges). Ties go to Markdown — the client asked for it explicitly.
+
+In practice:
+
+| `Accept` header | Serves | Why |
+|---|---|---|
+| `text/markdown` | Markdown | explicit, q defaults to 1.0 |
+| `text/markdown, text/html` | Markdown | equal weight — explicit ask wins the tie |
+| `text/html;q=0.9, text/markdown;q=0.8` | HTML | HTML weighted higher |
+| `text/html, text/markdown;q=0` | HTML | `q=0` means *not acceptable* |
+| `text/markdown;q=0.5, */*;q=0.9` | HTML | HTML is 0.9 via the wildcard |
+| `text/html,application/xhtml+xml,…,*/*;q=0.8` (a browser) | HTML | no explicit `text/markdown` |
+| `text/markdownish` or malformed garbage | HTML | no substring matching; parsing never raises |
+
+q-values default to `1.0` and are clamped to `0..1`; malformed media-ranges are ignored and an unusable header falls back to HTML.
 
 ---
 
@@ -7079,7 +7395,7 @@ Ship a normal XML sitemap alongside it. (OpenAI and Anthropic expose separate to
 
 **Serve docs from generated JSON** (as pyxle.dev does): one directory handler maps a slug to a pre-built Markdown field. See [directory handler](#3-a-directory-llmspy-handler-covers-a-route-subtree) above.
 
-**Rewrite links for portability.** Markdown that travels (pasted into a chat, saved to disk) should carry absolute links. Rewrite relative links to absolute `.md` URLs when you generate or store the Markdown, so `[Routing](../routing.md)` becomes `[Routing](https://example.com/docs/routing.md)`.
+**Rewrite links for portability.** Internal links already point at `.md` renditions — [autoConvert](#autoconvert-the-lossy-fallback) and `html_to_markdown` rewrite them for you. But Markdown that travels (pasted into a chat, saved to disk) should also carry **absolute** links. Make them absolute when you generate or store the Markdown, so `[Routing](/docs/routing.md)` becomes `[Routing](https://example.com/docs/routing.md)` — the generated `/llms.txt` already does this.
 
 **Add an agent search endpoint.** Agents can search by fetching `/llms-full.txt` and scanning it, but a dedicated endpoint is nicer. A plain `pages/api/*.py` route that ranks your content and returns Markdown links works well — then point to it from `wrap_markdown`:
 
@@ -7109,7 +7425,7 @@ async def endpoint(request):
 
 **Is this the same as Mintlify's `.md`/llms.txt?** Same idea, but built into the framework and applied to your *whole app*, not just a hosted docs site — and you control exactly where each page's Markdown comes from.
 
-**Who reads all this?** Right now, the clearest win is direct: point any AI assistant — Claude, Cursor, ChatGPT — at a `.md` URL or your `llms.txt` and it gets clean, token-efficient context instead of scraped HTML. Beyond that, `.md` and [llms.txt](https://llmstxt.org/) are the conventions the AI ecosystem is standardizing on — so your app already speaks the format machine readers are moving toward, served to spec (per-page Markdown, `Accept` negotiation, discovery headers) with nothing more to do as adoption grows.
+**Who reads all this?** Right now, the clearest win is direct: point any AI assistant — Claude, Cursor, ChatGPT — at a `.md` URL or your `llms.txt` and it gets clean, token-efficient context instead of scraped HTML. Beyond that, `.md` and [llms.txt](https://llmstxt.org/) are the conventions the AI ecosystem is standardizing on — so your app already speaks the format machine readers are moving toward, served to spec (per-page Markdown, RFC 9110 `Accept` negotiation, discovery headers) with nothing more to do as adoption grows.
 
 ---
 
@@ -7219,20 +7535,35 @@ The `pyxle` CLI manages Pyxle projects from scaffolding to production.
 Create a new Pyxle project.
 
 ```bash
-pyxle init <name> [options]
+pyxle init [name] [options]
 ```
 
-| Argument / Flag | Description |
-|----------------|-------------|
-| `name` | Project directory name (required) |
-| `--force` / `-f` | Overwrite existing directory |
-| `--template` / `-t` | Project template. Only `"default"` is supported today (other values error). |
-| `--install` / `--no-install` | Run `pip install` and `npm install` after scaffolding (default: no) |
+`pyxle init` is **interactive**: when stdin is a terminal and no flag pins the
+choice, it walks you through arrow-key selections — Tailwind CSS, shadcn/ui
+(only if Tailwind is enabled), and whether to customize the default import
+alias (`@/*`; the value input appears only if you say yes). When stdin is
+**not** a terminal (CI, pipes), it never prompts — it uses the flags and
+defaults below.
+
+| Argument / Flag | Default | Description |
+|----------------|---------|-------------|
+| `name` | `.` | Project directory to create. Use `.` (or omit) to scaffold into the current directory and derive the name from it. |
+| `--force` / `-f` | `false` | Overwrite an existing directory (or scaffold into a non-empty current directory). |
+| `--template` / `-t` | `default` | Project template. Only `"default"` is supported today (other values error). |
+| `--tailwind` / `--no-tailwind` | prompt → off | Set up Tailwind CSS v4 (wired into Vite). |
+| `--shadcn` / `--no-shadcn` | prompt → off | Set up shadcn/ui (implies `--tailwind`). |
+| `--import-alias` | `@/*` | Import alias for project modules (e.g. `~/*`). |
+| `--yes` / `-y` | `false` | Accept all defaults without prompting (no Tailwind, no shadcn, default alias). |
+| `--install` / `--no-install` | `false` | Run `pip install` and `npm install` after scaffolding. |
 
 **Examples:**
 
 ```bash
-pyxle init my-app
+pyxle init my-app                          # interactive prompts
+pyxle init my-app --yes                     # accept defaults (no Tailwind)
+pyxle init my-app --tailwind --no-shadcn    # Tailwind only, no prompts
+pyxle init my-app --shadcn                  # shadcn/ui (implies Tailwind)
+pyxle init .                                # scaffold into an empty current dir
 pyxle init my-app --force --install
 ```
 
@@ -7281,8 +7612,9 @@ pyxle dev [directory] [options]
 | `--ssr-workers` | `1` | Number of persistent SSR worker processes (`0` = per-request subprocess mode) |
 | `--config` | -- | Path to `pyxle.config.json` |
 | `--print-config` / `--no-print-config` | `false` | Print merged configuration before starting |
-| `--tailwind` / `--no-tailwind` | `true` | Auto-start Tailwind CSS watcher |
+| `--tailwind` / `--no-tailwind` | `true` | Auto-start the **legacy** standalone Tailwind v3 CLI watcher when a hand-written `tailwind.config.*` is present. Tailwind **v4** projects (the scaffold default when you opt into Tailwind) run through the `@tailwindcss/vite` plugin and ignore this flag. |
 | `--dashboard` / `--no-dashboard` | `false` | Periodically print a live [observability](https://pyxle.dev/docs/guides/observability.md#dev-dashboard) panel (request/SSR metrics) to the terminal |
+| `--verbose` / `-v` | `false` | Restore full output: the raw Vite log firehose, debug-level internals, and `DEBUG` server logs in the browser console. Equivalent to the global `pyxle -v dev`. |
 
 **Examples:**
 
@@ -7291,16 +7623,36 @@ pyxle dev
 pyxle dev --host 0.0.0.0 --port 3000
 pyxle dev --no-tailwind --ssr-workers 4
 pyxle dev ./my-app --print-config
+pyxle dev --verbose             # troubleshoot: full Vite + debug output
 ```
 
 **What it does:**
 
 1. Loads configuration from `pyxle.config.json` + environment variables + CLI flags
 2. Compiles `.pyxl` files into Python and JSX modules
-3. Starts the Vite dev server for React hot reload
-4. Starts the Tailwind watcher (if detected)
+3. Starts the Vite dev server for React hot reload (Tailwind v4 compiles here via the `@tailwindcss/vite` plugin)
+4. Starts the legacy Tailwind v3 watcher only if a hand-written `tailwind.config.*` is detected
 5. Starts the Starlette ASGI server
 6. Watches for file changes and recompiles automatically
+
+**Console output.** By default `pyxle dev` prints a clean, curated console — a
+startup summary (the local URL, the Vite URL, the route count, and the total
+"ready in X ms"), a concise one-line notice per incremental rebuild
+(`Rebuilt … in X ms`), and any warnings or errors. The raw line-by-line Vite
+firehose and debug-level internals are hidden. Pass `--verbose` (or `-v`, or the
+global `pyxle -v dev`) to restore the full output when troubleshooting. Genuine
+signal — errors, warnings, the URLs, and rebuild success/failure — is always
+shown, at every verbosity.
+
+**Server logs in the browser console (dev only).** While `pyxle dev` is running,
+your server-side `logging` output (from loaders, actions, and your own modules)
+is forwarded to the browser devtools console, prefixed `[pyxle:server]` and
+mapped to the matching `console` method (`info` → `console.info`, `warning` →
+`console.warn`, `error` → `console.error`). This lets you follow server logs
+without leaving the browser. By default only `INFO` and above from your own
+loggers are forwarded; `--verbose` additionally forwards `DEBUG` records and the
+framework's own internal loggers. This is strictly a development feature — it
+never runs under `pyxle serve` and never appears in the production bundle.
 
 ## `pyxle build`
 
@@ -7370,6 +7722,16 @@ Validate `.pyxl` files, configuration, and dependencies without starting the ser
 - **Python syntax** (via `ast`) and Pyxle structural rules (loader/action shape, `HEAD`, …).
 - **Python semantics** (via pyflakes): undefined names — e.g. a symbol you `raise` but never imported — unused imports, redefinitions. Compiler-injected runtime names (`server`, `action`, `LoaderError`, `ActionError`, …) are recognized, so the idiomatic patterns never read as undefined.
 - **JSX syntax** (via Babel): unclosed tags/expressions, mismatched braces, TypeScript in a client block, and **duplicate `export default`** (which Babel accepts but the build rejects).
+
+As of 0.7.0 the JSX level works out of the box — `pyxle-langkit`, which provides the Babel-based checker, ships with the framework. On earlier versions it required the `[langkit]` extra (`pip install 'pyxle-framework[langkit]'`); without it, the JSX check reported itself unavailable.
+
+> **What a green check proves — and what it doesn't.** `pyxle check` is a
+> static gate: it validates `.pyxl` syntax, Python semantics, and JSX syntax.
+> It does **not** render your pages, so a mistake that only exists at runtime —
+> a component reading `data.posts` when the loader returns `{"items": ...}`, a
+> loader whose query fails against the real database — surfaces when the page
+> renders, not here. Treat a clean check as "this compiles"; loading the page
+> under `pyxle dev` (or a test that requests it) remains the runtime proof.
 
 ```bash
 pyxle check [directory] [options]
@@ -7514,7 +7876,6 @@ Pyxle is configured via `pyxle.config.json` in the project root. All fields are 
   },
   "csrf": {
     "enabled": true,
-    "cookieName": "pyxle-csrf",
     "headerName": "x-csrf-token",
     "cookieSecure": false,
     "cookieSameSite": "lax",
@@ -7546,6 +7907,10 @@ Pyxle is configured via `pyxle.config.json` in the project root. All fields are 
   "llms": {
     "enabled": false,
     "autoConvert": false
+  },
+  "dev": {
+    "watch": [],
+    "ignore": []
   },
   "plugins": []
 }
@@ -7664,7 +8029,7 @@ Route-level hooks applied to specific route types.
 {
   "csrf": {
     "enabled": true,
-    "cookieName": "pyxle-csrf",
+    "cookieName": "my-app-csrf",
     "headerName": "x-csrf-token",
     "cookieSecure": true,
     "cookieSameSite": "strict",
@@ -7676,11 +8041,13 @@ Route-level hooks applied to specific route types.
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `csrf.enabled` | `boolean` | `true` | Enable CSRF protection |
-| `csrf.cookieName` | `string` | `"pyxle-csrf"` | CSRF cookie name |
+| `csrf.cookieName` | `string` | auto: `"pyxle-csrf-<port>"` | CSRF cookie name; unset → namespaced by the app's bind port |
 | `csrf.headerName` | `string` | `"x-csrf-token"` | CSRF header name |
 | `csrf.cookieSecure` | `boolean` | `false` | Set `Secure` flag on cookie |
 | `csrf.cookieSameSite` | `string` | `"lax"` | `SameSite` attribute (`"strict"`, `"lax"`, `"none"`) |
 | `csrf.exemptPaths` | `string[]` | `[]` | Paths exempt from CSRF checks (matched on segment boundaries) |
+
+**Cookie naming.** Browsers scope cookies to a host, ignoring the port, so a fixed cookie name would collide between two Pyxle apps on the same host (e.g. two dev servers on `127.0.0.1`) — each would overwrite the other's token and every action in the other app would fail with `403`. When `cookieName` is unset, Pyxle namespaces the cookie with the app's bind port (`pyxle-csrf-8000`), which is stable per app in development and behind a production reverse proxy. Set `cookieName` to pin an explicit name instead. Full details and the upgrade note: [Security → CSRF protection](https://pyxle.dev/docs/guides/security.md#csrf-protection).
 
 **Exemption matching.** An entry matches its exact path and anything beneath it at a `/` segment boundary: `/api/webhooks` exempts `/api/webhooks` and `/api/webhooks/stripe`, but not `/api/webhooks-admin`. Request paths are normalised first (`.`/`..` resolved, repeated slashes collapsed), so `/api/webhooks/../other` is checked as `/api/other`. An entry of `/` (or an empty string) is ignored rather than disabling CSRF site-wide — use `"csrf": false` to disable CSRF entirely.
 
@@ -7823,6 +8190,31 @@ Serve a clean **markdown** rendition of every page — at its URL with `.md` app
 **Where the markdown comes from** is *not* config — it lives in your project, resolved in this order (first hit wins): a co-located `<page>.md` file → a `to_markdown` handler in the page's server module → a `to_markdown` in the nearest ancestor `llms.py` (covers a route subtree; `pages/llms.py` is app-wide) → `autoConvert` (if on) → otherwise the `.md` URL redirects to the page. A root `pages/llms.py` may also define `wrap_markdown(ctx, markdown)` to frame every `.md` response with a header/footer. Likewise `/llms.txt` comes from a static `public/llms.txt`, else a `llms_txt` function in the root `pages/llms.py`, else a generated index. See the [guide](https://pyxle.dev/docs/guides/llms.md).
 
 > **Deploying handlers.** Co-located `.md` files and `llms.py` handlers are part of your source, so they must be present alongside `pages/` when you `pyxle serve`. (A page's own `to_markdown`, compiled into the build, works regardless.)
+
+## Development
+
+The `dev` block tunes the `pyxle dev` file watcher. **Both fields are dev-only** — `pyxle serve` runs no watcher (it serves a pre-built, immutable tree), so they are ignored in production.
+
+```json
+{
+  "dev": {
+    "watch": ["lib", "components"],
+    "ignore": ["pages/generated/*", "*.tmp"]
+  }
+}
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `dev` | `object` | `{}` | Development-server file-watcher settings. |
+| `dev.watch` | `string[]` | `[]` | Extra project-relative directories to watch for hot reload, **in addition to** the always-watched `pages/`. A change under a watched directory runs the normal rebuild + module-reload path. Each entry must resolve to a path **inside the project root** — an absolute path or one that escapes the root via `..` is rejected at config load. |
+| `dev.ignore` | `string[]` | `[]` | Extra glob patterns matched against each changed file's project-relative path; a match suppresses the rebuild/reload for that event. |
+
+**Why `dev.watch`.** Pyxle only watches `pages/` by default (unlike Next.js, which watches whatever the import graph touches). A shared Python module imported from outside `pages/` — say `lib/util.py` used by a loader — would not otherwise trigger a reload when you edit it. Listing its directory here closes that gap.
+
+**`dev.ignore` is additive, never subtractive.** Pyxle always ignores its own generated build output on the rebuild watch — compiled bytecode (`*.pyc`), `.pyxle-build`/`__pycache__` trees, and SQLite journals (`*.db`, `*.db-wal`, `*.db-shm`). Those built-in ignores are **load-bearing** (they prevent a self-sustaining rebuild loop) and stay in force regardless of config — a `dev.ignore` list can only add more patterns, it cannot clear them.
+
+> **Note on `public/`.** Changes under `public/` are never rebuilt or reloaded — static assets are served live from disk and picked up on the next refresh (like Next.js). You don't need to (and can't usefully) list `public/` in `dev.watch`. See [Architecture → the watcher](https://pyxle.dev/docs/architecture/dev-server.md#the-watcher).
 
 ## Plugins
 
@@ -9194,7 +9586,7 @@ async def load(request):
 
 ## Plugin settings
 
-All settings are optional — with none, you get SQLite at `./data/app.db`.
+All settings are optional — with none, you get SQLite at `./data/app.db`. There is no init step: on first startup the plugin creates the `data/` directory and the database file itself, then applies any pending migrations. (Plugins built on pyxle-db inherit this — [pyxle-auth](https://pyxle.dev/docs/plugins/pyxle-auth.md#where-accounts-live)'s user records land in this same file until you point `url` at a real server.)
 
 | Key | Default | What it does |
 |---|---|---|
@@ -9301,7 +9693,10 @@ async def load(request):
 
 @action
 async def create_post(request):
-    await request.state.db.execute("INSERT INTO posts (title) VALUES (?)", (title,))
+    body = await request.json()
+    await request.state.db.execute(
+        "INSERT INTO posts (title) VALUES (?)", (body["title"],)
+    )
     return {"ok": True}   # committed automatically on success
 ```
 
@@ -9438,7 +9833,7 @@ Source: https://pyxle.dev/docs/plugins/pyxle-auth.md
 
 `pyxle-auth` is Pyxle's official authentication plugin: email- **or** username-based password accounts, sliding sessions, password-reset and email-verification flows, role-based access control, and scoped API tokens — wired into your app with one config entry. It never sends email and never renders UI; it gives you hardened primitives and stays out of your templates.
 
-> **Version 0.3.0.** Runs on [pyxle-db](https://pyxle.dev/docs/plugins/pyxle-db.md) (SQLite, PostgreSQL, or MySQL — the full account lifecycle is tested against real servers in CI), or on any database layer satisfying the `DatabaseLike` contract.
+> **Version 0.4.0.** Runs on [pyxle-db](https://pyxle.dev/docs/plugins/pyxle-db.md) (SQLite, PostgreSQL, or MySQL — the full account lifecycle is tested against real servers in CI), or on any database layer satisfying the `DatabaseLike` contract.
 
 ## Install
 
@@ -9514,6 +9909,23 @@ async def endpoint(request: Request) -> JSONResponse:
 
 `sign_up` has the same shape and also returns `(user, cookie)`. `sign_out(cookie_value=...)` returns a cookie that clears the browser's copy — set it the same way.
 
+## Where accounts live
+
+pyxle-auth stores its records — users, sessions, rate-limit buckets, tokens, roles — in whatever database [pyxle-db](https://pyxle.dev/docs/plugins/pyxle-db.md) opens. With no pyxle-db settings, that's a SQLite file **auto-created at `data/app.db` on first run**: the plugin creates the directory and the file, and pyxle-auth's bundled migrations build its tables at startup. There is no manual migration or `create-db` step — the Quickstart config above boots against an empty project and just works.
+
+For production, point pyxle-db at your real database and pyxle-auth follows — its migrations apply there at startup exactly as they do to SQLite:
+
+```json
+{
+  "plugins": [
+    { "name": "pyxle-db", "settings": { "url": "env:DATABASE_URL" } },
+    "pyxle-auth"
+  ]
+}
+```
+
+The `env:` indirection keeps credentials out of the committed config — see [pyxle-db → Plugin settings](https://pyxle.dev/docs/plugins/pyxle-db.md#plugin-settings). Remember the SQLite file is your user table: back it up like one, and never commit or deploy a local `data/app.db` over a production database. (To back pyxle-auth with something other than pyxle-db entirely, see [Bring your own database](#bring-your-own-database).)
+
 ## Identity model: email or username
 
 By default accounts are identified by **email** — exactly as the examples above. To build a username-based app (any available handle, no email or phone required), set `identifier` to `"username"`:
@@ -9537,7 +9949,7 @@ is_free       = await auth.username_available("ada")                        # Fa
 
 - **Normalised:** usernames are trimmed and lowercased, so uniqueness is case-insensitive on every backend (`Ada` and `ada` are one account).
 - **Policy (configurable):** `usernameMinLength` / `usernameMaxLength` (3–30), `usernamePattern` (`^[a-z0-9_-]+$`), and a reserved-name block-list (~90 system/route names like `admin`, `api`, `login`) that blocks impersonation and route collisions.
-- **Availability is public** but **per-IP rate-limited** (`rateLimitUsernameCheckPerHour`, default 120) so it can't bulk-scrape the user list: `GET /auth/username-available?u=<name>` returns `{ "available": true | false }`, so a picker can check live as the user types. Sign-in stays enumeration-safe — a missing or malformed handle is an ordinary `InvalidCredentials`, never a distinct error.
+- **Availability is public** but **per-IP rate-limited** (`rateLimitUsernameCheckPerHour`, default 120) so it can't bulk-scrape the user list: `GET /auth/username-available?u=<name>` returns `{ "available": true | false }` — plus an optional human-readable `reason` (e.g. for reserved names) your picker UI can surface directly, so a picker can check live as the user types. Sign-in stays enumeration-safe — a missing or malformed handle is an ordinary `InvalidCredentials`, never a distinct error.
 - **Optional email:** username mode may still accept an email at sign-up (e.g. for a future reset) — pass both; only the configured identifier is required.
 - **No per-person limit:** anyone can register as many usernames as they like; tune `rateLimitSignUpPerHour` if you want to throttle.
 
@@ -9610,7 +10022,29 @@ function Account() {
 }
 ```
 
-The signed-in user is **seeded into the server render** (`window.__PYXLE_AUTH__`), so `useAuth` shows the right state on the first frame — no flash of "logged out", no extra round-trip.
+The signed-in user is **seeded into the page** (`window.__PYXLE_AUTH__`), so `useAuth` resolves without a network round-trip and shows the right state from the first post-hydration frame. The server-rendered markup itself renders the logged-out state (session-aware SSR is on the roadmap) — gate any flash-sensitive UI on `useAuth().loading`, or render it client-side.
+
+### CSRF
+
+`POST /auth/login`, `/auth/signup`, and `/auth/logout` are state-changing endpoints, so the framework's CSRF protection guards them like any other POST — a request that doesn't carry the token is rejected with `403` ("CSRF token missing"). `useAuth()` handles this for you; you only deal with it when calling the endpoints directly (curl, an HTTP client, an integration test).
+
+The dance is the standard double-submit pattern: any ordinary `GET` response issues the Pyxle CSRF cookie (responses marked publicly cacheable skip it), and the POST must echo that cookie's value back in the `X-CSRF-Token` header (alongside the cookie itself):
+
+```bash
+# 1. Any GET issues the CSRF cookie — capture it in a cookie jar
+curl -s -c jar.txt http://localhost:8000/auth/me > /dev/null
+
+# 2. The token is the value of the Pyxle CSRF cookie
+TOKEN=$(awk '$6 ~ /csrf/ { print $7 }' jar.txt)
+
+# 3. POST with the cookie jar, echoing the token in the header
+curl -s -b jar.txt -H "X-CSRF-Token: $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"email": "ada@example.com", "password": "correct horse battery"}' \
+     http://localhost:8000/auth/login
+```
+
+The cookie and header names (and how to customise or exempt paths from the check) are documented in [Security → CSRF protection](https://pyxle.dev/docs/guides/security.md#csrf-protection). For token-authenticated API clients that can't run this dance, see the exempt-paths note under [JWT](#jwt-for-api-mobile-clients).
 
 ## Guards
 
@@ -10615,10 +11049,14 @@ type `pyxle dev`, this is what happens:
    round-trip is ~30-80ms; spawning a fresh subprocess per request would
    be 200-400ms. Details: [SSR § Worker pool mode](https://pyxle.dev/docs/architecture/ssr.md#worker-pool-mode).
 
-5. **Start the file watcher.** Pyxle watches `pages/`, `public/`, and any
-   global stylesheets/scripts. When a file changes, the watcher debounces
-   for 250ms (so saving twice in quick succession is one rebuild), then
-   recompiles only the changed files. Details:
+5. **Start the file watcher.** Pyxle watches `pages/` (plus any `dev.watch`
+   directories and global stylesheets/scripts) for hot reload. When a watched
+   file changes, the watcher debounces for 250ms (so saving twice in quick
+   succession is one rebuild), then recompiles only the changed files and
+   reloads the browser. Changes under `public/` are **not** rebuilt — static
+   assets are served live from disk and picked up on the next refresh (like
+   Next.js); the watcher only keeps `public/`'s file index current so a newly
+   added asset resolves without a restart. Details:
    [The dev server § The watcher](https://pyxle.dev/docs/architecture/dev-server.md#the-watcher).
 
 6. **Start Starlette on port 8000.** This is the ASGI app that actually
@@ -10627,15 +11065,18 @@ type `pyxle dev`, this is what happens:
    public assets, and a catch-all 404 handler. Details:
    [The dev server § The Starlette app](https://pyxle.dev/docs/architecture/dev-server.md#the-starlette-app).
 
-When all six are up, the console shows:
+When all six are up, the console shows a curated startup summary:
 
 ```
-✅ Initial build completed — 1 page(s) compiled
-✅ Vite dev server ready at http://127.0.0.1:5173 (0.20s)
-ℹ️  Starting Starlette on http://127.0.0.1:8000 (Vite proxy at http://127.0.0.1:5173)
+✅ Pyxle dev server ready in 512 ms
+ℹ️    Local:   http://127.0.0.1:8000
+ℹ️    Vite:    http://127.0.0.1:5173
+ℹ️    Routes:  1 page(s), 1 API route(s)
 ```
 
-You're ready to take requests.
+You're ready to take requests. The per-line Vite firehose and the step-by-step
+internal build chatter are hidden by default — pass `pyxle dev --verbose` to
+restore them. See [The dev server § lifecycle](https://pyxle.dev/docs/architecture/dev-server.md#lifecycle-in-one-diagram).
 
 ---
 
@@ -13393,7 +13834,7 @@ when you save a file, and how to read the dev server's source code.
 | `error_pages.py` (~140) | Discovers `error.pyxl` and `not-found.pyxl` boundaries |
 | `route_hooks.py` (~225) | Per-route middleware policies |
 | `middleware.py` (~75) | Loads custom user middleware modules |
-| `tailwind.py` (~300) | Optional Tailwind CSS watcher |
+| `tailwind.py` (~300) | Legacy standalone Tailwind v3 watcher (Tailwind v4 runs through the `@tailwindcss/vite` plugin instead) |
 | `csrf.py` (~160) | CSRF protection middleware |
 | `client_files.py` (~2170) | Bundled client runtime sources |
 | `scripts.py`, `styles.py` | Global script and stylesheet resolution |
@@ -13446,31 +13887,35 @@ $ pyxle dev
    │
    ▼
 6. Start the file watcher (watcher.py)
-   - Watch pages/, public/, global stylesheets/scripts
+   - Rebuild watch: pages/, dev.watch dirs, global stylesheets/scripts
+   - Index-only watch: public/ (served live — never rebuilds/reloads)
    - Debounce events for 250ms
-   - On change: rebuild via builder.py and reload registry
+   - On a rebuild-watch change: rebuild via builder.py and reload registry
    │
    ▼
 7. Start uvicorn on port 8000
    - The Starlette app is now serving requests
 ```
 
-When all seven steps are done, the console shows:
+When all seven steps are done, the console shows a curated startup summary:
 
 ```
-ℹ️  Starting Pyxle dev server on http://127.0.0.1:8000 with Vite proxy at http://127.0.0.1:5173
-ℹ️  Preparing Pyxle development server
-✅ Initial build completed — 14 page(s) compiled; 1 API module(s) copied
-ℹ️  Discovered 13 page route(s) and 1 API route(s)
-ℹ️  Launching Vite dev server: vite dev --config ... --port 5173
-ℹ️  [vite]   VITE v5.4.21  ready in 188 ms
-✅ Vite dev server ready at http://127.0.0.1:5173 (0.30s)
-ℹ️  Starting Starlette on http://127.0.0.1:8000 (Vite proxy at http://127.0.0.1:5173)
+✅ Pyxle dev server ready in 512 ms
+ℹ️    Local:   http://127.0.0.1:8000
+ℹ️    Vite:    http://127.0.0.1:5173
+ℹ️    Routes:  13 page(s), 1 API route(s)
 ```
 
-You can read those lines in order against the seven steps above —
-each `ℹ️` log is one piece of the lifecycle reporting that it's
-done.
+By default the per-line Vite firehose and the internal step-by-step lifecycle
+chatter (`Preparing …`, `Launching Vite …`, `Discovered … route(s)`, the raw
+`[vite] …` output) are hidden so the console stays readable. Each incremental
+rebuild then prints a single concise line (`✅ Rebuilt … in X ms`). Run
+`pyxle dev --verbose` (or `pyxle -v dev`) to restore the full firehose and the
+debug-level internals — every one of those hidden lines is emitted at debug
+level, so verbose mode surfaces the entire lifecycle for troubleshooting.
+
+Genuine signal — errors, warnings, the URLs, and rebuild success/failure — is
+always shown regardless of verbosity.
 
 ---
 
@@ -13499,7 +13944,7 @@ a `Starlette` instance with:
 - **Health endpoints** — `/healthz` and `/readyz` for orchestration.
 - **Catch-all 404** — walks up the request path looking for the
   nearest `not-found.pyxl` boundary.
-- **WebSocket route** at `/__pyxle/overlay` — used by the dev
+- **WebSocket route** at `/__pyxle__/overlay` — used by the dev
   overlay client.
 
 ### Middleware stack
@@ -13618,15 +14063,41 @@ new code.
 
 By default, the watcher observes:
 
-- `pages/` — recursive
-- `public/` — recursive
+- `pages/` — recursive, on the **rebuild** watch (a change runs
+  `build_once()` and reloads the browser)
+- Any directory listed in [`dev.watch`](https://pyxle.dev/docs/reference/configuration.md#development)
+  — also on the rebuild watch, so a shared Python module imported from
+  outside `pages/` (e.g. `lib/`) hot-reloads
 - Any file referenced in `globalStyles` or `globalScripts` config
+- `public/` — recursive, but on a **lightweight index-only** watch that
+  never rebuilds or reloads (see below)
 - The `pyxle.config.json` itself (changing the config triggers a
   full restart, not a hot-reload)
 
-It does **not** watch `node_modules/`, `.pyxle-build/`, `dist/`, or
-any dotfiles. Those are either output directories (changing them
-would loop) or noise.
+On the rebuild watch, generated build output is ignored so a rebuild's
+own writes don't trigger another rebuild: `.pyxle-build/` and
+`__pycache__/` trees, `*.pyc` bytecode, and `*.db`/`*.db-wal`/`*.db-shm`
+journals. A [`dev.ignore`](https://pyxle.dev/docs/reference/configuration.md#development) list
+adds extra glob patterns on top of these built-ins — it can add ignores
+but never clear them. The watcher does not watch `node_modules/` or
+`dist/`.
+
+### `public/` is served live, not rebuilt
+
+Changes under `public/` **do not** rebuild or reload the page — matching
+Next.js, which never rebuilds on `public/` changes. Public assets are
+served straight from disk (dev serves them with a revalidating
+`no-cache` header), so an **edited** file is reflected on the next
+request/refresh with no watcher action.
+
+The watcher still keeps a lightweight watch on `public/` for one job: a
+**newly created or deleted** file changes which URLs resolve, so those
+structural events refresh the static-file index the static middleware
+uses for its O(1) membership check. That's how a freshly added public
+asset becomes reachable without restarting `pyxle dev`. This index
+watch never calls `build_once()` and never touches the browser-reload
+channel. (`pyxle serve` builds the index once and runs no watcher — the
+production tree is immutable.)
 
 ---
 
@@ -13761,6 +14232,25 @@ Event types:
   client uses this to dismiss any visible error overlay.
 - `"reload"` — sent after a successful rebuild. The client triggers
   a soft reload of the current page.
+- `"log"` — a server-side `logging` record forwarded to the browser
+  devtools console (dev only). The payload carries the target
+  `console` method (`info`/`warn`/`error`/`debug`), the formatted
+  message, and the originating logger name; the client prints it
+  prefixed `[pyxle:server]`. A bounded `logging.Handler`
+  (`devserver/log_forwarding.py`) is attached to the root logger while
+  the dev server runs and detached on shutdown. It never blocks the
+  event loop, drops records when no client is connected or the send
+  fails, guards against re-entrancy, and throttles bursts. By default
+  only `INFO`+ from your own loggers is forwarded; `--verbose` also
+  forwards `DEBUG` and the framework's internal loggers. To make those
+  records reachable (Python's root logger defaults to `WARNING`, which
+  drops `INFO` before any handler sees it), the handler lowers the root
+  logger level to `INFO` (`DEBUG` under `--verbose`) for the lifetime of
+  the dev session and restores the previous level on shutdown. A side
+  effect is that if your app has configured its own root handler (e.g.
+  via `logging.basicConfig`), your `INFO` logs also become visible in the
+  terminal during `pyxle dev`. This is dev-only; `pyxle serve` never
+  touches your logging configuration.
 
 The browser-side overlay client lives in `pyxle/client/` and is
 included in the default scaffold.
@@ -14403,9 +14893,9 @@ The browser starts receiving bytes immediately. Practical effect:
   but time-to-first-paint is much faster than a non-streaming
   response would be.
 
-### What about React 18 streaming SSR?
+### What about React's streaming SSR?
 
-React 18 has its own streaming SSR via `renderToPipeableStream`,
+React has its own streaming SSR via `renderToPipeableStream`,
 which can interleave Suspense boundaries with the document. Pyxle
 *does not* use that yet — the current renderer uses
 `renderToString`, which is synchronous on the React side.
@@ -15632,16 +16122,24 @@ Under the hood:
 2. **Resolves the template.** Defaults to `default`. Templates live
    in `pyxle/templates/scaffold/` inside the package — they're
    shipped with `pyxle-framework`.
-3. **Copies the template files** into the new directory using
-   `shutil.copytree`. The template includes:
+3. **Renders the template files** into the new directory. A
+   `TemplateRegistry` composed from the user's choices maps each output path to
+   a `string.Template` resource under `pyxle/templates/scaffold/`, rendered with
+   a context (project name, framework requirement, feature-conditional
+   dependency lines, import alias). The always-present set includes:
    - `pages/index.pyxl` — a working "Hello, Pyxle" page
    - `pages/api/pulse.py` — a sample API route
-   - `package.json` — Vite + React 18 + Tailwind dependencies
+   - `package.json` — Vite 7 + React 19 (plus Tailwind/shadcn deps when chosen)
    - `pyxle.config.json` — minimal config (`{"middleware": []}`)
    - `requirements.txt` — pinned `pyxle-framework` version
-   - `postcss.config.cjs`, `tailwind.config.cjs` — Tailwind setup
+   - `jsconfig.json` + `vite.config.js` — import alias + Vite-ecosystem config
    - `public/` — favicon and a few static files
    - `.gitignore` — sensible defaults
+
+   Feature-conditional files: a Tailwind v4 CSS entry (or a plain-CSS +
+   CSS-Modules baseline when Tailwind is declined), and shadcn/ui's
+   `components.json` + `lib/utils.js` when selected. There are no
+   `tailwind.config`/`postcss.config` files — Tailwind v4 runs through Vite.
 4. **Optionally installs dependencies.** With `--install` (the
    default), runs `pip install -e .` and `npm install` in the new
    directory. With `--no-install`, skips both — useful for CI or
@@ -15692,7 +16190,7 @@ Runs the development server. The full lifecycle is documented in
 | `--debug / --no-debug` | `--debug` | Dev mode toggle |
 | `--config <path>` | `pyxle.config.json` | Config file path |
 | `--ssr-workers <n>` | from config | Override SSR worker count |
-| `--tailwind / --no-tailwind` | auto | Force/disable Tailwind watcher |
+| `--tailwind / --no-tailwind` | auto | Force/disable the legacy Tailwind v3 watcher |
 
 ### What it does
 
@@ -15711,20 +16209,19 @@ Source: `cli/__init__.py:247-398`.
 
 ### Tailwind handling
 
-Pyxle has optional first-class Tailwind support. The CLI auto-detects
-Tailwind by checking for `tailwind.config.cjs` or `tailwind.config.js`
-in the project root. If found:
+Tailwind is **opt-in** at `pyxle init`. When chosen, the scaffold uses
+**Tailwind v4** via the `@tailwindcss/vite` plugin: the generated Vite config
+(`devserver/client_files.py::_render_vite_config`) adds the plugin whenever the
+project's `package.json` depends on `@tailwindcss/vite`, so Tailwind compiles
+inside Vite's normal CSS pipeline with HMR — no config files, no separate
+process.
 
-- A separate Tailwind watcher process is spawned alongside Vite.
-- The watcher rebuilds the Tailwind CSS file whenever a Tailwind
-  source class changes.
-- When `postcss.config.cjs` *also* exists, the standalone Tailwind
-  watcher is *skipped* — Vite handles Tailwind via PostCSS instead,
-  which is faster and integrates with HMR.
-
-The flag `--tailwind / --no-tailwind` lets you force one mode or the
-other. Most users never touch it. Source:
-`cli/__init__.py:343-378`, `devserver/tailwind.py`.
+A **legacy** path remains for hand-configured Tailwind v3 projects: if the CLI
+finds a `tailwind.config.{cjs,js}` in the project root (and no PostCSS config),
+it spawns a standalone `tailwindcss --watch` process alongside Vite. The
+`--tailwind / --no-tailwind` flag forces or disables that legacy watcher; it has
+no effect on Tailwind v4 (Vite-plugin) projects. Source:
+`cli/__init__.py`, `devserver/tailwind.py`.
 
 ---
 
@@ -16402,7 +16899,7 @@ Python 3.10 or later. Python 3.12 is recommended.
 
 ### What Node.js version do I need?
 
-Node.js 18 or later. Node.js 20+ is recommended.
+Node.js **20.19** or later (Vite 7's minimum). Node 18 is end-of-life and no longer supported.
 
 ## `.pyxl` files
 
@@ -16416,7 +16913,7 @@ No. The Python and JSX sections are compiled into separate files. Python code ru
 
 ### Can I use any React library?
 
-Yes. Any npm package that works with React 18 and Vite should work. Install it via `npm install` and import it in your JSX section.
+Yes. Any npm package that works with React 19 and Vite should work. Install it via `npm install` and import it in your JSX section.
 
 ### Can I have multiple loaders in one file?
 
@@ -16480,7 +16977,7 @@ If you raise `LoaderError`, the nearest `error.pyxl` is rendered. Other exceptio
 
 ### Do I have to use Tailwind CSS?
 
-No. Tailwind is included in the scaffold for convenience, but you can remove it and use any CSS approach: plain CSS files, CSS Modules, Sass, CSS-in-JS libraries, etc.
+No. Tailwind is **opt-in** — `pyxle init` asks whether you want it. Decline it and a fresh project uses plain CSS and CSS Modules out of the box; you can also add Sass or any CSS-in-JS library. Choose it and you get Tailwind v4 wired into Vite. See [Styling](https://pyxle.dev/docs/guides/styling.md).
 
 ### How do I add a global CSS reset?
 
@@ -16565,11 +17062,11 @@ Run `pyxle install` or `npm install` in your project directory.
 
 ### The page renders without styles
 
-`pyxle dev` compiles Tailwind through PostCSS automatically when
-`postcss.config.cjs` is present (the scaffold default). If you removed
-that file or are on a custom stylesheet setup, re-check your
-[styling configuration](https://pyxle.dev/docs/guides/styling.md) — specifically that the
-relevant CSS is imported from a page or layout.
+Vite compiles every stylesheet you **import from a JSX module**, so the most
+common cause is a stylesheet that isn't imported anywhere. Make sure your CSS
+(e.g. `pages/styles/app.css`) is imported from a page or layout. If you enabled
+Tailwind, confirm that entry contains `@import "tailwindcss";`. See the
+[styling guide](https://pyxle.dev/docs/guides/styling.md).
 
 ### Hot reload is not working
 
@@ -16596,6 +17093,45 @@ Source: https://pyxle.dev/docs/changelog.md
 # Changelog
 
 Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include breaking changes — those are called out explicitly here. To upgrade, run `pip install --upgrade pyxle-framework`.
+
+## 0.7.0 — 2026-07-09
+
+- **Fix: `error.pyxl` renders even when an ancestor layout has a `@server` loader.** The error boundary is compiled wrapped in its layout chain like any page, but its render received no layout loader data — the layout component crashed on the missing props and the request silently fell back to the built-in error document (in dev *and* production, with no log). Boundary renders now execute ancestor layout loaders exactly like a normal page; a loader that fails during the boundary render no longer masks the boundary (it renders with error-only props and the failure is logged), and a boundary that itself fails now logs the fallback instead of swapping silently. Also: honest scope wording for `pyxle typecheck` (page JSX isn't checked without `checkJs` — planned, see [the typed-Pyxle roadmap](https://pyxle.dev/docs/guides/fully-typed-pyxle.md)), the pyxle-auth doc header says 0.4.0, the `useAuth` seed claim matches real SSR behavior, the `username-available` `reason` field is documented, six missing guides join the docs index, and three dead anchors are fixed.
+
+- **Pre-release verification fixes.** `PYXLE_SSR_WORKER_CONCURRENCY` now actually reaches the SSR worker (the sanitized spawn environment stripped it, making the documented knob a no-op). `SIGTERM` to `pyxle dev` — what process managers and IDE stop buttons send — tears down the whole child tree (Vite, esbuild, SSR workers) exactly like Ctrl-C instead of orphaning Vite on its port. A failed rebuild now broadcasts to the browser overlay (as the architecture docs promise), and reverting a file to its last-good content after a failed build correctly triggers the recovery rebuild instead of being hash-skipped. Assorted doc corrections: the overlay WebSocket path (`/__pyxle__/overlay`), the scaffold's generated `.env.local` in the project-structure tree, a verbatim `pyxle routes` sample, a legacy-Tailwind-v3 note in the styling guide, and MiB units in the security guide.
+
+- **Fix: React UI libraries that resolve to a CommonJS build no longer crash SSR.** A dependency without an `exports` map (e.g. `lucide-react`, common across the shadcn/ui ecosystem) resolved to its CommonJS build during the server render, whose `require('react')` failed with `Dynamic require of "react" is not supported` — a 500 on any page importing it. The SSR bundler now resolves dependencies **ESM-first** (prefers the `module`/ESM entry over CommonJS `main`, as Vite's SSR does), so those packages link cleanly against the runtime's React. A genuinely CommonJS-only package that still `require`s a runtime module now fails with an actionable error naming the module and the page, pointing at an ES-module version or `<ClientOnly>`, instead of the bare esbuild message. See [Third-party packages → CommonJS packages and SSR](https://pyxle.dev/docs/guides/third-party-packages.md#commonjs-packages-and-ssr).
+
+- **Docs: the road to a fully-typed Pyxle.** A new [roadmap page](https://pyxle.dev/docs/guides/fully-typed-pyxle.md) lays out where Pyxle's type story is heading — authoring your client in TypeScript and forwarding Python types across the boundary so your component's `data` is typed from the Python that produced it — grounded in what already works today (`pyxle check`, `pyxle typecheck`, Pydantic `@action` validation). JavaScript remains fully first-class; nothing here changes today's behavior.
+- **Breaking prerequisite: Node.js 20.19+ is now required.** Node 18 is end-of-life; Vite 7 (below) needs Node `>=20.19`. Update your Node before upgrading. The scaffold now declares `"engines": { "node": ">=20.19" }`, and [Installation](https://pyxle.dev/docs/getting-started/installation.md) states the new floor.
+- **Modernized scaffold — React 19, Vite 7, and an interactive `pyxle init`.** A fresh project now ships **React 19** and **Vite 7** (with the Vite-7-compatible `@vitejs/plugin-react` 5), and `pyxle init` is **interactive**: polished arrow-key prompts (highlighted defaults, Enter to accept) ask whether you want Tailwind CSS, whether you want shadcn/ui (only when Tailwind is on), and whether to customize the default `@/*` import alias — the value input appears only if you opt in — then scaffold only what you chose. Non-interactive callers (CI, scripts, non-TTY stdin) never block — pass `--yes` for defaults, or the explicit `--tailwind/--no-tailwind`, `--shadcn/--no-shadcn`, and `--import-alias` flags. `pyxle init .` (or `pyxle init` in an empty directory) scaffolds into the current directory and derives the project name from it. Fresh installs pass `npm audit` clean. See [Quick Start](https://pyxle.dev/docs/getting-started/quick-start.md).
+- **Tailwind CSS is now opt-in — and, when chosen, Tailwind v4 wired straight into Vite.** Previously every project got Tailwind v3 through a side-channel (`tailwind.config.cjs`, `postcss.config.cjs`, a pre-compiled `public/styles/tailwind.css`, and a standalone `tailwindcss --watch` process). That whole mechanism is gone. Choose Tailwind at `pyxle init` and you get **Tailwind v4** via the `@tailwindcss/vite` plugin and a single `@import "tailwindcss";` CSS entry — no config files, no separate watcher, no output-CSS-in-`public/`, and therefore no "Tailwind writes into a watched dir" rebuild loop. Pyxle adds the plugin to the Vite config it generates only when the project depends on `@tailwindcss/vite`. Decline Tailwind and you get a clean baseline where **plain CSS and CSS Modules** work out of the box (both verified in dev and build). CSS Module class names are generated deterministically, so the server-rendered markup and the client bundle match exactly — no React 19 hydration mismatch. See [Styling](https://pyxle.dev/docs/guides/styling.md).
+- **shadcn/ui support.** Choose shadcn at `pyxle init` (it implies Tailwind) and the scaffold pre-configures `components.json`, the `@` import alias, `lib/utils.js`, and a Tailwind v4 stylesheet with the shadcn theme — so `npx shadcn@latest add button` works with no `shadcn init` step. Every project also gets a root `vite.config.js` (re-exporting Pyxle's generated config) and a `jsconfig.json`, so the Vite ecosystem and editors find a config and resolve the import alias. Pyxle resolves that alias in both the Vite client build **and** the SSR runtime, so aliased imports render on the server too. See [Third-party packages → shadcn/ui](https://pyxle.dev/docs/guides/third-party-packages.md#shadcnui).
+- **Fix: streaming SSR no longer serializes across requests.** Concurrent requests to a page that streams (`<Suspense>` / `loading.pyxl`) used to render strictly one at a time: each connection's first byte arrived only after the *previous* stream had fully finished, so several visitors hitting the same slow page saw a time-to-first-byte staircase (roughly 0.5s, 1s, 3s, 6s…) even though each render was mostly idle waiting on its own boundaries. An SSR worker now handles many renders **concurrently** — overlapping requests all begin rendering immediately and interleave, so every visitor gets the shell in tens of milliseconds regardless of how many others are mid-render. Each render's per-request state (pathname, CSRF token, `<Head>` tags, inline styles) is isolated with `AsyncLocalStorage`, so interleaving can never render one visitor's token or head tags into another's page. As part of this, `pyxle serve` now **auto-sizes** its SSR worker pool by default (previously a single process), so production renders in parallel out of the box; `pyxle dev` still runs a single worker. In-worker render concurrency defaults to 16 and is tunable with `PYXLE_SSR_WORKER_CONCURRENCY`. See the [Streaming guide](https://pyxle.dev/docs/guides/streaming.md#concurrent-streams-dont-queue), [Deployment → SSR workers](https://pyxle.dev/docs/guides/deployment.md#ssr-workers), and [Environment variables](https://pyxle.dev/docs/guides/environment-variables.md#ssr-rendering).
+- **`pyxle init` no longer scaffolds a stale framework pin.** The generated `requirements.txt` used to hard-code `pyxle-framework>=0.4.1,<0.5`, so `pyxle install` in a fresh project silently *downgraded* the framework that scaffolded it. The requirement is now rendered from the running version — running `0.7.0` emits `pyxle-framework>=0.7.0,<0.8` (current release up to the next minor).
+- **`pyxle typecheck` now fails fast with a clear error when TypeScript isn't installed.** It previously fell back to `npx --yes tsc`, which resolves npm's placeholder `tsc` package — relaying its banner and ending with a self-contradictory "Type check failed with 0 error(s)". The command now checks for a real `tsc` (local `node_modules/.bin`, then global) *before* building and exits with `TypeScript is required for 'pyxle typecheck' — run: npm install --save-dev typescript` (or "run: npm install" when it's declared but not installed). A failed `tsc` run that produces no diagnostics now reports the exit code instead of "0 error(s)". See [TypeScript guide](https://pyxle.dev/docs/guides/typescript.md).
+- **Scaffolded `AGENTS.md` corrected on auto-injected names.** It claimed `LoaderError` had to be imported from `pyxle.runtime` — false since 0.6.1, and contradicted by the rest of the file. It now consistently documents that `server`, `action`, `LoaderError`, `ActionError`, `ValidationActionError`, and `invalidate_routes` are all auto-injected by the compiler.
+- **`pyxle check` works out of the box — `pyxle-langkit` is now a default dependency.** On a fresh install, `pyxle check` — quick-start step 6 — exited 1 on a brand-new scaffold with "JSX checker unavailable" because the JSX layer lived behind the undocumented `[langkit]` extra. The extra is no longer needed: `pip install pyxle-framework` now pulls in `pyxle-langkit`, so the full check (Python syntax, semantics, and JSX) passes on generated files with zero extra steps. The `[langkit]` extra remains for backward compatibility but is now redundant. See [Installation](https://pyxle.dev/docs/getting-started/installation.md) and [Quick Start](https://pyxle.dev/docs/getting-started/quick-start.md).
+- **Fix: the CSRF cookie no longer collides between Pyxle apps on the same host.** The cookie was literally `pyxle-csrf` with `Path=/`, and browsers scope cookies to a host — ignoring the port — so two Pyxle dev servers on `127.0.0.1` kept overwriting each other's token and every action in the other app failed with `403 CSRF token mismatch`. The default cookie name is now namespaced by the app's bind port (`pyxle-csrf-8000`), a stable per-app discriminator in dev *and* behind a production reverse proxy, and the document shell injects the effective name into every page (`window.__PYXLE_CSRF_COOKIE__`) so `<Form>`/`useAction` always read the right cookie. Pin an explicit name with the existing `csrf.cookieName` key. **Upgrade note:** a leftover `pyxle-csrf` cookie from an earlier version is simply ignored — the token re-issues under the namespaced name on the next page load; no action needed. See [Security → CSRF protection](https://pyxle.dev/docs/guides/security.md#csrf-protection) and [Configuration → CSRF](https://pyxle.dev/docs/reference/configuration.md#csrf).
+- **Fix: multipart forms (file uploads) now pass CSRF with a `_csrf_token` field.** Posting an action as `multipart/form-data` with a correct `_csrf_token` field was rejected with `403 CSRF token missing` — the middleware only read urlencoded bodies and the `X-CSRF-Token` header, so a progressive-enhancement `<Form>` containing a file input was broken before hydration. The middleware now stream-parses a multipart body just far enough to obtain `_csrf_token` (which `<Form>` renders before all other fields) and then replays the consumed bytes downstream untouched — file parts are never buffered by the CSRF layer, so uploads of any size work. The pre-token scan is capped at 1 MiB; past the cap (or when the field is absent) the request is rejected with a `403` that says exactly what to do: send the token in the `X-CSRF-Token` header, or place `_csrf_token` before the file fields. `missing` vs `mismatch` errors are now accurate on every path, including a new `CSRF cookie missing` message when a token is submitted without its cookie half. See [Security → Form bodies and uploads](https://pyxle.dev/docs/guides/security.md#form-bodies-and-uploads).
+- **`pyxle dev` output is clean and readable by default, with `--verbose` for the firehose.** The dev console used to dump Vite's raw line-by-line stdout and a wall of internal build chatter, burying the one thing you need — the URL. `pyxle dev` now prints a curated startup summary (the local URL, the Vite URL, the route count, and the total "ready in X ms"), a concise one-line notice per incremental rebuild (`Rebuilt … in X ms`), and any warnings or errors — nothing else. The raw `[vite] …` firehose and the step-by-step internals are hidden behind `--verbose` (or the global `pyxle -v dev`), which restores the full output for troubleshooting. Genuine signal — errors, warnings, the URLs, and rebuild success/failure — is always shown. `pyxle serve` (production) output is unchanged. See [CLI → pyxle dev](https://pyxle.dev/docs/reference/cli.md#pyxle-dev).
+- **Server-side logs now stream to the browser console during `pyxle dev`.** Your server-side `logging` output (from loaders, actions, and your own modules) is forwarded over the dev overlay's WebSocket to the browser devtools console, prefixed `[pyxle:server]` and mapped to the matching `console` method (`info`→`console.info`, `warning`→`console.warn`, `error`→`console.error`) — so you can follow server logs without leaving the browser. By default only `INFO`+ from your own loggers is forwarded; `--verbose` also forwards `DEBUG` records and the framework's internal loggers. The bridge is bounded and non-blocking (it never stalls the event loop, drops records when no tab is connected or a send fails, guards against re-entrancy, and throttles bursts), and is strictly development-only — it never runs under `pyxle serve` and never ships in the production bundle. See [CLI → pyxle dev](https://pyxle.dev/docs/reference/cli.md#pyxle-dev) and [Architecture → the error overlay](https://pyxle.dev/docs/architecture/dev-server.md#the-error-overlay).
+- **`public/` changes are picked up on refresh instead of triggering a rebuild (matching Next.js).** Editing, adding, or deleting a file under `public/` no longer runs a build pass or forces a browser reload. Static assets are served live from disk, so an edited file shows up on the next request/refresh, and dev now serves public assets with a revalidating `no-cache` header (previously a one-hour cache masked edits until it expired). The dev server keeps a lightweight watch on `public/` for the sole purpose of keeping its static-file index current, so a **newly added or removed** asset becomes (un)discoverable without restarting `pyxle dev`. This also removes the root cause of the Tailwind reload loop: with `tailwind.config.*` and no PostCSS config, the standalone `tailwindcss --watch` compiler writes `public/styles/tailwind.css` into the watched tree — that write used to trigger a rebuild that let Tailwind re-emit the CSS, a self-sustaining loop (about once a second, most visible on Linux). Because `public/` writes no longer rebuild, the loop cannot occur; genuine CSS edits still hot-reload through the `pages/styles/*.css` source path. The rebuild watch (`pages/` and any `dev.watch` extras) still ignores generated build output — `.pyxle-build`/`__pycache__` trees, `*.pyc` bytecode, and `*.db`/`*.db-wal`/`*.db-shm` journals. See [Styling → Legacy Tailwind v3 projects](https://pyxle.dev/docs/guides/styling.md#legacy-tailwind-v3-projects) and [Architecture → the watcher](https://pyxle.dev/docs/architecture/dev-server.md#the-watcher).
+- **Watch extra directories for hot reload with `dev.watch`, and ignore extra paths with `dev.ignore`.** Pyxle watches `pages/` for hot reload, but a shared Python module imported from outside it (e.g. `lib/` or `components/`) would not trigger a rebuild. A new `dev` config block closes that gap: `dev.watch` lists extra project-relative directories to also watch (a change under one runs the normal rebuild + module reload), and `dev.ignore` lists extra glob patterns to skip. `dev.ignore` is **additive** to the built-in generated-output ignores — those are load-bearing and always stay in force, so a user list can only add to them, never clear them. `dev.watch` entries must resolve inside the project root; a traversal path (`../…`) or absolute path is rejected at config load. Both default empty, and both are dev-only (ignored by `pyxle serve`). See [Configuration → Development](https://pyxle.dev/docs/reference/configuration.md#development).
+
+### Documentation
+- **The flagship WebSockets example no longer crashes SSR when copy-pasted.** The first example in the [WebSockets guide](https://pyxle.dev/docs/guides/websockets.md) passed `window.location.pathname` to `useWebSocket()` — evaluated during the server render, where `window` doesn't exist, so following the guide verbatim 500'd the page. The example now derives the socket path from the route's loader data (the loader returns the `room` segment; the component templates it into the same path the page was served from), and a callout explains the rule: the hook never *connects* during SSR, but its arguments are evaluated there — build paths from props/params, not browser globals.
+- **Fixed a broken `@action` example in the [pyxle-db docs](https://pyxle.dev/docs/plugins/pyxle-db.md).** The request-scoped-access example inserted an undefined `title` instead of reading the request body; it now uses `body = await request.json()` (`request.json` is an async method — subscripting it without awaiting fails at runtime), matching the [Server Actions](https://pyxle.dev/docs/core-concepts/server-actions.md) page.
+- **Documented CSRF on the pyxle-auth credential endpoints.** `POST /auth/login` / `/auth/signup` / `/auth/logout` are CSRF-protected like every state-changing POST, so a raw curl per the old docs got `403` with no explanation. A new [CSRF subsection](https://pyxle.dev/docs/plugins/pyxle-auth.md#csrf) states this, explains the double-submit dance (any GET issues the token cookie; echo it via the `X-CSRF-Token` header), notes that `useAuth()` does it automatically, and shows a working curl sequence.
+- **Documented where pyxle-auth accounts live.** A new [Where accounts live](https://pyxle.dev/docs/plugins/pyxle-auth.md#where-accounts-live) section covers the SQLite database auto-created at `data/app.db` on first run (no manual migration step) and how to point at a production database via pyxle-db's `url` setting; the [pyxle-db settings docs](https://pyxle.dev/docs/plugins/pyxle-db.md#plugin-settings) now also state that the file and its directory are created automatically.
+- **Honest scope note on `pyxle check`.** The [CLI reference](https://pyxle.dev/docs/reference/cli.md#pyxle-check) now spells out that a green check validates syntax and semantics but does not prove a page renders — runtime-only mistakes (e.g. a component reading a loader key that doesn't exist) surface when the page loads, not in `check`. It also notes that as of 0.7.0 the JSX level works out of the box, since pyxle-langkit ships with the framework (previously the `[langkit]` extra).
+- **Prerequisites up front.** The [Introduction](https://pyxle.dev/docs/getting-started/introduction.md) now says on page one that Pyxle needs Python 3.10+ (3.12 recommended) and Node.js 20.19+ with npm, matching [Installation](https://pyxle.dev/docs/getting-started/installation.md).
+- **`Accept: text/markdown` negotiation now follows RFC 9110.** The check used to be a substring match on the raw `Accept` header, which ignored q-values entirely — `text/html, text/markdown;q=0` served Markdown even though `q=0` means *not acceptable*, and `text/html;q=0.9, text/markdown;q=0.8` served Markdown even though HTML was preferred. The header is now properly parsed: media types match by exact type/subtype token (no substrings — `text/markdownish` no longer counts), q-values are honoured (`q=0` excludes; default `1.0`, clamped to `0..1`), wildcards like `*/*` never select Markdown, ties go to Markdown, and malformed headers never raise — they fall back to HTML. Since negotiated responses carry `Vary: Accept`, shared caches now key on the correct variant. New public helper: `pyxle.devserver.llms.markdown_is_acceptable(accept)`. See [AI accessibility → Negotiation rules](https://pyxle.dev/docs/guides/llms.md#negotiation-rules).
+- **The generated `/llms.txt` no longer advertises Markdown that isn't there.** The default index used to emit relative links and to link every concrete page's `.md` URL — including pages whose `.md` URL just `307`-redirects to HTML. It now emits **absolute URLs** derived from the request's scheme and host (proxy headers respected), links `.md` only for pages whose Markdown actually resolves (a co-located `.md`, a `to_markdown` handler, an ancestor `llms.py` — or every page when `autoConvert` is on), and lists the rest at their canonical HTML URL. Custom `llms_txt` hooks are unaffected; `ctx.render_default()` returns the improved index. See [AI accessibility → The /llms.txt index](https://pyxle.dev/docs/guides/llms.md#the-llmstxt-index).
+- **Converted Markdown keeps agents on the Markdown channel** (breaking behavior change). `autoConvert` output — and the public `html_to_markdown()` helper — now rewrites internal page links to their `.md` renditions: `[About](/about)` becomes `[About](/about.md)`, preserving query strings and fragments (`/about?x=1#y` → `/about.md?x=1#y`). External URLs, `mailto:`/`tel:` links, `/api/` routes, asset paths with a file extension, and links already ending in `.md` are untouched, and `wrap_markdown` hooks receive the rewritten Markdown. **Breaking:** `html_to_markdown()` rewrites by default — pass `rewrite_links=False` for the old verbatim behavior. See [AI accessibility → autoConvert](https://pyxle.dev/docs/guides/llms.md#autoconvert-the-lossy-fallback).
+- **Fix: a burst of rapid file saves can no longer kill the dev server.** Two dev-server robustness fixes land together. First, build passes are now serialized and `meta.json` is written atomically and only when its content changed — previously a debounce-timer race could run two rebuilds at once, and one pass reading the build metadata mid-write misdiagnosed it as a schema mismatch and wiped the whole `.pyxle-build` cache, deleting and recreating `vite.config.js`. Vite answers a config change with a full restart, and a restart racing the next rebuild could die (`[vite] process exited`), leaving nothing listening until a manual restart. Second, the Vite subprocess is now properly supervised: **any** exit the dev server didn't initiate — including a "clean" exit code 0 — logs a clear warning and relaunches Vite with a short exponential backoff (0.5s, doubling) and a bounded budget (3 consecutive attempts). If relaunching keeps failing, a structured `ViteSupervisionError` is surfaced loudly in the terminal instead of a silently dead asset server.
+- **Fix: touching `request.state.<name>` without the providing plugin now explains itself.** A loader or `@action` that reads a `request.state` attribute nothing populated (most commonly `request.state.db` without the pyxle-db plugin) used to 500 with a bare `AttributeError: 'State' object has no attribute 'db'` and a raw traceback that pointed nowhere. The framework now detects exactly this case and reports it as a structured error with guidance: state attributes are provided by plugins or middleware — e.g. `request.state.db` requires the pyxle-db plugin in `pyxle.config.json` (`"plugins": ["pyxle-db"]`). In dev the message appears in the error overlay, the action's JSON error, and the server log (with the original traceback chained); in production the response stays generic, as always. Any other `AttributeError` from your code flows through unchanged.
+- **Actionable SSR error when a component touches a browser global.** A component that evaluates `window`, `document`, `navigator`, `localStorage`, `sessionStorage`, `location`, `matchMedia`, or `requestAnimationFrame` at render scope used to fail SSR with a bare `window is not defined` and a traceback of framework frames — naming the route but never your file, with no hint at the fix. Dev mode (error page, overlay, log) now explains that browser globals don't exist during server-side rendering, names the page's `.pyxl` source file, and gives the remedy: move the browser-only code into a `useEffect` hook or an event handler, or render the subtree with `<ClientOnly>` — see the [Client Components guide](https://pyxle.dev/docs/guides/client-components.md). Production responses stay generic (no file paths or internals in the body); the enriched explanation goes to the server log. `ReferenceError`s on other names, and all other render errors, flow through exactly as before.
 
 ## 0.6.1 — 2026-07-01
 
@@ -16629,6 +17165,7 @@ changes below are called out explicitly.
 - **Fix: scaffold `.gitignore` no longer ignores `.env`.** A fresh `pyxle init` git-ignored `.env` even though the env-vars doc tells you to commit `.env` / `.env.development` / `.env.production` and ignore only the `.local` variants. The scaffold now matches the doc.
 - **Fix: `<Image>` emits a lowercase `fetchpriority` attribute.** The `priority` image rendered camelCase `fetchPriority`, which React 18.3.1 rejects with an unknown-prop warning on every such image. It now emits the valid lowercase HTML attribute.
 - **Fix: production gzip no longer prints `I/O operation on closed file`.** `StreamingGZipMiddleware` now closes its `GzipFile` + buffer deterministically on every path (small/already-encoded responses, and streams interrupted mid-flight), so the GC no longer finalizes an open compressor and the noisy `Exception ignored while finalizing file … I/O operation on closed file` stderr messages are gone.
+- **Fix: the scaffolded `jsconfig.json` no longer trips TypeScript's `baseUrl` deprecation.** VS Code (TypeScript 6+) flags `baseUrl` as deprecated — slated for removal in TS 7 — so every fresh project opened with a warning on a file Pyxle generated. The scaffold now declares the import alias with tsconfig-relative `paths` only (`"@/*": ["./*"]`), which resolves identically without `baseUrl`; editors, Vite, the SSR runtime, and shadcn/ui all read the alias the same way as before.
 - **Fix: `pyxle typecheck` works out of the box on current TypeScript.** The generated `tsconfig.json` used `moduleResolution: "node10"` and `baseUrl`, both deprecated in TypeScript 7.0, so `tsc` failed with TS5107/TS5101 on a new-enough TypeScript. It now uses `"bundler"` resolution (correct for the Vite/esbuild pipeline) with tsconfig-relative `paths` and no `baseUrl`.
 - **Startup warning when a `BaseHTTPMiddleware` is paired with streaming routes.** A custom middleware subclassing Starlette's `BaseHTTPMiddleware` buffers the whole response, which breaks streaming SSR (a `<Suspense>` page would arrive all at once / raise `No response returned` on a mid-stream disconnect). Pyxle now logs a clear warning at startup naming the offending middleware class and pointing to the pure-ASGI pattern. See [Middleware](https://pyxle.dev/docs/guides/middleware.md).
 - **Clear compile-time error for TypeScript syntax in a client block.** A `.pyxl` client block is plain JSX — type annotations (`const x: number`), `interface`, generics, and `as` casts aren't supported there. Previously such syntax slipped past the compiler (Babel parses it) and failed later in esbuild/Vite with a confusing message pointing into a generated `.pyxle-build` path. The compiler now detects it up front and raises a clear error pointing at your `.pyxl` source line: "TypeScript syntax (…) isn't supported in a .pyxl client block yet — keep the client half plain JSX." Detection is AST-based (any TS-only node), so valid JSX — ternaries, object literals, the `as` prop — is never flagged. See [TypeScript](https://pyxle.dev/docs/guides/typescript.md).
