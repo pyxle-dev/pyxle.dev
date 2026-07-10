@@ -86,6 +86,8 @@ const NAV_STRUCTURE = [
       { file: "guides/plugins.md", slug: "plugins" },
       { file: "guides/environment-variables.md", slug: "environment-variables" },
       { file: "guides/error-handling.md", slug: "error-handling" },
+      { file: "guides/testing.md", slug: "testing" },
+      { file: "guides/debugging.md", slug: "debugging" },
       { file: "guides/client-components.md", slug: "client-components" },
       { file: "guides/security.md", slug: "security" },
       { file: "guides/observability.md", slug: "observability" },
@@ -189,6 +191,8 @@ const SEARCH_KEYWORDS = {
   "guides/websockets": ["websocket", "websockets", "ws", "wss", "realtime", "real-time", "pub/sub", "pubsub", "channel", "room", "broadcast", "useWebSocket", "live", "chat", "socket"],
   "guides/api-routes": ["api", "rest", "json api", "endpoint", "websocket", "starlette"],
   "guides/background-tasks": ["background", "background tasks", "tasks", "queue", "async", "fire and forget", "deferred", "post-response", "celery", "arq", "dramatiq", "job queue", "enqueue", "request.state.background", "send email", "webhook"],
+  "guides/testing": ["test", "testing", "tests", "pytest", "unit test", "unit testing", "end-to-end", "e2e", "test client", "pyxle.testing", "load_loader", "load_page", "test a loader", "test an action", "httpx", "mock request", "fake request", "PyxleTestClient"],
+  "guides/debugging": ["debug", "debugging", "pdb", "breakpoint", "traceback", "error overlay", "server logs", "console.log", "inspect", "node inspector", "ssr error", "compiled output", ".pyxle-build", "window is not defined", "stack trace", "logging"],
   "guides/middleware": ["middleware", "request hook", "auth guard"],
   "guides/plugins": ["plugin", "plugins", "installed apps", "extensions", "packages"],
   "guides/environment-variables": ["env", "environment variables", "secrets", "dotenv", ".env", "config"],
@@ -797,7 +801,7 @@ function build() {
   // Regenerated from NAV_STRUCTURE so it can never drift from the site.
   const PUBLIC_DIR = join(__dirname, "..", "public");
   const TAGLINE =
-    "Python and React in one file. A Python-first full-stack framework where @server loaders and @action mutations sit beside real React 18 (SSR + hydration) in a single .pyxl file — file-based routing, no API plumbing, no separate front-end build to wire up.";
+    "Python and React in one file. A Python-first full-stack framework where @server loaders and @action mutations sit beside real React 19 (SSR + hydration) in a single .pyxl file — file-based routing, no API plumbing, no separate front-end build to wire up.";
   const oneLine = (s) => (s || "").replace(/\s+/g, " ").trim();
 
   const llms = [`# Pyxle`, ``, `> ${TAGLINE}`, ``];

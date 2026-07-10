@@ -1,6 +1,6 @@
 # Pyxle
 
-> Python and React in one file. A Python-first full-stack framework where @server loaders and @action mutations sit beside real React 18 (SSR + hydration) in a single .pyxl file — file-based routing, no API plumbing, no separate front-end build to wire up.
+> Python and React in one file. A Python-first full-stack framework where @server loaders and @action mutations sit beside real React 19 (SSR + hydration) in a single .pyxl file — file-based routing, no API plumbing, no separate front-end build to wire up.
 
 ## Getting Started
 
@@ -34,6 +34,8 @@
 - [Plugins](https://pyxle.dev/docs/guides/plugins.md): Pyxle plugins are reusable pieces of functionality — database layers, auth systems, storage adapters — that a host app composes via `pyxle.config.json` rather than hand-wiring in its entry point. The
 - [Environment Variables](https://pyxle.dev/docs/guides/environment-variables.md): Pyxle loads environment variables from `.env` files and supports special prefixes for configuration overrides and client-side injection.
 - [Error Handling](https://pyxle.dev/docs/guides/error-handling.md): Pyxle provides structured error handling through error exceptions, error boundaries, and not-found pages.
+- [Testing](https://pyxle.dev/docs/guides/testing.md): Pyxle apps are mostly plain Python — your `@server` loaders and `@action` handlers are ordinary `async` functions, and your business logic is whatever Python you write. That means you can test with th
+- [Debugging](https://pyxle.dev/docs/guides/debugging.md): A Pyxle app has two runtimes: **Python** (your `@server` loaders, `@action` handlers, and the request pipeline) and **Node.js** (the SSR worker that renders your React components to HTML). Knowing whi
 - [Client Components](https://pyxle.dev/docs/guides/client-components.md): Pyxle provides built-in React components and hooks importable from `pyxle/client`.
 - [Security](https://pyxle.dev/docs/guides/security.md): Pyxle includes CSRF protection, CORS support, and HEAD element sanitisation out of the box.
 - [Observability](https://pyxle.dev/docs/guides/observability.md): Pyxle gives every request a **correlation id** and measures how long it takes — on by default, with no setup. Both are cheap enough (a `uuid4` and two `perf_counter` reads, no I/O) to run on every req

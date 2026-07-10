@@ -30,6 +30,8 @@
   <url><loc>https://pyxle.dev/docs/guides/plugins</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/environment-variables</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/error-handling</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/testing</loc><priority>0.7</priority></url>
+  <url><loc>https://pyxle.dev/docs/guides/debugging</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/client-components</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/security</loc><priority>0.7</priority></url>
   <url><loc>https://pyxle.dev/docs/guides/observability</loc><priority>0.7</priority></url>
