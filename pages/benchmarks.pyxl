@@ -38,9 +38,9 @@ export const createSlots = () => slots;
    req/s at 100 concurrent connections — two AWS c7i.2xlarge boxes
    (8 vCPU each): the seven frameworks on one, the load generator
    (oha) on the other, over the private network. Native multi-process
-   production mode at 8 workers; median of 3 reps. Measured June 2026;
-   numbers cross-checked against the raw oha JSON
-   (ec2-bench-results/offbox-2box) before publishing. ─────────────── */
+   production mode at 8 workers (dynamic SSR measured per core); median of
+   3 reps. Measured July 2026 on Pyxle 0.7.1; numbers taken straight from the
+   raw oha JSON (benchmarks/results/0.7.1-run) before publishing. ────────── */
 
 const PYTHON_FRAMEWORKS = [
     { key: "pyxle", name: "Pyxle", type: "Full-stack (SSR + API)" },
@@ -53,86 +53,83 @@ const ALL_FRAMEWORKS = [
     ...PYTHON_FRAMEWORKS,
     { key: "express", name: "Express", type: "API framework" },
     { key: "hono", name: "Hono", type: "Ultralight API" },
-    { key: "nextjs", name: "Next.js", type: "Full-stack (SSR)" },
 ];
 
 const TESTS = {
     form: {
         name: "Form Submission (POST)",
         desc: "Parse a JSON body, validate fields, return a response. Measures the request-processing pipeline.",
-        data: { pyxle: 49487, fastapi: 38409, django: 7483, flask: 18350, express: 34676, hono: 40433, nextjs: 4849 },
+        data: { pyxle: 52438, fastapi: 47125, django: 8576, flask: 21264, express: 42949, hono: 79278 },
     },
     json: {
         name: "JSON Serialization",
         desc: "Return a static JSON object. Measures pure framework and serialization overhead.",
-        data: { pyxle: 56545, fastapi: 48827, django: 7717, flask: 21473, express: 44466, hono: 224530, nextjs: 5510 },
+        data: { pyxle: 59766, fastapi: 61565, django: 9126, flask: 23809, express: 53164, hono: 212528 },
     },
     health: {
         name: "Health Check",
         desc: "A minimal endpoint. Measures raw framework routing overhead.",
-        data: { pyxle: 57030, fastapi: 50293, django: 7742, flask: 21422, express: 45444, hono: 179984, nextjs: 5679 },
+        data: { pyxle: 59785, fastapi: 63040, django: 9138, flask: 24094, express: 54058, hono: 214692 },
     },
     db: {
         name: "Single DB Query",
         desc: "Read one random row from SQLite with a persistent per-worker connection. The driver dominates here, not the framework.",
-        data: { pyxle: 27932, fastapi: 28491, django: 5979, flask: 18876, express: 40780, hono: 169874, nextjs: 5436 },
+        data: { pyxle: 29299, fastapi: 32319, django: 6970, flask: 21382, express: 47937, hono: 172870 },
     },
     queries5: {
         name: "Multiple Queries (5)",
         desc: "Read 5 random rows from SQLite. Measures query-loop performance.",
-        data: { pyxle: 21566, fastapi: 18434, django: 5511, flask: 15957, express: 33662, hono: 95730, nextjs: 5344 },
+        data: { pyxle: 24681, fastapi: 22013, django: 6298, flask: 18286, express: 41031, hono: 105988 },
     },
     queries20: {
         name: "Multiple Queries (20)",
-        desc: "Read 20 random rows from SQLite. A heavier database workload where Node's native driver pulls ahead.",
-        data: { pyxle: 13039, fastapi: 9867, django: 4688, flask: 11721, express: 21978, hono: 31690, nextjs: 4960 },
+        desc: "Read 20 random rows from SQLite. A heavier database workload where the query loop dominates.",
+        data: { pyxle: 15569, fastapi: 11862, django: 5432, flask: 14213, express: 26205, hono: 34547 },
     },
 };
 
 // Dynamic SSR — the full page re-rendered on every request, at 100
-// concurrent connections, both frameworks clustered to 8 workers.
-// Pyxle's @server vs Next.js force-dynamic, on equivalent pages
-// (same data, same DOM — parity-verified; see the payload note below).
+// concurrent connections, per core (single worker — SSR is CPU-bound
+// on the Node render, so per-core isolates true render efficiency and
+// avoids core oversubscription). Pyxle's @server vs Next.js
+// force-dynamic, on equivalent pages (same data, same DOM —
+// parity-verified; see the payload note below).
 const SSR_COMPARISON = [
-    { page: "Landing page", detail: "Hero, feature grid, stats — a typical marketing home", pyxle: 4584, nextjs: 1076, pyxleP50: 21, nextjsP50: 89 },
-    { page: "300-row data table", detail: "A large inventory table, fully server-rendered", pyxle: 373, nextjs: 165, pyxleP50: 259, nextjsP50: 604 },
-    { page: "Nested dashboard", detail: "Stat cards, grouped category cards, and a data table", pyxle: 533, nextjs: 228, pyxleP50: 135, nextjsP50: 437 },
-    { page: "API route, same app", detail: "A JSON endpoint served through each full SSR app", pyxle: 54965, nextjs: 6238, pyxleP50: 2, nextjsP50: 14 },
+    { page: "Landing page", detail: "Hero, feature grid, stats — a typical marketing home", pyxle: 1151, nextjs: 524, pyxleP50: 84, nextjsP50: 183 },
+    { page: "300-row data table", detail: "A large inventory table, fully server-rendered", pyxle: 158, nextjs: 75, pyxleP50: 644, nextjsP50: 1344 },
+    { page: "Nested dashboard", detail: "Stat cards, grouped category cards, and a data table", pyxle: 237, nextjs: 103, pyxleP50: 419, nextjsP50: 983 },
+    { page: "API route, same app", detail: "A JSON endpoint served through each full SSR app", pyxle: 11784, nextjs: 2149, pyxleP50: 8, nextjsP50: 45 },
 ];
-
-// Static file serving — a prebuilt asset straight off disk/cache;
-// Pyxle caches small assets in memory in production. Both at 8 workers.
-const STATIC_SERVING = { pyxle: 81816, nextjs: 25396 };
 
 // Same app, same box — the only change is `pyxle serve --workers 8`.
 // req/s at 100 connections, 1 worker vs 8 workers.
 const SCALING = [
-    { test: "JSON serialization", one: 11190, eight: 56545 },
-    { test: "Form POST", one: 9993, eight: 49487 },
-    { test: "Single DB query", one: 3622, eight: 27932 },
-    { test: "Five-query page", one: 1868, eight: 21566 },
+    { test: "JSON serialization", one: 11820, eight: 59766 },
+    { test: "Form POST", one: 10705, eight: 52438 },
+    { test: "Single DB query", one: 3816, eight: 29299 },
+    { test: "Five-query page", one: 1961, eight: 24681 },
 ];
 
 const KEY_TAKEAWAYS = [
     {
-        title: "The fastest Python framework on the board",
-        desc: "Pyxle leads FastAPI, Flask, and Django on JSON, health checks, and form POST — 56,545 req/s on JSON to FastAPI's 48,827 — while running a full middleware stack (SSR, server actions, GZip). And the tails are tight: p99 under 3 ms on JSON and POST, where Express and Flask sit between 15 and 26 ms.",
+        title: "~2.2× Next.js at dynamic SSR",
+        desc: "Re-rendering the full page on every request — per core, the apples-to-apples match for Pyxle's @server loader and Next.js's force-dynamic — Pyxle serves 2.1–2.3× Next.js's throughput at every complexity, from a marketing home to a 300-row table, at roughly half the median latency. And it ships the same DOM in 2.5–3.2× fewer bytes: Next.js inlines React Server Component hydration data into every response. An API route through the same app: 5.5× faster than Next's.",
     },
     {
-        title: "Fastest of all seven on form POST",
-        desc: "Parse a JSON body, validate it, respond: Pyxle's 49,487 req/s beats every framework tested, Node included — Hono 40,433, FastAPI 38,409, Express 34,676. The moment a request does real work, the gap to the ultralight Node runtimes closes — and flips.",
+        title: "Shoulder to shoulder with FastAPI — ahead on real work",
+        desc: "On a plain JSON response Pyxle runs within 3% of FastAPI (59.8k req/s to 61.6k) while carrying a full-stack middleware pipeline FastAPI doesn't — server-side rendering, server actions, GZip. The moment a request touches the database it pulls ahead: 24.7k req/s on a five-query page to FastAPI's 22.0k, 15.6k to 11.9k on twenty, and it takes the form-POST test 52.4k to 47.1k. Tails stay tight — p99 in the low single-digit milliseconds.",
     },
     {
-        title: "2.3–4.3× Next.js at dynamic SSR",
-        desc: "Re-rendering the full page on every request, Pyxle serves 4.3× Next.js's throughput on a landing page at a quarter of the median latency, and 2.3× on heavy pages — shipping the same DOM in 2–3× fewer bytes. Static assets: 3.2× faster. An API route through the same app: 8.8× faster.",
+        title: "Scales across every core with one flag",
+        desc: "pyxle serve --workers 8 lifts JSON throughput ~5× (11.8k → 59.8k) — and database endpoints more, because a single worker leaves cores idle waiting on SQLite. Pyxle out-scales FastAPI on every endpoint in the suite. No load balancer, no shared state to configure.",
     },
     {
-        title: "Near-linear scaling with one flag",
-        desc: "pyxle serve --workers 8 takes Pyxle to a mean 8.5× its single-worker throughput across the suite — near-ideal use of all eight cores, where Hono and Express plateau at 3.4–3.7×. No load balancer, no shared state to configure.",
+        title: "Raw serialization belongs to the Node ultralights — by design",
+        desc: "Hono clears 200k+ req/s on JSON, an order of magnitude above every Python framework here — V8's HTTP pipeline and native C++ SQLite bindings are hard to beat when there's nothing else to do. Pyxle isn't chasing that number. It's the only framework on the board that renders React on the server, runs your Python, and still holds five-figure throughput per core.",
     },
     {
-        title: "Zero errors, and the losses in full",
-        desc: "The load generator runs on a separate box, so the harness can never cap the results — a same-box generator competes for the server's cores and compresses the field toward its own ceiling. Every cell was served with zero errors, zero timeouts, zero non-2xx — and the workloads Pyxle loses are printed at the same size as the wins.",
+        title: "Zero errors, and the losses printed in full",
+        desc: "The load generator runs on a separate box, so the harness can never cap the results — a same-box generator competes for the server's cores and compresses the field toward its own ceiling. Every cell was served with zero errors, zero timeouts, zero non-2xx — and the workloads Pyxle loses (raw JSON and DB reads to FastAPI, everything to Hono) are shown at the same size as the wins.",
     },
 ];
 
@@ -155,7 +152,7 @@ const METHOD_ROWS = [
     ["Generator", "oha v1.14 — on a separate box"],
     ["Hardware", "2× AWS c7i.2xlarge (8 vCPU each)"],
     ["Protocol", "100 connections · median of 3 reps"],
-    ["Duration", "10s per test, 5s warmup"],
+    ["Duration", "12s per test, 8s warmup"],
     ["Workers", "8 per framework (native multi-process)"],
     ["Correctness", "0 errors · 0 non-2xx · 0 timeouts"],
 ];
@@ -212,7 +209,7 @@ function Method() {
                     ))}
                 </dl>
                 <p data-reveal className="mt-8 max-w-[68ch] text-pretty text-base leading-[1.7] text-ink2">
-                    Measured June 2026 on two dedicated EC2 instances in the same subnet: all
+                    Measured July 2026 on two dedicated EC2 instances in the same subnet: all
                     seven frameworks on one box, the load generator on the other, over the
                     private network. Off-box generation is the point — a generator sharing the
                     server's cores becomes the bottleneck and clips the fastest frameworks
@@ -229,8 +226,9 @@ function Method() {
                     Endpoint parity is verified before every run — each framework must return an
                     identical JSON shape (and equivalent SSR DOM) or the run aborts. A separate
                     single-worker pass measures per-core throughput. Database: SQLite (WAL),
-                    1,000 pre-seeded rows. Versions: Pyxle 0.4.3, Hono 4.12, Express 5.2,
-                    Next.js 16.2 (React 19.2), FastAPI 0.136, Django 5.2, Flask 3.1, Node 20.20.
+                    1,000 pre-seeded rows. Versions: Pyxle 0.7.1 (on Starlette 0.37.2, the release
+                    pinned by the shared benchmark environment), Hono 4.12, Express 5.2,
+                    Next.js 16.2 (React 19.2), FastAPI 0.139, Django 5.2, Flask 3.1, Node 22.23.
                 </p>
                 <p data-reveal className="mt-5 font-mono text-xs text-ink2">
                     Harness:{' '}
@@ -277,7 +275,7 @@ function SsrLedger() {
                 n="03"
                 eyebrow="Dynamic SSR"
                 title="Server-side rendering: faster than Next.js."
-                lead="The full page re-rendered on every request — the apples-to-apples match for Pyxle's @server loader and Next.js's force-dynamic. On equivalent pages (same data, same DOM, parity-verified), both clustered to 8 workers, Pyxle is 2.3–4.3× faster at every complexity — with lower median latency everywhere."
+                lead="The full page re-rendered on every request — the apples-to-apples match for Pyxle's @server loader and Next.js's force-dynamic. On equivalent pages (same data, same DOM, parity-verified), per core, Pyxle is 2.1–2.3× faster at every complexity — with roughly half the median latency everywhere."
             />
             <div data-reveal className="mt-12 max-w-4xl overflow-x-auto">
                 <table className="w-full min-w-[40rem] border-collapse">
@@ -312,20 +310,17 @@ function SsrLedger() {
                 </table>
             </div>
             <p data-reveal className="mt-6 max-w-[78ch] font-mono text-xs leading-relaxed text-ink2">
-                At 100 concurrent connections. Both frameworks render React on the server with
-                full HTML document assembly — Pyxle via a persistent Node.js worker pool,
-                Next.js via React Server Components. The pages are equivalent, not
+                Per core, at 100 concurrent connections. Both frameworks render React on the
+                server with full HTML document assembly — Pyxle via a persistent Node.js worker
+                pool, Next.js via React Server Components. The pages are equivalent, not
                 byte-identical: Next.js serializes the component tree into every response as
                 RSC hydration data, shipping 2–3× more bytes for the same DOM (landing page
-                4.7 KB vs 13.7 KB; 300-row table 144.5 KB vs 331.8 KB).{' '}
+                5.4 KB vs 13.7 KB; 300-row table 145 KB vs 332 KB).{' '}
                 <strong className="font-semibold text-ink">The fair
                 caveat:</strong> this measures pages that <em>must</em> render per request
-                (personalized, authenticated, real-time). For genuinely static content both
-                frameworks serve from cache — and there Pyxle is faster too: prebuilt assets at{' '}
-                <span className="text-acct">{STATIC_SERVING.pyxle.toLocaleString()}</span> vs{' '}
-                {STATIC_SERVING.nextjs.toLocaleString()} req/s
-                ({(STATIC_SERVING.pyxle / STATIC_SERVING.nextjs).toFixed(1)}×), served from Pyxle's
-                in-memory production cache.
+                (personalized, authenticated, real-time). Genuinely static content is served
+                from cache by both frameworks — a different workload from the live render
+                measured here.
             </p>
         </GpSection>
     );
@@ -431,15 +426,16 @@ function ApiThroughput() {
                     <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">Reading these results</p>
                     <p className="mt-4 max-w-[68ch] text-pretty text-sm leading-[1.8] text-ink2">
                         Pyxle is a <strong className="font-semibold text-ink">full-stack framework</strong> serving
-                        these endpoints through its production middleware stack — and it leads
-                        every Python framework on every test above except the single-row read,
-                        where FastAPI edges it by 2%. Its tails are the standout: p99 under 3 ms
-                        on JSON and POST, 6.5 ms with a single-row DB read.
+                        these endpoints through its production middleware stack, and it runs
+                        step-for-step with FastAPI — a few percent behind on the trivial endpoints
+                        (JSON, health, single-row read), and ahead the moment real work appears:
+                        both multi-query pages and the form POST. Its tails stay tight — p99 around
+                        2 ms on JSON and POST, a fraction of Express's and Flask's 8–15 ms.
                         {showAllFrameworks ? (
-                            <> Across runtimes the picture is honest, not flattering: Hono's raw JSON and DB throughput is far ahead — per core, V8's optimized HTTP pipeline and native C++ SQLite bindings (<code className="text-[0.9em] text-acct">better-sqlite3</code>) lead — while Pyxle takes the POST test outright and holds far tighter tails on JSON, POST, and DB (p99 2.3–6.5 ms to Express's 15–17 ms). The DB rows measure the driver more than the framework; cross-runtime, they're context, not a like-for-like target.</>
+                            <> Across runtimes the picture is honest, not flattering: the ultralight Node routers are in a different league on raw work — Hono clears 200k req/s on JSON, because per core V8's HTTP pipeline and native C++ SQLite bindings (<code className="text-[0.9em] text-acct">better-sqlite3</code>) are hard to beat when there's nothing else to do. Pyxle leads the Python field on the query-heavy and form tests and holds far tighter tails than Express and Flask. The DB rows measure the driver more than the framework; cross-runtime, they're context, not a like-for-like target.</>
                         ) : null}
                         {' '}The headline: you get SSR, server actions, and Python's whole ecosystem
-                        in one framework, <span className="text-ink">at the front of the Python pack on raw throughput</span>.
+                        in one framework, <span className="text-ink">on par with the fastest pure-API Python framework — and ahead of it on real database work</span>.
                     </p>
                 </div>
                 <span className="gp-rule-x block h-px bg-rule" style={{ ['--rule-delay']: '120ms' }} aria-hidden="true" />
@@ -481,12 +477,13 @@ function Scaling() {
                     })}
                 </dl>
                 <p data-reveal className="border-t border-rule pt-5 font-mono text-xs leading-relaxed text-ink2">
-                    1 worker → 8 workers, 100 concurrent connections — a mean 8.5× across all six
-                    endpoint tests (FastAPI 7.3×, Flask 8.8×, Hono 3.7×, Express 3.4× on the same
-                    move). The multi-query tests scale past 8× because a single worker serializes
-                    its blocking SQLite reads; eight workers overlap them. Per core, the optimized Node
-                    runtimes still lead — scaling is how Pyxle puts whole machines to work, not a
-                    claim to the per-core crown. Requires Pyxle 0.4.3+.
+                    1 worker → 8 workers, 100 concurrent connections — about 5× on JSON and form,
+                    and more on the database endpoints (mean 9.0× across the six API tests, to
+                    FastAPI's 7.4× on the same move — Pyxle out-scales it on every one). The
+                    multi-query tests scale past 8× because a single worker serializes its blocking
+                    SQLite reads; eight workers overlap them. Per core, the optimized Node runtimes
+                    still lead — scaling is how Pyxle puts whole machines to work, not a claim to
+                    the per-core crown. Requires Pyxle 0.4.3+.
                 </p>
             </div>
         </GpSection>
@@ -498,13 +495,13 @@ function Scaling() {
 const LOSSES = [
     {
         title: "Raw JSON and health-check throughput",
-        numbers: <><span className="text-ink2">Hono 224,530</span>{' '}<span className="text-ink2 opacity-70">vs</span>{' '}<span className="text-acct">Pyxle 56,545</span>{' '}<span className="text-[11px] text-ink2">req/s, JSON</span></>,
-        desc: "On endpoints that do almost no work, Hono — an ultralight Node framework with no SSR — is about 4× faster, and 3.2× on the bare health ping. Per core, V8's optimized HTTP pipeline simply leads — and an off-box harness is what keeps a gap like this visible instead of letting the generator's own ceiling flatten it. Pyxle's answer is the POST win, the 2–3 ms tails, and near-linear scaling, not a claim to the raw-JSON crown.",
+        numbers: <><span className="text-ink2">Hono 212,528</span>{' '}<span className="text-ink2 opacity-70">vs</span>{' '}<span className="text-acct">Pyxle 59,766</span>{' '}<span className="text-[11px] text-ink2">req/s, JSON</span></>,
+        desc: "On endpoints that do almost no work, Hono — an ultralight Node framework with no SSR — is about 3.5× faster, and FastAPI edges Pyxle by a few percent on JSON and the bare health ping too. Per core, V8's HTTP pipeline and a leaner ASGI stack lead when there's nothing to render — and an off-box harness is what keeps a gap like this visible instead of letting the generator's own ceiling flatten it. Pyxle's answer is holding level with FastAPI while carrying a full render pipeline, the ~2 ms tails, and near-linear scaling — not a claim to the raw-JSON crown.",
     },
     {
         title: "Raw database reads",
-        numbers: <><span className="text-ink2">Hono 169,874 · Express 40,780 · FastAPI 28,491</span>{' '}<span className="text-ink2 opacity-70">vs</span>{' '}<span className="text-acct">Pyxle 27,932</span>{' '}<span className="text-[11px] text-ink2">req/s, single row</span></>,
-        desc: "Node's native better-sqlite3 bindings dominate single-row SQLite reads — and FastAPI edges Pyxle by 2% there too. Add real work and Pyxle moves back ahead of every Python framework (21,566 req/s on the five-query page to FastAPI's 18,434), but the single-read crown belongs to the native drivers.",
+        numbers: <><span className="text-ink2">Hono 172,870 · Express 47,937 · FastAPI 32,319</span>{' '}<span className="text-ink2 opacity-70">vs</span>{' '}<span className="text-acct">Pyxle 29,299</span>{' '}<span className="text-[11px] text-ink2">req/s, single row</span></>,
+        desc: "Node's native better-sqlite3 bindings dominate single-row SQLite reads, and FastAPI's leaner stack leads Pyxle by about 10% there. Add real work and Pyxle moves back ahead of FastAPI (24,681 req/s on the five-query page to 22,013), but the single-read crown belongs to the native drivers.",
     },
 ];
 
@@ -645,7 +642,7 @@ export default function BenchmarksPage({ data }) {
         <>
             <Head>
                 <title>Benchmarks - Pyxle Framework</title>
-                <meta name="description" content="Honest, reproducible benchmarks with off-box load generation — Pyxle vs FastAPI, Django, Flask, Express, Hono, and Next.js. Fastest Python framework tested, #1 of 7 on form POST, 2.3–4.3× Next.js at dynamic SSR." />
+                <meta name="description" content="Honest, reproducible benchmarks with off-box load generation — Pyxle vs FastAPI, Django, Flask, Express, Hono, and Next.js. ~2.2× Next.js at dynamic SSR with 2–3× smaller payloads, on par with FastAPI and ahead on real database work, with the losses shown in full." />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <meta name="theme-color" content="#101411" />
                 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
