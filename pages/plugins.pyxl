@@ -252,7 +252,7 @@ export default function PluginsPage({ data }) {
         <>
             <Head>
                 <title>Plugins - Pyxle Framework</title>
-                <meta name="description" content="The Pyxle plugin directory: official plugins (pyxle-db, pyxle-auth) and five reserved founding slots for the community. Build a plugin that meets the published standards and claim one — permanently." />
+                <meta name="description" content="The Pyxle plugin directory: official plugins (pyxle-db, pyxle-auth, pyxle-mail) and five reserved founding slots for the community. Build a plugin that meets the published standards and claim one — permanently." />
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <meta name="theme-color" content="#101411" />
                 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />

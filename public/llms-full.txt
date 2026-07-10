@@ -55,7 +55,7 @@ The loader's return value *is* the component's `data` prop. There's no `fetch`, 
 
 ## What's new
 
-Pyxle 0.5.0 — the **depth release** — adds server-side **caching, SSG & ISR**, **streaming SSR**, **realtime WebSockets** (with a cross-worker Redis broker), **Pydantic-validated actions**, **observability**, **background tasks**, image optimization, and **multi-worker serving**. See the full [Changelog](https://pyxle.dev/docs/changelog.md) for release notes.
+Pyxle has grown into a depth-first full-stack framework: server-side **caching, SSG & ISR**, **streaming SSR**, **realtime WebSockets** (with a cross-worker Redis broker for multi-process serving), **Pydantic-validated actions**, **observability**, **background tasks**, **image optimization**, and **multi-worker serving** — plus serving any page as **clean Markdown** with an `llms.txt` index, so AI agents read your app as text. See the full [Changelog](https://pyxle.dev/docs/changelog.md) for what shipped in each release.
 
 ---
 
@@ -3988,7 +3988,7 @@ Source: https://pyxle.dev/docs/guides/plugins.md
 
 Pyxle plugins are reusable pieces of functionality — database layers, auth systems, storage adapters — that a host app composes via `pyxle.config.json` rather than hand-wiring in its entry point. The design is deliberately Django-inspired: declare what you want, and the framework handles discovery, startup order, and lifecycle.
 
-> **Status (0.5.0).** This guide covers the Phase A plugin surface: lifecycle hooks, named services, and middleware contribution. Page contribution (plugins shipping their own `.pyxl` pages that get merged into the host's route tree — the "pyxle-auth ships a default `/sign-in` page" use case) is a Phase B follow-up. Everything documented here is stable; the additions in Phase B will be strictly additive.
+> **Status (Phase A — stable since 0.5.0).** This guide covers the Phase A plugin surface: lifecycle hooks, named services, and middleware contribution. Page contribution (plugins shipping their own `.pyxl` pages that get merged into the host's route tree — the "pyxle-auth ships a default `/sign-in` page" use case) is a Phase B follow-up, still in [RFC](https://pyxle.dev/docs/plugins/rfc-plugin-pages.md). Everything documented here is stable; the additions in Phase B will be strictly additive.
 
 ## TL;DR
 
@@ -7368,7 +7368,7 @@ Honesty builds trust. Here's where Pyxle isn't the right choice:
   Astro or Eleventy are simpler.
 - **A pure JSON API.** If you're building a backend-only service
   with no UI, FastAPI is simpler.
-- **A mature production framework.** Pyxle is young (0.4.x).
+- **A mature production framework.** Pyxle is young (0.7.x).
   It's genuinely usable and under active development, but it
   doesn't have the decade of battle-testing that Django,
   Next.js, or Rails have. Best fit: greenfield projects,
@@ -15448,9 +15448,13 @@ optimize:
 - **Set worker count to your CPU core count** for production.
   `pyxle dev --ssr-workers 4` on a quad-core gives you four-way
   rendering parallelism.
-- **Cache loader results** if your data changes infrequently. Pyxle
-  doesn't have a built-in HTTP cache; use whatever caching layer
-  fits your stack (Redis, in-memory LRU, CDN).
+- **Cache the rendered page** if your data changes infrequently.
+  Pyxle ships a built-in server-side page cache — return a
+  `{"data": ..., "revalidate": N}` envelope from your loader (or a
+  module-level `CACHE` directive on a loader-less page) to serve the
+  stored HTML without re-running the loader or the Node render. A CDN
+  or a Redis cache backend can sit in front for multi-host
+  deployments. See the [Caching guide](https://pyxle.dev/docs/guides/caching.md).
 - **Don't import heavy modules at module top level.** Each
   hot-reload re-imports the module; deferring expensive imports to
   inside the loader function avoids paying the cost on every save.
@@ -17319,7 +17323,7 @@ Those frameworks let you build the UI in pure Python; Pyxle has you write real R
 
 ### Is Pyxle production-ready?
 
-Pyxle is in **beta** (version 0.7.0). The core features are implemented and tested (2,400+ tests, with a 95% coverage gate enforced in CI), but the API may change before 1.0. Use it for new projects and experiments, but be prepared for breaking changes.
+Pyxle is in **beta** (the `0.7.x` series). The core features are implemented and tested (2,500+ tests, with a 95% coverage gate enforced in CI), but the API may change before 1.0. Use it for new projects and experiments, but be prepared for breaking changes.
 
 ### What Python version do I need?
 
@@ -17375,7 +17379,27 @@ Wrap it in parentheses: `pages/(admin)/dashboard.pyxl` creates the route `/dashb
 
 ### My loader is slow. Can I cache results?
 
-Pyxle does not include built-in caching. Use your own caching strategy:
+Yes. Pyxle has a built-in **page cache**: return a `{"data": ..., "revalidate": <seconds>}`
+envelope from your `@server` loader, and the rendered page (loader result *and* SSR output) is
+served from cache until it goes stale, then refreshed in the background — so a slow loader runs at
+most once per window:
+
+```python
+@server
+async def load_post(request):
+    slug = request.path_params["slug"]
+    return {
+        "data": {"post": await _fetch_post(slug)},
+        "revalidate": 60,   # serve this render from cache for 60s
+    }
+```
+
+Only cache pages that render no per-user data — a cached render is shared with every visitor.
+Loader-less pages opt in with a module-level `CACHE = {"revalidate": N}` directive, and
+`pyxle build --static` pre-renders them at build time (SSG/ISR). See the [Caching guide](https://pyxle.dev/docs/guides/caching.md).
+
+To cache just an expensive call *inside* a loader, a plain `functools.lru_cache` on the helper —
+or an async cache like `aiocache` — still works:
 
 ```python
 from functools import lru_cache
@@ -17384,14 +17408,7 @@ from functools import lru_cache
 def _fetch_post(slug):
     # expensive database call
     ...
-
-@server
-async def load_post(request):
-    slug = request.path_params["slug"]
-    return {"post": _fetch_post(slug)}
 ```
-
-For async caching, consider libraries like `aiocache`.
 
 ### Can I access the database from a loader?
 
@@ -17521,6 +17538,11 @@ Source: https://pyxle.dev/docs/changelog.md
 # Changelog
 
 Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include breaking changes — those are called out explicitly here. To upgrade, run `pip install --upgrade pyxle-framework`.
+
+## Unreleased
+
+- **Fix: `pyxle init` scaffolds an installable `requirements.txt` again.** The template pinned `starlette>=0.37,<0.38` — the exact range 0.7.1's security bump moved off — so a fresh project's `requirements.txt` was unsatisfiable against the `pyxle-framework>=0.7.1` line beside it (which requires `starlette>=1.3.1`), and `pip install -r requirements.txt` failed to resolve. The scaffold now pins `starlette>=1.3.1,<2.0`, matching the framework.
+- **Config: a boolean port is now rejected instead of silently binding port 1.** Because `bool` is a subclass of `int` in Python, `{"starlette": {"port": true}}` slipped past the port validator and bound port `1` (or `0`). `_validate_port` now rejects booleans with a clear `ConfigError`, matching every other integer setting in the config.
 
 ## 0.7.1 — 2026-07-10
 
