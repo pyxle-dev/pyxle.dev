@@ -1,6 +1,6 @@
 # Pyxle — Python and React, one file
 
-Pyxle is a Python-first full-stack web framework. You write `@server` loaders and `@action` mutations in Python right beside real React 18 components (server-rendered and hydrated) in a single `.pyxl` file — file-based routing, no separate API layer, no front-end build to wire up.
+Pyxle is a Python-first full-stack web framework. You write `@server` loaders and `@action` mutations in Python right beside real React 19 components (server-rendered and hydrated) in a single `.pyxl` file — file-based routing, no separate API layer, no front-end build to wire up.
 
 If it runs Python and Node, it runs Pyxle.
 
