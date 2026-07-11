@@ -1,0 +1,530 @@
+import React from 'react';
+import { Link, Head } from 'pyxle/client';
+import {
+    useScrollReveal, CopyButton, CodeBlock, PMark,
+    InkButton, EditorialLink, Plate, GpSection, GpHead, GalleyFooter,
+} from './components/galley.jsx';
+
+/* ════════════════════════════════════════════════════════════════
+   THE SEAM — /compare
+   Every stack has a seam: the place where your data becomes your
+   interface. This page traces ONE real field — a search result —
+   across four stacks, counting the representations it wears crossing
+   from server to browser. The centerpiece (§02) draws four ledger
+   lines at ONE speed; the longest line finishes last because it has
+   the most stations, not because it was slowed. Every Pyxle exhibit
+   is a byte captured from a real build. Where another stack is the
+   right call, we say so at full size. Loader-less, fully SSG.
+   ════════════════════════════════════════════════════════════════ */
+
+
+export const slots = {
+    'nav-extra': () => (
+        <a
+            href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/compare.pyxl"
+            target="_blank"
+            rel="noreferrer"
+            title="View this page's source"
+            className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
+        >
+            source ↗
+        </a>
+    ),
+};
+export const createSlots = () => slots;
+
+
+/* ── The field we follow, born in a real loader ──────────────────── */
+
+const LOADER = `@server
+async def load(request):
+    q = request.query_params.get("q", "ink")
+    notes, total = await asyncio.gather(find_notes(q), count_notes(q))
+    return {"q": q, "notes": notes, "total": total}   # ← this dict IS the props`;
+
+
+/* ── The custody ledger: one field, four journeys ────────────────── */
+
+const SEAM = [
+    {
+        key: 'next',
+        stack: 'Next.js + FastAPI',
+        note: 'a schema, a generated client, and a contract two runtimes keep by hand',
+        stations: ['Note', 'response_model', 'openapi.json', 'types.gen.ts', 'fetch', 'props'],
+        count: '6 representations',
+        drift: '3 places to drift',
+    },
+    {
+        key: 'reflex',
+        stack: 'Reflex',
+        note: 'the field crosses wearing the wrapper’s costume',
+        stations: ['rx.State', 'diff over WS', 'wrapped var'],
+        count: '3 representations',
+        drift: '1 wrapper to cross',
+    },
+    {
+        key: 'django',
+        stack: 'Django',
+        note: 'nearly as short as ours — until you want a component model',
+        stations: ['QuerySet', 'context', 'template'],
+        count: '3 representations',
+        drift: 'types end at the template',
+    },
+    {
+        key: 'pyxle',
+        stack: 'Pyxle',
+        note: 'the loader’s return value is the component’s props',
+        stations: ['loader return', 'props'],
+        count: '1 representation',
+        drift: '0 places to drift',
+    },
+];
+
+/* One ledger row. The line grows, the stations land one beat apart,
+   the count prints when the last station arrives. All timing is
+   `--i` (station index) × one beat — identical speed on every row,
+   so a longer line simply has farther to travel. */
+function SeamRow({ row, i }) {
+    const isPyxle = row.key === 'pyxle';
+    const last = row.stations.length - 1;
+    return (
+        <div
+            className={`seam-row ${isPyxle ? 'seam-row--pyxle' : ''}`}
+            style={{ ['--last']: last, ['--reveal-delay']: `${i * 70}ms` }}
+        >
+            <div className="seam-head">
+                <span className={`font-mono text-[13px] ${isPyxle ? 'font-medium text-acct' : 'text-ink'}`}>{row.stack}</span>
+                <span className="mt-1 block max-w-[26ch] text-[12px] leading-snug text-ink2">{row.note}</span>
+            </div>
+            <div className="seam-track" role="img" aria-label={`${row.stations.join(' to ')} — ${row.count}, ${row.drift}`}>
+                <span className="seam-line" aria-hidden="true" />
+                <ol className="seam-stations">
+                    {row.stations.map((s, j) => (
+                        <li key={s} className="seam-station" style={{ ['--i']: j }}>
+                            <span className="seam-dot" aria-hidden="true" />
+                            <span className="seam-label font-mono">{s}</span>
+                        </li>
+                    ))}
+                </ol>
+            </div>
+            <div className="seam-count" style={{ ['--i']: row.stations.length }}>
+                <span className={`font-mono text-[13px] font-medium ${isPyxle ? 'text-acct' : 'text-ink'}`}>{row.count}</span>
+                <span className="mt-0.5 block font-mono text-[11px] text-ink2">{row.drift}</span>
+            </div>
+        </div>
+    );
+}
+
+
+/* ── Hero ────────────────────────────────────────────────────────── */
+
+function Hero() {
+    return (
+        <section className="relative">
+            <div className="mx-auto max-w-[76rem] px-5 pb-16 pt-28 sm:px-8 sm:pb-20 sm:pt-36">
+                <p className="font-mono text-xs uppercase tracking-[0.14em] text-ink2">
+                    Compare — field notes on four stacks
+                </p>
+                <h1 className="mt-5 font-display text-[2.9rem] font-[560] leading-[1.04] tracking-[-0.015em] text-ink sm:text-[4.2rem] lg:text-[5.2rem]">
+                    Every stack
+                    <br />
+                    has a seam<span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
+                    <span className="sr-only">.</span>
+                </h1>
+                <p className="mt-7 max-w-[60ch] text-pretty text-lg leading-[1.7] text-ink2">
+                    The seam is where your data becomes your interface. Next.js and FastAPI bridge
+                    it with a schema, a generated client, and a contract two runtimes keep by hand.
+                    Reflex wraps it. Django stops at it.{' '}
+                    <span className="text-ink">Pyxle returns across it.</span>
+                </p>
+                <p className="mt-5 max-w-[60ch] text-pretty text-base leading-[1.7] text-ink2">
+                    What follows is one real field — a search result — traced through all four,
+                    ending in real bytes you can reproduce in a terminal. Where another stack is the
+                    better choice, we say so, at full size.
+                </p>
+                <svg data-reveal="none" className="mt-8 h-[3px] w-48" viewBox="0 0 192 3" fill="none" aria-hidden="true">
+                    <path d="M0 1.5 H192" pathLength="1" className="gp-draw-load" style={{ ['--draw-dur']: '800ms', ['--draw-delay']: '350ms' }} stroke="var(--c-press)" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <p className="mt-6 font-mono text-xs text-ink2">
+                    same DOM · 2–3× fewer bytes · one language · one deploy · pre-1.0, and we’ll say where that bites
+                </p>
+                <div className="mt-9 flex flex-wrap items-center gap-5">
+                    <InkButton href="/docs/getting-started/quick-start">Get started</InkButton>
+                    <EditorialLink href="#verdict">Skip to the verdict ↓</EditorialLink>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+
+/* ── 01 · The field ──────────────────────────────────────────────── */
+
+function TheField() {
+    return (
+        <GpSection n="01" id="field">
+            <GpHead
+                n="01"
+                eyebrow="The protagonist"
+                title="Watch one field."
+                lead="Here is a real Pyxle loader — the part of search.pyxl that produces the data. Follow notes, the list it returns. It is about to travel four very different distances to reach the page."
+            />
+            <div data-reveal className="mt-12 max-w-3xl">
+                <Plate label="pages/search.pyxl · the loader" caption={<>Fig. 1 — the field is born. From the complete 34-line <span className="text-ink">search.pyxl</span> that produced every captured byte on this page.</>}>
+                    <div className="duotone">
+                        <CodeBlock code={LOADER} lang="python" className="p-5 text-[12.5px]" />
+                    </div>
+                </Plate>
+                <p data-reveal className="mt-6 max-w-[58ch] text-pretty text-base leading-[1.7] text-ink2">
+                    In Pyxle that returned dict <span className="text-ink">is</span> the component’s
+                    props — the field arrives having changed nothing. In the other stacks, the same
+                    field puts on a costume at every border it crosses.
+                </p>
+            </div>
+        </GpSection>
+    );
+}
+
+
+/* ── 02 · The custody ledger (centerpiece) ───────────────────────── */
+
+function CustodyLedger() {
+    return (
+        <section id="ledger" className="relative">
+            <div className="mx-auto max-w-[80rem] px-5 py-20 sm:px-8 sm:py-28">
+                <div data-reveal="none" className="flex items-center gap-4">
+                    <span className="font-mono text-xs uppercase tracking-[0.14em] text-press">02 — Four journeys</span>
+                    <span className="gp-rule-x gp-from-left h-px flex-1 bg-rule" style={{ ['--rule-delay']: '150ms' }} aria-hidden="true" />
+                    <span className="hidden font-mono text-xs uppercase tracking-[0.14em] text-ink2 sm:block">Chain of custody for one field</span>
+                </div>
+
+                <div data-reveal="none" className="mt-12 max-w-2xl">
+                    <h2 className="font-display text-[2rem] font-[540] leading-[1.08] tracking-[-0.01em] text-ink sm:text-[2.6rem]">
+                        <span className="gp-lm"><span>The line that finishes first.</span></span>
+                    </h2>
+                    <p className="mt-5 max-w-[60ch] text-pretty text-base leading-[1.7] text-ink2">
+                        Each line traces <code className="text-[0.9em] text-acct">notes</code> from
+                        the database to your component. Every station is a real artifact from that
+                        stack’s own vocabulary — no invented code. All four draw at the same speed:
+                        one station per beat. Pyxle’s is done while the two-stack line is still on
+                        its way to <code className="text-[0.9em] text-acct">types.gen.ts</code>.
+                    </p>
+                </div>
+
+                <div data-reveal data-rt="late" className="seam-fig mt-14">
+                    {SEAM.map((row, i) => <SeamRow key={row.key} row={row} i={i} />)}
+                </div>
+
+                <p className="mt-8 max-w-[68ch] font-mono text-xs leading-relaxed text-ink2">
+                    Fig. 2 — chain of custody for <span className="text-ink">notes</span>. Station
+                    names are each framework’s own (<code className="text-acct">types.gen.ts</code> is
+                    the conventional name for the client types openapi-typescript generates;{' '}
+                    <code className="text-acct">response_model</code>{' '}
+                    is FastAPI’s; <code className="text-acct">rx.State</code> is Reflex’s;{' '}
+                    <code className="text-acct">context</code> is Django’s). The lines animate at one
+                    speed — a longer line has more stations to cross, not a slower clock. Sources
+                    cited below.
+                </p>
+            </div>
+        </section>
+    );
+}
+
+
+/* ── 03 · The dossiers ───────────────────────────────────────────── */
+
+const DOSSIERS = [
+    {
+        stack: 'Next.js + FastAPI',
+        seam: <>A schema on each side and a generated client between them: FastAPI’s <Cite href="https://fastapi.tiangolo.com/tutorial/response-model/">response_model</Cite> publishes an <Cite href="https://fastapi.tiangolo.com/features/">OpenAPI</Cite> document; <Cite href="https://github.com/drwpow/openapi-typescript">openapi-typescript</Cite> turns it into <code className="text-[0.9em] text-acct">types.gen.ts</code>; your <Cite href="https://nextjs.org/docs/app/building-your-application/data-fetching">fetch layer</Cite> parses it back. Two runtimes keep one contract by hand.</>,
+        buys: 'The gold standard, and for good reason: two enormous, battle-tested ecosystems and a hard frontend/backend boundary that scales cleanly to large teams who want it.',
+        instead: 'you have a large team that wants the split, frontend and backend deploy on different cadences, or maximum ecosystem maturity outweighs the seam. The boundary is a tax to a solo dev and a feature to a 40-person org — both are true.',
+        artifact: '/**\n * This file was auto-generated by openapi-typescript.\n * Do not make direct changes to the file.\n */',
+        artifactCap: <>Fig. 3 — the banner openapi-typescript writes atop the file it generates. Not a criticism; a maintenance schedule.</>,
+    },
+    {
+        stack: 'Reflex',
+        seam: <>The whole app is Python: state lives on the server as <Cite href="https://reflex.dev/docs/state/overview/">rx.State</Cite>, diffed to the browser over a WebSocket, and compiled to React underneath. Your field crosses wearing Reflex’s component costume.</>,
+        buys: 'A genuinely compelling promise — never write JavaScript, express the whole UI in Python — executed well.',
+        instead: '“zero JavaScript, ever” is a hard requirement. Pyxle hands you the real React 19 component and lets you npm-install anything; Reflex asks you to go through its wrapper. If writing JSX is a dealbreaker, Reflex is the honest answer.',
+    },
+    {
+        stack: 'Django',
+        seam: <>The generous surprise of this page: Django’s seam is nearly as short as ours. A <Cite href="https://docs.djangoproject.com/en/stable/topics/db/queries/">QuerySet</Cite> passes through the view’s <Cite href="https://docs.djangoproject.com/en/stable/topics/templates/">context</Cite> into a template — three stations. The difference is the far shore: types end at the template, and the moment you want a real component model you bolt on a React SPA and inherit journey number one.</>,
+        buys: 'The batteries-included incumbent: a superb ORM, the legendary admin, auth, migrations, a decade-mature ecosystem.',
+        instead: 'you’re building content or CRUD at scale and a decade of batteries plus the admin does most of your work. Reach for Pyxle when you specifically want a React UI without a second service to serve it.',
+    },
+];
+
+function Cite({ href, children }) {
+    return (
+        <a href={href} target="_blank" rel="noreferrer" className="focus-ring rounded text-acct underline decoration-1 underline-offset-2 hover:decoration-2">{children}</a>
+    );
+}
+
+function Dossier({ d, i }) {
+    return (
+        <div data-reveal className="border-t border-rule py-10" style={{ ['--reveal-delay']: `${(i % 2) * 90}ms` }}>
+            <div className="grid gap-8 lg:grid-cols-12">
+                <div className="lg:col-span-4">
+                    <h3 className="font-display text-[1.5rem] font-[540] leading-tight tracking-[-0.01em] text-ink">{d.stack}</h3>
+                </div>
+                <div className="lg:col-span-8">
+                    <p className="max-w-[62ch] text-pretty text-base leading-[1.7] text-ink2">{d.seam}</p>
+                    <p className="mt-4 max-w-[62ch] text-pretty text-base leading-[1.7] text-ink2">
+                        <span className="text-ink">What it buys you.</span> {d.buys}
+                    </p>
+                    {d.artifact && (
+                        <Plate className="mt-6 max-w-xl" label="types.gen.ts" caption={d.artifactCap}>
+                            <div className="duotone">
+                                <CodeBlock code={d.artifact} lang="js" className="p-4 text-[12px]" />
+                            </div>
+                        </Plate>
+                    )}
+                    <p className="mt-5 max-w-[62ch] text-pretty text-base leading-[1.7]">
+                        <span className="font-mono text-[13px] uppercase tracking-[0.1em] text-press">Use them instead when </span>
+                        <span className="text-ink2">{d.instead}</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function TheDossiers() {
+    return (
+        <GpSection n="03" id="dossiers">
+            <GpHead
+                n="03"
+                eyebrow="The dossiers"
+                title="Each stack, in its own words."
+                lead="What their seam is made of — cited from their own docs — what it buys you, and exactly when it’s the better choice than Pyxle. The concessions are set at the same size as the claims, on purpose."
+            />
+            <div className="mt-12">
+                {DOSSIERS.map((d, i) => <Dossier key={d.stack} d={d} i={i} />)}
+                <div data-reveal className="border-t border-rule py-8">
+                    <p className="max-w-[68ch] text-pretty text-base leading-[1.7] text-ink2">
+                        <span className="text-ink">And the dashboards.</span>{' '}
+                        <Cite href="https://nicegui.io/">NiceGUI</Cite> and{' '}
+                        <Cite href="https://streamlit.io/">Streamlit</Cite> do a different job and are
+                        superb at it. If you’re building an internal tool or an ML dashboard,{' '}
+                        <span className="text-ink">close this tab and use them</span> — they’ll be
+                        faster than us to a working interface, full stop.
+                    </p>
+                </div>
+            </div>
+        </GpSection>
+    );
+}
+
+
+/* ── 04 · The receipt (real captured bytes) ──────────────────────── */
+
+function TheReceipt() {
+    return (
+        <GpSection n="04" id="receipt">
+            <GpHead
+                n="04"
+                eyebrow="The receipt"
+                title="What the short seam costs at runtime: nothing."
+                lead="The seam argument, settled in captured bytes — a real response, a real grep, a real 422. Everything below came off a build of the Fig. 1 file."
+            />
+            <div className="mt-12 grid gap-8 lg:grid-cols-2">
+                <Plate data-reveal label="GET /search?q=in — the whole document" meta="2,020 bytes" caption={<>Fig. 4 — the entire response. The field arrives still wearing its only costume: props, shipped once as inert JSON.</>}>
+                    <div className="duotone">
+                        <CodeBlock lang="html" className="p-5 text-[12px]" code={`<h1>3<!-- --> notes match “<!-- -->in<!-- -->”</h1>
+<ul><li>Kerning the long dash</li>
+    <li>Ochre ink, mixing notes</li>
+    <li>On margins and measure</li></ul>
+<script id="__PYXLE_PROPS__" type="application/json">
+  {"data":{"q":"in","notes":[{"id":2,"title":"Kerning the long dash"},
+   {"id":3,"title":"Ochre ink, mixing notes"},
+   {"id":4,"title":"On margins and measure"}],"total":3}}
+</script>
+<link rel="modulepreload" href="…/search-CXnHMteq.js" />
+⋯  x-request-id: 256151ee6c574687bd04dc4cdeb0c769`} />
+                    </div>
+                </Plate>
+                <Plate data-reveal label="the split, proven" caption={<>Fig. 5 — the loader’s server code, grepped for in the built client chunk. Absent by construction. The page’s own chunk: 2.6&nbsp;KB / 1.3&nbsp;KB gzip.</>}>
+                    <div className="duotone">
+                        <CodeBlock lang="bash" className="p-5 text-[12px]" code={`$ grep -c 'find_notes\\|remember\\|SavedSearch' \\
+    dist/assets/search-*.js
+0`} />
+                    </div>
+                </Plate>
+                <Plate data-reveal className="lg:col-span-2" label="the seam under fire" caption={<>Fig. 6 — Pydantic guards the only crossing. One validator, both directions; nobody wrote the wire format.</>}>
+                    <div className="duotone">
+                        <CodeBlock lang="bash" className="p-5 text-[12px]" code={`$ curl -s -X POST …/api/__actions/search/save_search -d '{"query": "ink", "max_results": 10}'
+{"ok":true,"saved":true}
+
+$ curl -s -X POST … -d '{"max_results": "ten"}'
+HTTP/1.1 422 Unprocessable Content
+{"ok":false,"error":"Validation failed","fields":{"query":["Field required"],
+ "max_results":["Input should be a valid integer, unable to parse string as an integer"]}}`} />
+                    </div>
+                </Plate>
+            </div>
+            <p data-reveal className="mt-10 max-w-[72ch] text-pretty text-base leading-[1.7] text-ink2">
+                On parity-verified pages this seam serves <span className="text-ink">2.1–2.3×</span>{' '}
+                Next.js’s throughput per core at roughly half the median latency, shipping the same
+                DOM in <span className="text-ink">2–3× fewer bytes</span> (5.4 KB vs 13.7 KB on the
+                landing page; 145 KB vs 332 KB on a 300-row table). On API work it sits at rough
+                parity with FastAPI on trivial endpoints — a few percent behind — and ahead on real
+                work: 1.12× on five queries, 1.31× on twenty, 1.11× on form POSTs.{' '}
+                <span className="text-ink">Hono and raw Node beat everyone at pure JSON, including
+                us; we don’t claim that crown.</span> Zero errors under load; 2,500+ tests; 95%
+                coverage. Full tables, hardware, and losses:{' '}
+                <Link href="/benchmarks" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">/benchmarks →</Link>
+            </p>
+        </GpSection>
+    );
+}
+
+
+/* ── 05 · Where we lose ──────────────────────────────────────────── */
+
+const GAPS = [
+    ['No TSX authoring yet', 'end-to-end Python types work today; writing the client block in TypeScript is the next milestone'],
+    ['No first-class test client', 'you can unit-test loaders/actions and run e2e today; an in-process PyxleTestClient is on the roadmap'],
+    ['No automatic image/font byte-optimization', 'responsive <Image> ships; byte resizing is opt-in via a loader/CDN, and there’s no next/font yet'],
+    ['No built-in i18n', 'use a React i18n library with the locale resolved in a loader'],
+    ['Pre-1.0 APIs', 'we’re 0.x and moving; minor versions may still shift, and we call breaking changes out explicitly'],
+];
+
+function WhereWeLose() {
+    return (
+        <GpSection n="05" id="gaps">
+            <GpHead
+                n="05"
+                eyebrow="Where we lose"
+                title="The honest edges."
+                lead="No strikes, no spin — just the list. If any of these is your load-bearing wall today, the dossiers above told you where to go."
+            />
+            <div className="mt-12 max-w-3xl">
+                {GAPS.map(([name, desc], i) => (
+                    <div key={name} data-reveal className="group flex flex-col gap-1 border-t border-rule py-4 sm:flex-row sm:items-baseline sm:gap-4" style={{ ['--reveal-delay']: `${(i % 2) * 90}ms` }}>
+                        <span className="shrink-0 font-display text-lg font-[540] tracking-[-0.01em] text-ink sm:w-[19rem]">{name}</span>
+                        <span className="text-[13px] leading-relaxed text-ink2">{desc}</span>
+                    </div>
+                ))}
+                <p data-reveal className="mt-8 max-w-[58ch] text-pretty text-base leading-[1.7] text-ink2">
+                    None of these blocks shipping a real app — they’re the honest edges of a
+                    fast-moving 0.x. <span className="text-ink">Come back at 1.0</span> if one of them
+                    is a dealbreaker today.
+                </p>
+            </div>
+        </GpSection>
+    );
+}
+
+
+/* ── 06 · The verdict ────────────────────────────────────────────── */
+
+const VERDICT = [
+    ['Big team that wants the hard boundary', 'Next.js + FastAPI', '/docs/guides/comparison', false],
+    ['Zero JavaScript, ever, as policy', 'Reflex', 'https://reflex.dev', true],
+    ['Content and CRUD on decade-mature batteries', 'Django', 'https://www.djangoproject.com', true],
+    ['An internal tool or a data dashboard', 'NiceGUI / Streamlit', 'https://nicegui.io', true],
+    ['Python brain, real React hands, one file, one deploy', 'Pyxle', '/docs/getting-started/quick-start', false],
+];
+
+function Verdict() {
+    return (
+        <GpSection n="06" id="verdict">
+            <GpHead
+                n="06"
+                eyebrow="Choose your seam"
+                title="The sixty-second verdict."
+                lead="The whole page, compressed for the skimmer who scrolled straight here. Four of these five point somewhere other than us."
+            />
+            <div className="mt-12 max-w-3xl">
+                {VERDICT.map(([cond, pick, href, ext], i) => {
+                    const isPyxle = pick === 'Pyxle';
+                    return (
+                        <div key={pick} data-reveal className="flex items-baseline gap-4 border-t border-rule py-5 last:border-b" style={{ ['--reveal-delay']: `${(i % 2) * 90}ms` }}>
+                            <span className="shrink-0 pt-1 font-mono text-sm text-press" aria-hidden="true">{i + 1}</span>
+                            <span className="flex-1 text-pretty text-base leading-[1.6] text-ink2 sm:text-lg">{cond}</span>
+                            <span aria-hidden="true" className="hidden shrink-0 self-center font-mono text-ink2 sm:block">→</span>
+                            {ext
+                                ? <a href={href} target="_blank" rel="noreferrer" className={`focus-ring shrink-0 self-center rounded font-mono text-sm font-medium ${isPyxle ? 'text-acct' : 'text-ink'} underline decoration-rule decoration-2 underline-offset-4 hover:decoration-accent`}>{pick}</a>
+                                : <Link href={href} className={`focus-ring shrink-0 self-center rounded font-mono text-sm font-medium ${isPyxle ? 'text-acct' : 'text-ink'} underline decoration-rule decoration-2 underline-offset-4 hover:decoration-accent`}>{pick}</Link>}
+                        </div>
+                    );
+                })}
+            </div>
+        </GpSection>
+    );
+}
+
+
+/* ── 07 · Reproduce ──────────────────────────────────────────────── */
+
+const REPRO = `pip install pyxle-framework
+pyxle init seam && cd seam
+# add a server-only helper to pages/index.pyxl:
+#   def _server_only(): return "never shipped"
+#   @server
+#   async def load(request): return {"msg": _server_only()}
+pyxle build --analyze                    # weigh your own chunks
+grep -c _server_only dist/assets/*.js    # -> 0 : your Python stays server-side`;
+
+function Reproduce() {
+    return (
+        <GpSection n="07" id="reproduce">
+            <GpHead
+                n="07"
+                eyebrow="Reproduce it"
+                title="Run the seam yourself."
+                lead="Every artifact above came off a real build — nothing is a mockup. There’s no repo to trust: scaffold a page and measure your own."
+            />
+            <div className="mt-10 max-w-2xl">
+                <Plate label="terminal">
+                    <div className="duotone flex items-start justify-between gap-3">
+                        <CodeBlock lang="bash" className="p-5 text-[12.5px]" code={`$ pip install pyxle-framework
+$ pyxle init seam && cd seam
+# add a server-only helper to pages/index.pyxl:
+#   def _server_only(): return "never shipped"
+#   @server
+#   async def load(request): return {"msg": _server_only()}
+$ pyxle build --analyze
+$ grep -c _server_only dist/assets/*.js   # → 0`} />
+                        <span className="p-4"><CopyButton text={REPRO} /></span>
+                    </div>
+                </Plate>
+                <p className="mt-8 font-display text-lg text-ink">Measured, not marketed.</p>
+                <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2">
+                    <EditorialLink href="/benchmarks">Full benchmarks →</EditorialLink>
+                    <EditorialLink href="/docs/guides/comparison">The long-form comparison →</EditorialLink>
+                    <EditorialLink href="/playground">Try it in the browser →</EditorialLink>
+                </div>
+            </div>
+        </GpSection>
+    );
+}
+
+
+/* ── The page ────────────────────────────────────────────────────── */
+
+export default function Compare() {
+    useScrollReveal();
+    return (
+        <div className="relative">
+            <Head>
+                <title>Compare - Pyxle vs Next.js + FastAPI, Reflex, Django</title>
+                <meta name="description" content="One real field, traced through four stacks. Where Pyxle wins, where it loses, and who should choose what — with captured bytes and a command to reproduce them. Measured, not marketed." />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <meta name="theme-color" content="#101411" />
+                <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+            </Head>
+            <Hero />
+            <TheField />
+            <CustodyLedger />
+            <TheDossiers />
+            <TheReceipt />
+            <WhereWeLose />
+            <Verdict />
+            <Reproduce />
+            <GalleyFooter />
+        </div>
+    );
+}

@@ -31,6 +31,7 @@ function readInitialTheme() {
 // layout so every page renders the exact same masthead — no per-page copies.
 const NAV_LINKS = [
     { href: '/docs', label: 'Docs', match: '/docs' },
+    { href: '/compare', label: 'Compare', match: '/compare' },
     { href: '/playground', label: 'Playground', match: '/playground' },
     { href: '/plugins', label: 'Plugins', match: '/plugins' },
     { href: '/benchmarks', label: 'Benchmarks', match: '/benchmarks' },
