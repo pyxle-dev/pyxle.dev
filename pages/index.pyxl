@@ -211,7 +211,7 @@ function Hero({ version }) {
                         <p className="mt-7 font-mono text-xs text-ink2">
                             MIT{version ? ` · v${version}` : ''} ·{' '}
                             <Link href="/benchmarks" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">
-                                up to 4.3× faster SSR than Next.js →
+                                ~2× faster SSR than Next.js →
                             </Link>
                         </p>
                     </div>
@@ -443,12 +443,12 @@ function TheIndex() {
 
 /* ── 04 · The numbers (a typeset ledger) ─────────────────────────── */
 
-// From the June 2026 off-box EC2 run (2× c7i.2xlarge, oha on its own
-// box, 8 workers) — see /benchmarks.
+// From the July 2026 off-box EC2 run on Pyxle 0.7.1 (2× c7i.2xlarge,
+// oha on its own box; SSR measured per core, API at 8 workers) — see /benchmarks.
 const LEDGER = [
-    ['4.3×', 'faster server-side rendering than Next.js, on a landing page'],
-    ['#1 of 7', 'on form POST — ahead of Hono, FastAPI, and Express'],
-    ['56k+', 'JSON requests per second — the fastest Python framework tested'],
+    ['~2.2×', 'faster server-side rendering than Next.js, per core'],
+    ['2–3×', 'smaller HTML than Next.js for the same page'],
+    ['1.3×', "FastAPI's throughput on database-heavy pages, at 8 workers"],
 ];
 
 function CircledZero() {
