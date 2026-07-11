@@ -14,6 +14,7 @@
   "middleware": [],
   "cache": {
     "/": 60,
+    "/anatomy": 1800,
     "/benchmarks": 3600,
     "/docs/*": 1800,
     "/plugins": 1800,

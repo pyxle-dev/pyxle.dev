@@ -227,6 +227,7 @@ const SEARCH_KEYWORDS = {
 const SITE_PAGES = [
   { path: "/", priority: "1.0" },
   { path: "/docs", priority: "0.9" },
+  { path: "/anatomy", priority: "0.9" },
   { path: "/playground", priority: "0.8" },
   { path: "/plugins", priority: "0.8" },
   { path: "/roadmap", priority: "0.8" },
@@ -818,6 +819,7 @@ function build() {
   llms.push(
     `## More`,
     ``,
+    `- [The anatomy of a page](${SITE_URL}/anatomy.md): how one .pyxl file becomes two programs — dissected with real bytes`,
     `- [Plugin directory](${SITE_URL}/plugins.md): official and community plugins`,
     `- [Benchmarks & methodology](${SITE_URL}/benchmarks.md): reproducible performance numbers`,
     `- [Interactive playground](${SITE_URL}/playground.md): run Pyxle in the browser`,

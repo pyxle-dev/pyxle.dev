@@ -1,0 +1,705 @@
+import React, { useEffect, useState } from 'react';
+import { Link, Head } from 'pyxle/client';
+import {
+    useScrollReveal, CopyButton, CodeBlock, PMark,
+    InkButton, EditorialLink, Plate, GpSection, GpHead, GalleyFooter,
+} from './components/galley.jsx';
+import { tokenizeBlock } from './components/code-highlighter.jsx';
+
+/* ════════════════════════════════════════════════════════════════
+   THE ANATOMY OF A PAGE — /anatomy
+   One .pyxl file, dissected in public: the cut the compiler makes,
+   the bytes the server ships, the round trip the browser makes back.
+   Every exhibit on this page is a real byte from a real response,
+   captured from the specimen app and reproducible with curl.
+   The dissection is choreographed with ONE IntersectionObserver
+   setting ONE data attribute; every visual state is prerendered
+   CSS. Without JavaScript, the page ships as the finished diagram.
+   ════════════════════════════════════════════════════════════════ */
+
+
+export const slots = {
+    'nav-extra': () => (
+        <a
+            href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/anatomy.pyxl"
+            target="_blank"
+            rel="noreferrer"
+            title="View this page's source"
+            className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
+        >
+            source ↗
+        </a>
+    ),
+};
+export const createSlots = () => slots;
+
+
+/* ── The specimen — a complete, real .pyxl file. This exact file was
+   built and served; every exhibit below came off its wire. ───────── */
+
+const SPECIMEN = `# pages/search.pyxl
+import asyncio
+from pydantic import BaseModel
+from db import find_notes, count_notes, remember
+
+class SavedSearch(BaseModel):
+    query: str
+    max_results: int = 20
+
+@server
+async def load(request):
+    q = request.query_params.get("q", "ink")
+    notes, total = await asyncio.gather(find_notes(q), count_notes(q))
+    return {"q": q, "notes": notes, "total": total}
+
+@action
+async def save_search(request, body: SavedSearch):
+    await remember(body.query, body.max_results)
+    return {"saved": True}
+
+
+import React from 'react';
+import { useAction } from 'pyxle/client';
+
+export default function Search({ data }) {
+    const save = useAction('save_search');
+    return (
+        <main>
+            <h1>{data.total} notes match “{data.q}”</h1>
+            <ul>{data.notes.map((n) => <li key={n.id}>{n.title}</li>)}</ul>
+            <button onClick={() => save({ query: data.q })}>Save this search</button>
+        </main>
+    );
+}`;
+
+/* Line groups, derived from the source so they can never drift.
+   A line may belong to several groups; the dissection steps light
+   them up via [data-astep] CSS in styles/tailwind.css. */
+const SPECIMEN_LINES = SPECIMEN.split('\n');
+const _find = (needle) => SPECIMEN_LINES.findIndex((l) => l.includes(needle));
+const LN = {
+    model: [_find('class SavedSearch'), _find('max_results: int')],
+    loader: [_find('@server'), _find('return {"q"')],
+    action: [_find('@action'), _find('return {"saved"')],
+    boundary: _find("import React from 'react'"),
+    component: [_find('export default'), SPECIMEN_LINES.length - 1],
+    wake: [_find('useAction('), _find('onClick')],
+    render: [_find('<h1>'), _find('</ul>') === -1 ? _find('map((n)') : _find('map((n)')],
+};
+
+function lineGroups(i) {
+    const g = [];
+    g.push(i < LN.boundary ? 'py' : 'cli');
+    if (i >= LN.model[0] && i <= LN.model[1]) g.push('model');
+    if (i >= LN.loader[0] && i <= LN.loader[1]) g.push('loader');
+    if (i >= LN.action[0] && i <= LN.action[1]) g.push('action');
+    if (i >= LN.component[0] && i <= LN.component[1]) g.push('comp');
+    if (i === LN.wake[0] || i === LN.wake[1]) g.push('wake');
+    if (i >= LN.render[0] && i <= LN.render[1]) g.push('render');
+    return g.join(' ');
+}
+
+/* The cut — a dashed hairline with registration marks, typeset
+   between the two halves like a printer's trim line. Always visible:
+   it is the registration mark of the whole dissection. */
+function CutRow() {
+    return (
+        <div className="an-cutrow relative my-1 flex items-center gap-3 px-5" aria-hidden="true">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-press">server module ↑</span>
+            <span className="h-px flex-1 border-t border-dashed" style={{ borderColor: 'var(--c-press)', opacity: 0.55 }} />
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em]" style={{ color: 'var(--c-accent)' }}>↓ client chunk</span>
+        </div>
+    );
+}
+
+/* The specimen, typeset line by line so the dissection can address
+   every organ. `from`/`to` clip it to an excerpt (mobile steps). */
+function SpecimenCode({ from = 0, to = SPECIMEN_LINES.length - 1, size = 'text-[12.5px]' }) {
+    const lines = tokenizeBlock(SPECIMEN, 'pyxl');
+    return (
+        <pre className={`overflow-x-auto py-4 font-mono leading-[1.66] ${size}`}>
+            <code>
+                {lines.map((tokens, i) => {
+                    if (i < from || i > to) return null;
+                    return (
+                        <React.Fragment key={i}>
+                            {i === LN.boundary - 1 && from < LN.boundary - 1 && to >= LN.boundary ? <CutRow /> : null}
+                            <span className="an-ln block px-5" data-half={i < LN.boundary ? 'py' : 'cli'} data-g={lineGroups(i)}>
+                                {tokens.length === 0 ? ' ' : tokens.map((t, j) => <span key={j} className={t.cls}>{t.text}</span>)}
+                            </span>
+                        </React.Fragment>
+                    );
+                })}
+            </code>
+        </pre>
+    );
+}
+
+/* A mobile excerpt: the organ under discussion, clipped from the same
+   source. Hidden at lg+, where the sticky specimen carries the show. */
+function Excerpt({ from, to, label }) {
+    return (
+        <div className="mt-6 lg:hidden">
+            <Plate label={label} meta={`lines ${from + 1}–${to + 1}`}>
+                <div className="duotone">
+                    <SpecimenCode from={from} to={to} size="text-[12px]" />
+                </div>
+            </Plate>
+        </div>
+    );
+}
+
+
+/* ── The dissection steps. Copy scrolls; the specimen answers. ────── */
+
+const STEPS = [
+    {
+        n: 'i',
+        title: 'The cut.',
+        body: (
+            <>
+                <p className="max-w-[52ch] text-pretty text-base leading-[1.7] text-ink2">
+                    At build time the compiler reads this one file and writes two programs.
+                    Everything above the line becomes a server module and{' '}
+                    <span className="text-ink">runs only in CPython</span> — the queries, the
+                    validation model, the credentials they touch. Everything below it becomes
+                    a browser chunk. Nothing crosses the cut unless you return it.
+                </p>
+                <p className="mt-4 max-w-[52ch] text-pretty text-base leading-[1.7] text-ink2">
+                    Not convention. Not a lint rule. The Python{' '}
+                    <span className="text-ink">is not in the artifact</span> — grep it yourself.
+                </p>
+            </>
+        ),
+        exhibit: (
+            <Plate
+                className="mt-8"
+                label="the shipped chunk, searched"
+                caption={<>Fig. 2 — the loader, the action, and the model, grepped for in the built client chunk. Absent by construction, not by discipline.</>}
+            >
+                <div className="duotone">
+                    <CodeBlock lang="bash" className="p-5 text-[12.5px]" code={`$ pyxle build
+$ grep -c 'find_notes\\|remember\\|SavedSearch' dist/assets/search-*.js
+0`} />
+                </div>
+            </Plate>
+        ),
+        excerpt: { from: LN.action[0], to: LN.boundary + 1, label: 'search.pyxl — the boundary' },
+    },
+    {
+        n: 'ii',
+        title: 'The request.',
+        body: (
+            <>
+                <p className="max-w-[52ch] text-pretty text-base leading-[1.7] text-ink2">
+                    A request arrives and the loader runs — here, two queries under one{' '}
+                    <code className="text-[0.9em] text-acct">asyncio.gather</code>, concurrently,
+                    in the same process that will render the page. There is no API hop between
+                    your data and your markup, because there is no API between them.
+                </p>
+                <p className="mt-4 max-w-[52ch] text-pretty text-base leading-[1.7] text-ink2">
+                    Every response carries a correlation id, on by default. This one is real.
+                </p>
+            </>
+        ),
+        exhibit: (
+            <Plate
+                className="mt-8"
+                label="GET /search?q=ink — the response, as received"
+                caption={<>Fig. 3 — the actual headers, abridged only of date and cookie. The id is yours to trace through the logs.</>}
+            >
+                <div className="duotone">
+                    <CodeBlock lang="bash" className="p-5 text-[12.5px]" code={`$ curl -si 'http://127.0.0.1:8123/search?q=ink'
+HTTP/1.1 200 OK
+content-type: text/html; charset=utf-8
+cache-control: private, no-cache
+x-request-id: 12f3312fe9c4452c882f27485182cb0d
+x-content-type-options: nosniff
+x-frame-options: SAMEORIGIN
+referrer-policy: strict-origin-when-cross-origin
+transfer-encoding: chunked
+⋯`} />
+                </div>
+            </Plate>
+        ),
+        excerpt: { from: LN.loader[0], to: LN.loader[1], label: 'search.pyxl — the loader' },
+    },
+    {
+        n: 'iii',
+        title: 'The page, shipped.',
+        body: (
+            <>
+                <p className="max-w-[52ch] text-pretty text-base leading-[1.7] text-ink2">
+                    The component renders on the server — real React 19, in a persistent worker
+                    pool — and what leaves the machine is <span className="text-ink">finished HTML
+                    with the data already in it</span>. The props ride along once, as inert JSON,
+                    so the component can wake with the same state it rendered from. There is no
+                    serialized component tree, no double-shipped markup.
+                </p>
+                <p className="mt-4 max-w-[52ch] text-pretty text-base leading-[1.7] text-ink2">
+                    The entire document below — head, markup, data, preloads —{' '}
+                    <span className="text-ink">is 1,874 bytes</span>. Pages that suspend stream
+                    their shell first; this one had nothing to wait for.
+                </p>
+            </>
+        ),
+        exhibit: (
+            <Plate
+                className="mt-8"
+                label="the response body, abridged"
+                caption={<>Fig. 4 — the wire, verbatim: rendered markup, the props as inert JSON, and the chunk preloads. Whole document: 1,874 bytes.</>}
+            >
+                <div className="duotone">
+                    <CodeBlock lang="html" className="p-5 text-[12px]" code={`<h1>1<!-- --> notes match “<!-- -->ink<!-- -->”</h1>
+<ul><li>Ochre ink, mixing notes</li></ul>
+⋯
+<script id="__PYXLE_PROPS__" type="application/json">
+  {"data":{"q":"ink","notes":[{"id":3,
+   "title":"Ochre ink, mixing notes"}],"total":1}}
+</script>
+<link rel="modulepreload" href="/client/dist/assets/search-CXnHMteq.js" />
+<script type="module" src="/client/dist/assets/search-CXnHMteq.js"></script>`} />
+                </div>
+            </Plate>
+        ),
+        excerpt: { from: LN.component[0], to: LN.component[1], label: 'search.pyxl — the component' },
+    },
+    {
+        n: 'iv',
+        title: 'The wake.',
+        body: (
+            <>
+                <p className="max-w-[52ch] text-pretty text-base leading-[1.7] text-ink2">
+                    In the browser, React hydrates the markup it was given — the page was
+                    interactive HTML before it was an application. The code that wakes it is
+                    the page's own chunk: <span className="text-ink">2.6 KB raw, 1.3 KB
+                    gzipped</span>. React itself rides in a shared chunk, cached once for the
+                    whole site.
+                </p>
+            </>
+        ),
+        exhibit: (
+            <Plate
+                className="mt-8"
+                label="pyxle build --analyze"
+                caption={<>Fig. 5 — the build, weighing itself. The measurement isn't bespoke to this page: it's a CLI flag.</>}
+            >
+                <div className="duotone">
+                    <CodeBlock lang="bash" className="p-5 text-[12.5px]" code={`$ pyxle build --analyze
+  dist/assets/search-Bl6T_110.js     2.6KB /  1.3KB gzip
+  dist/assets/search-CXnHMteq.js     1.1KB /  0.6KB gzip
+  ⋯`} />
+                </div>
+            </Plate>
+        ),
+        excerpt: { from: LN.wake[0], to: LN.wake[1] + 1, label: 'search.pyxl — the handler' },
+    },
+    {
+        n: 'v',
+        title: 'The round trip.',
+        body: (
+            <>
+                <p className="max-w-[52ch] text-pretty text-base leading-[1.7] text-ink2">
+                    The button calls <code className="text-[0.9em] text-acct">save_search</code>{' '}
+                    — a Python function — like a function. On the wire it is a POST to an
+                    endpoint <span className="text-ink">you never wrote</span>; the compiler
+                    emitted it from the decorator. The body is validated against the Pydantic
+                    model before your code runs, and a bad request comes back as a precise,
+                    field-mapped 422.
+                </p>
+                <p className="mt-4 max-w-[52ch] text-pretty text-base leading-[1.7] text-ink2">
+                    This is the API layer. It was the compiler's output all along.
+                </p>
+            </>
+        ),
+        exhibit: (
+            <Plate
+                className="mt-8"
+                label="the action, called twice"
+                caption={<>Fig. 6 — a real mutation and a real rejection. CSRF headers elided; the double-submit dance is automatic in <span className="text-ink">useAction</span> and <span className="text-ink">&lt;Form&gt;</span>.</>}
+            >
+                <div className="duotone">
+                    <CodeBlock lang="bash" className="p-5 text-[12px]" code={`$ curl -s -X POST …/api/__actions/search/save_search \\
+    -d '{"query": "ink", "max_results": 10}'
+{"ok":true,"saved":true}
+
+$ curl -s -X POST … -d '{"max_results": "ten"}'
+HTTP/1.1 422 Unprocessable Content
+{"ok":false,"error":"Validation failed",
+ "fields":{"query":["Field required"],
+  "max_results":["Input should be a valid integer, …"]}}`} />
+                </div>
+            </Plate>
+        ),
+        excerpt: { from: LN.model[0], to: LN.action[1], label: 'search.pyxl — model + action' },
+    },
+];
+
+
+/* ── One observer, one attribute. Every visual state is CSS. The
+   server renders data-astep="print" — the finished diagram — so
+   no-JS visitors and crawlers get the complete dissection. ───────── */
+function useDissection() {
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const root = document.getElementById('dissection');
+        if (!root) return;
+        const marks = Array.from(root.querySelectorAll('[data-astep-mark]'));
+        if (!marks.length || !('IntersectionObserver' in window)) return;
+        root.dataset.astep = '1';
+        const io = new IntersectionObserver(
+            (entries) => {
+                for (const e of entries) {
+                    if (e.isIntersecting) root.dataset.astep = e.target.dataset.astepMark;
+                }
+            },
+            { rootMargin: '-42% 0px -42% 0px', threshold: 0 },
+        );
+        marks.forEach((m) => io.observe(m));
+        return () => io.disconnect();
+    }, []);
+}
+
+
+/* Fragment links no-op on content-visibility sections; scroll by hand. */
+function scrollToId(e, id) {
+    e.preventDefault();
+    const el = document.getElementById(id);
+    if (!el) return;
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    history.replaceState(null, '', `#${id}`);
+}
+
+
+/* ── Hero ────────────────────────────────────────────────────────── */
+
+function Hero() {
+    return (
+        <section className="relative">
+            <div className="mx-auto max-w-[76rem] px-5 pb-16 pt-28 sm:px-8 sm:pb-20 sm:pt-36">
+                <p className="font-mono text-xs uppercase tracking-[0.14em] text-ink2">
+                    How Pyxle works — from one file to a painted page
+                </p>
+                {/* Static LCP; only the period performs. */}
+                <h1 className="mt-5 font-display text-[2.9rem] font-[560] leading-[1.04] tracking-[-0.015em] text-ink sm:text-[4.2rem] lg:text-[5.2rem]">
+                    One file in.
+                    <br />
+                    Two programs out<span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
+                    <span className="sr-only">.</span>
+                </h1>
+                <p className="mt-7 max-w-[58ch] text-pretty text-lg leading-[1.7] text-ink2">
+                    A <code className="text-[0.92em] text-acct">.pyxl</code> page is Python and
+                    React sharing a file. What follows is a public dissection: the cut the
+                    compiler makes, the bytes the server ships, the round trip your browser
+                    makes back. <span className="text-ink">Every exhibit is a real byte from a
+                    real response</span> — bring curl.
+                </p>
+                {/* The trim line that will make the cut, foreshadowed. */}
+                <svg data-reveal="none" className="mt-8 h-[3px] w-40" viewBox="0 0 160 3" fill="none" aria-hidden="true">
+                    <path d="M0 1.5 H160" pathLength="1" className="gp-draw-load" style={{ ['--draw-dur']: '700ms', ['--draw-delay']: '350ms' }} stroke="var(--c-press)" strokeWidth="2" strokeDasharray="6 5" strokeLinecap="round" />
+                </svg>
+                <div className="mt-9 flex flex-wrap items-center gap-5">
+                    <InkButton href="/docs/getting-started/quick-start">Get started</InkButton>
+                    <a
+                        href="#receipts"
+                        onClick={(e) => scrollToId(e, 'receipts')}
+                        className="focus-ring rounded font-mono text-[13px] text-ink underline decoration-rule decoration-2 underline-offset-[5px] transition-colors hover:decoration-accent"
+                    >
+                        Skip to the receipts ↓
+                    </a>
+                </div>
+                <p className="mt-8 font-mono text-xs text-ink2">
+                    Specimen: <span className="text-ink">search.pyxl</span> — 34 lines, complete.
+                    The dissection begins below.
+                </p>
+            </div>
+        </section>
+    );
+}
+
+
+/* ── 01 · The specimen ───────────────────────────────────────────── */
+
+function TheSpecimen() {
+    return (
+        <GpSection n="01" id="specimen">
+            <GpHead
+                n="01"
+                eyebrow="The specimen"
+                title="Thirty-four lines, complete."
+                lead="One loader with two concurrent queries, one validated mutation, one component. Chosen because it exercises everything the machine below will do — and small enough to hold in your head while it's taken apart. This exact file produced every exhibit on this page."
+            />
+            <div data-reveal className="mt-12 max-w-3xl lg:hidden">
+                <Plate label="pages/search.pyxl" meta="34 lines · complete" caption={<>Fig. 1 — the specimen. Python above the line, React below it, one route between them.</>}>
+                    <div className="duotone">
+                        <SpecimenCode size="text-[12px]" />
+                    </div>
+                </Plate>
+            </div>
+            <p data-reveal className="mt-8 hidden font-mono text-xs leading-relaxed text-ink2 lg:block">
+                The specimen is pinned on the left as the dissection proceeds — Fig. 1, below.
+            </p>
+        </GpSection>
+    );
+}
+
+
+/* ── 02 · The dissection (the centerpiece) ───────────────────────── */
+
+function TheDissection() {
+    return (
+        <section id="dissection" data-astep="print" className="relative">
+            <div className="mx-auto max-w-[76rem] px-5 py-20 sm:px-8 sm:py-28">
+                {/* Running head, magazine-spread style */}
+                <div data-reveal="none" className="flex items-center gap-4">
+                    <span className="font-mono text-xs uppercase tracking-[0.14em] text-press">02 — The dissection</span>
+                    <span className="gp-rule-x gp-from-left h-px flex-1 bg-rule" style={{ ['--rule-delay']: '150ms' }} aria-hidden="true" />
+                    <span className="hidden font-mono text-xs uppercase tracking-[0.14em] text-ink2 sm:block">Follow the file</span>
+                </div>
+
+                <div data-reveal="none" className="mt-12 max-w-2xl">
+                    <h2 className="font-display text-[2rem] font-[540] leading-[1.08] tracking-[-0.01em] text-ink sm:text-[2.6rem]">
+                        <span className="gp-lm"><span>Watch where every line goes.</span></span>
+                    </h2>
+                    <p className="mt-5 max-w-[58ch] text-pretty text-base leading-[1.7] text-ink2">
+                        Five stations, one specimen. As each passage reaches the middle of your
+                        screen, the file answers on the plate.{' '}
+                        <span className="hidden lg:inline">Reading without JavaScript? You're
+                        holding the finished diagram.</span>
+                    </p>
+                </div>
+
+                <div className="mt-14 grid items-start gap-x-12 lg:grid-cols-12">
+                    {/* The pinned specimen (desktop). aria-hidden: it duplicates
+                       Fig. 1 / the mobile excerpts for the visual choreography. */}
+                    <div className="an-stage hidden lg:col-span-6 lg:block" aria-hidden="true">
+                        <div className="sticky top-[4.75rem]">
+                            <Plate label="pages/search.pyxl" meta="34 lines · complete" caption={<>Fig. 1 — the specimen, pinned for dissection.</>}>
+                                <div className="duotone">
+                                    <SpecimenCode size="text-[11.5px] xl:text-[12.5px]" />
+                                </div>
+                            </Plate>
+                        </div>
+                    </div>
+
+                    {/* The stations */}
+                    <div className="lg:col-span-6">
+                        {STEPS.map((s, i) => (
+                            <div
+                                key={s.n}
+                                data-astep-mark={i + 1}
+                                className="flex min-h-[70vh] flex-col justify-center border-t border-rule py-14 first:border-t-0 lg:min-h-[78vh]"
+                            >
+                                <p className="font-mono text-sm text-press">{s.n}</p>
+                                <h3 className="mt-3 font-display text-[1.6rem] font-[540] leading-snug tracking-[-0.01em] text-ink sm:text-[1.9rem]">
+                                    {s.title}
+                                </h3>
+                                <div className="mt-4">{s.body}</div>
+                                {s.excerpt ? <Excerpt from={s.excerpt.from} to={s.excerpt.to} label={s.excerpt.label} /> : null}
+                                <div data-reveal>{s.exhibit}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+
+/* ── 03 · The receipts ───────────────────────────────────────────── */
+
+/* A printer's rule used as an actual ruler: the same DOM, weighed.
+   13.7 KB spans the measure; 5.4 KB is drawn to scale against it. */
+function ByteRuler() {
+    const W = 560;
+    const px = (kb) => Math.round((kb / 13.7) * (W - 40));
+    return (
+        <figure data-reveal className="mt-12 max-w-3xl">
+            <svg viewBox={`0 0 ${W} 96`} className="w-full" role="img" aria-label="Payload comparison: Pyxle ships the landing page in 5.4 kilobytes; Next.js ships the same DOM in 13.7 kilobytes.">
+                {/* tick marks, one per KB */}
+                {Array.from({ length: 14 }, (_, i) => (
+                    <line key={i} x1={(i / 13.7) * (W - 40)} y1="40" x2={(i / 13.7) * (W - 40)} y2="46" stroke="var(--c-rule)" strokeWidth="1" />
+                ))}
+                <text x="0" y="16" className="font-mono" fontSize="11" fill="var(--c-accent-text)">Pyxle — 5.4 KB</text>
+                <path d={`M0 30 H${px(5.4)}`} pathLength="1" className="gp-draw" style={{ ['--draw-dur']: '600ms' }} stroke="var(--c-accent)" strokeWidth="4" strokeLinecap="round" />
+                <circle cx={px(5.4)} cy="30" r="4" className="gp-dot" style={{ ['--dot-delay']: '650ms' }} fill="var(--c-accent)" />
+                <text x="0" y="70" className="font-mono" fontSize="11" fill="var(--c-ink2)">Next.js — 13.7 KB · the same DOM</text>
+                <path d={`M0 84 H${px(13.7)}`} pathLength="1" className="gp-draw" style={{ ['--draw-dur']: '900ms', ['--draw-delay']: '250ms' }} stroke="var(--c-ink2)" strokeWidth="4" strokeLinecap="round" opacity="0.5" />
+            </svg>
+            <figcaption className="mt-3 font-mono text-xs leading-relaxed text-ink2">
+                Fig. 7 — the parity-verified landing page, weighed on the wire. The difference is
+                the hydration payload Next.js inlines and Pyxle doesn't ship. At 300 rows: 145 KB
+                vs 332 KB.
+            </figcaption>
+        </figure>
+    );
+}
+
+const RECEIPT_ROWS = [
+    ['No hydration blob', 'data rides once, as JSON — 2–3× fewer bytes, same DOM'],
+    ['Persistent render pool', '2.1–2.3× Next.js throughput per core, ~half the median latency'],
+    ['Compiled actions on ASGI', 'ahead of FastAPI on query-heavy work; a few % behind on bare JSON'],
+    ['One flag, every core', '--workers: ~5× JSON throughput, more on database endpoints'],
+];
+
+function TheReceipts() {
+    return (
+        <GpSection n="03" id="receipts">
+            <GpHead
+                n="03"
+                eyebrow="The receipts"
+                title="Each mechanism, priced."
+                lead="What you just watched, measured — off-box load generation, parity-verified pages, the losses printed at the same size as the wins."
+            />
+            <ByteRuler />
+            <div className="mt-10 max-w-3xl">
+                {RECEIPT_ROWS.map(([name, desc], i) => (
+                    <div
+                        key={name}
+                        data-reveal
+                        className="group flex items-baseline gap-4 py-3.5"
+                        style={{ ['--reveal-delay']: `${(i % 2) * 90}ms` }}
+                    >
+                        <span className="font-display text-lg font-[540] tracking-[-0.01em] text-ink sm:text-xl">{name}</span>
+                        <span className="gp-leader group-hover:border-accent" aria-hidden="true" />
+                        <span className="text-right font-mono text-xs text-ink2 transition-colors group-hover:text-ink sm:text-[13px]">{desc}</span>
+                    </div>
+                ))}
+                <p data-reveal className="mt-8 font-mono text-xs leading-relaxed text-ink2">
+                    Hono serializes raw JSON faster than we do; we publish that too. 0 errors under
+                    sustained load · 2,500+ tests · 95% coverage gate. Full tables, methodology,
+                    and the losses:{' '}
+                    <Link href="/benchmarks" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">/benchmarks →</Link>
+                </p>
+            </div>
+        </GpSection>
+    );
+}
+
+
+/* ── 04 · The colophon (the page dissects itself) ────────────────── */
+
+function SelfLedger() {
+    const [rows, setRows] = useState(null);
+    useEffect(() => {
+        if (typeof window === 'undefined' || !('performance' in window)) return;
+        const [nav] = performance.getEntriesByType('navigation');
+        if (!nav) return;
+        const kb = nav.transferSize > 0 ? `${(nav.transferSize / 1024).toFixed(1)} KB` : 'from cache';
+        setRows([
+            ['served over', nav.nextHopProtocol || '—'],
+            ['transferred', kb],
+            ['first byte', `${Math.max(0, Math.round(nav.responseStart - nav.startTime))} ms`],
+        ]);
+    }, []);
+    return (
+        <figure data-reveal className="mt-10 max-w-md">
+            <dl className="border-t border-rule">
+                {(rows || [['served over', '—'], ['transferred', '—'], ['first byte', '—']]).map(([k, v]) => (
+                    <div key={k} className="flex items-baseline justify-between gap-6 border-b border-rule py-3">
+                        <dt className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">{k}</dt>
+                        <dd className="font-mono text-[13px] tabular-nums text-ink">{v}</dd>
+                    </div>
+                ))}
+            </dl>
+            <figcaption className="mt-3 font-mono text-xs leading-relaxed text-ink2">
+                Fig. 8 — your copy of this page, accounted for by your own browser.
+            </figcaption>
+        </figure>
+    );
+}
+
+function TheColophon() {
+    return (
+        <GpSection n="04" id="colophon">
+            <GpHead
+                n="04"
+                eyebrow="Colophon"
+                title="This page came off the same press."
+                lead="It is a .pyxl file with no loader — the machine it documents is the machine that served it. The claims above aren't a demo build; they're the shipped defaults."
+            />
+            <div className="mt-12 grid max-w-3xl gap-10 sm:grid-cols-2">
+                <div data-reveal>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">Read it as Markdown</p>
+                    <div className="mt-3 flex items-center justify-between gap-3 rounded-[6px] bg-plate px-3.5 py-2.5">
+                        <code className="truncate font-mono text-[12.5px] text-[#D7DCD4]">curl pyxle.dev/anatomy.md</code>
+                        <CopyButton text="curl pyxle.dev/anatomy.md" />
+                    </div>
+                    <p className="mt-3 font-mono text-xs leading-relaxed text-ink2">
+                        This page is also Markdown — like every page here. One config flag.
+                    </p>
+                </div>
+                <div data-reveal style={{ ['--reveal-delay']: '90ms' }}>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">Run the dissection on your app</p>
+                    <div className="mt-3 flex items-center justify-between gap-3 rounded-[6px] bg-plate px-3.5 py-2.5">
+                        <code className="truncate font-mono text-[12.5px] text-[#D7DCD4]">pyxle build --analyze</code>
+                        <CopyButton text="pyxle build --analyze" />
+                    </div>
+                    <p className="mt-3 font-mono text-xs leading-relaxed text-ink2">
+                        Fig. 5 wasn't bespoke: weighing the build is a CLI flag.
+                    </p>
+                </div>
+            </div>
+            <SelfLedger />
+        </GpSection>
+    );
+}
+
+
+/* ── 05 · Begin ──────────────────────────────────────────────────── */
+
+const BEGIN_CMDS = 'pip install pyxle-framework\npyxle init my-app && cd my-app\npyxle dev';
+
+function Begin() {
+    return (
+        <GpSection n="05" id="begin">
+            <GpHead
+                n="05"
+                eyebrow="Begin"
+                title="Your file is three commands away."
+            />
+            <div className="mt-10 max-w-xl">
+                <Plate label="terminal">
+                    <div className="duotone flex items-start justify-between gap-3">
+                        <CodeBlock lang="bash" className="p-5 text-[13px]" code={`$ pip install pyxle-framework
+$ pyxle init my-app && cd my-app
+$ pyxle dev`} />
+                        <span className="p-4"><CopyButton text={BEGIN_CMDS} /></span>
+                    </div>
+                </Plate>
+                <div className="mt-8 flex flex-wrap items-center gap-5">
+                    <InkButton href="/docs/getting-started/quick-start">Quick start</InkButton>
+                    <EditorialLink href="/playground">Or dissect ours first →</EditorialLink>
+                </div>
+            </div>
+        </GpSection>
+    );
+}
+
+
+/* ── The page ────────────────────────────────────────────────────── */
+
+export default function Anatomy() {
+    useScrollReveal();
+    useDissection();
+    return (
+        <div className="relative">
+            <Head>
+                <title>The anatomy of a page - Pyxle Framework</title>
+                <meta name="description" content="One .pyxl file, dissected in public: the cut the compiler makes, the bytes the server ships, the round trip back. Every exhibit is a real byte from a real response — bring curl." />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <meta name="theme-color" content="#101411" />
+                <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+            </Head>
+            <Hero />
+            <TheSpecimen />
+            <TheDissection />
+            <TheReceipts />
+            <TheColophon />
+            <Begin />
+            <GalleyFooter />
+        </div>
+    );
+}

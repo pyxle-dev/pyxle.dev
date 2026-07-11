@@ -93,6 +93,7 @@
 
 ## More
 
+- [The anatomy of a page](https://pyxle.dev/anatomy.md): how one .pyxl file becomes two programs — dissected with real bytes
 - [Plugin directory](https://pyxle.dev/plugins.md): official and community plugins
 - [Benchmarks & methodology](https://pyxle.dev/benchmarks.md): reproducible performance numbers
 - [Interactive playground](https://pyxle.dev/playground.md): run Pyxle in the browser

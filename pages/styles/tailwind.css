@@ -574,3 +574,42 @@ html.no-js .rm-dot--shipped { background-color: var(--c-accent); border-color: v
     }
     html.js [data-reveal].is-visible .rm-dot--now { animation: none; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   /anatomy — the dissection state machine.
+   One IntersectionObserver sets data-astep on #dissection; every
+   visual state below is prerendered CSS. The server renders
+   data-astep="print" (the finished diagram), so no-JS visitors and
+   crawlers receive the complete dissection. Lines carry data-half
+   (py|cli — the two sides of the cut) and data-g (organ groups).
+   ════════════════════════════════════════════════════════════════ */
+
+.an-ln {
+    transition:
+        opacity 420ms cubic-bezier(0.22, 1, 0.36, 1),
+        background-color 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* The two halves, registered in the margin: ochre press ink for the
+   server's side of the cut, accent for the browser's. */
+.an-ln[data-half="py"]  { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--c-press) 50%, transparent); }
+.an-ln[data-half="cli"] { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--c-accent) 42%, transparent); }
+
+/* Station focus: dim everything but the organ under discussion… */
+#dissection[data-astep="2"] .an-stage .an-ln:not([data-g~="loader"]),
+#dissection[data-astep="3"] .an-stage .an-ln:not([data-g~="comp"]),
+#dissection[data-astep="4"] .an-stage .an-ln:not([data-g~="wake"]),
+#dissection[data-astep="5"] .an-stage .an-ln:not([data-g~="action"]):not([data-g~="model"]) {
+    opacity: 0.32;
+}
+/* …and set the organ itself in a wash. */
+#dissection[data-astep="2"] .an-stage .an-ln[data-g~="loader"],
+#dissection[data-astep="3"] .an-stage .an-ln[data-g~="render"],
+#dissection[data-astep="4"] .an-stage .an-ln[data-g~="wake"],
+#dissection[data-astep="5"] .an-stage .an-ln[data-g~="action"],
+#dissection[data-astep="5"] .an-stage .an-ln[data-g~="model"] {
+    background-color: color-mix(in srgb, var(--c-accent) 10%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .an-ln { transition: none; }
+}
