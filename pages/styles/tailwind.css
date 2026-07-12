@@ -700,3 +700,49 @@ html.js [data-reveal].is-visible .seam-count {
         html.js [data-reveal].is-visible .seam-line { transform: scaleY(1); }
     }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   /compare — the capability matrix.
+   Pyxle's column is tinted and capped in accent so the eye reads it
+   as the only complete column. Marks: full (dot), partial (ring),
+   none (dash). No transforms on table rows; the whole figure reveals
+   as one via .mx-wrap[data-reveal].
+   ════════════════════════════════════════════════════════════════ */
+
+.mx-table { border-collapse: separate; border-spacing: 0; }
+.mx-table th, .mx-table td { padding: 0.95rem 0.6rem; }
+.mx-cap-h, .mx-cap { text-align: left; width: 42%; padding-left: 0; }
+.mx-col-h, .mx-cell { text-align: center; vertical-align: middle; width: 14.5%; }
+.mx-table thead th { vertical-align: bottom; padding-bottom: 1rem; border-bottom: 1px solid var(--c-rule); }
+.mx-table tbody tr { border-top: 1px solid var(--c-rule); }
+.mx-table tbody tr:first-child > * { border-top: 0; }
+.mx-cap { vertical-align: baseline; }
+
+/* the highlighted winning column */
+.mx-col-pyxle { background: color-mix(in srgb, var(--c-accent) 7%, transparent); }
+.mx-table thead th.mx-col-pyxle {
+    border-top: 2px solid var(--c-accent);
+    border-top-left-radius: 7px; border-top-right-radius: 7px;
+}
+.mx-tally .mx-col-pyxle {
+    border-bottom: 2px solid var(--c-accent);
+    border-bottom-left-radius: 7px; border-bottom-right-radius: 7px;
+}
+.mx-tally th, .mx-tally td { padding-top: 1.15rem; border-top: 1px solid var(--c-rule); }
+
+/* marks */
+.mx-mark { display: inline-block; vertical-align: middle; }
+.mx-full { width: 10px; height: 10px; border-radius: 9999px; background: var(--c-ink2); }
+.mx-full.mx-acct {
+    background: var(--c-accent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 16%, transparent);
+    width: 11px; height: 11px;
+}
+.mx-part { width: 10px; height: 10px; border-radius: 9999px; border: 1.5px solid var(--c-ink2); background: transparent; }
+.mx-none { width: 12px; height: 2px; border-radius: 2px; background: var(--c-ink2); opacity: 0.38; }
+
+@media (max-width: 640px) {
+    .mx-table th, .mx-table td { padding: 0.8rem 0.4rem; }
+    .mx-cap { width: 38%; }
+    .mx-col-h .font-display { font-size: 0.95rem; }
+}
