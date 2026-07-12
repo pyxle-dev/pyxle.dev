@@ -574,3 +574,175 @@ html.no-js .rm-dot--shipped { background-color: var(--c-accent); border-color: v
     }
     html.js [data-reveal].is-visible .rm-dot--now { animation: none; }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   /compare — the custody ledger.
+   Four ledger lines trace one field across four stacks. Line width
+   is proportional to station count, so Pyxle's line is physically
+   short and the two-stack line is long. All rows animate at ONE
+   speed — one station per beat (300ms) — released by the shared
+   scroll-reveal observer (.is-visible on the .seam-fig ancestor).
+   No JS off / reduced-motion / print → the finished ledger.
+   Per-row --last = stations-1; per-station --i = index.
+   ════════════════════════════════════════════════════════════════ */
+
+.seam-fig { display: flex; flex-direction: column; gap: 0; }
+
+.seam-row {
+    display: flex;
+    align-items: center;
+    gap: 1.75rem;
+    padding: 1.9rem 0;
+    border-top: 1px solid var(--c-rule);
+}
+.seam-row:first-child { border-top: 0; }
+.seam-head { width: 13.5rem; flex: none; }
+
+.seam-track {
+    position: relative;
+    flex: none;
+    width: calc((var(--last) + 0.55) * 6.6rem);
+    max-width: 100%;
+    padding-bottom: 1.6rem;   /* room for labels below the line */
+}
+.seam-line {
+    position: absolute;
+    left: 0; top: 4px;
+    height: 2px; width: 100%;
+    background: color-mix(in srgb, var(--c-ink2) 42%, transparent);
+    transform-origin: left center;
+}
+.seam-row--pyxle .seam-line { background: var(--c-accent); height: 2.5px; top: 3.75px; }
+
+.seam-stations {
+    position: relative;
+    margin: 0; padding: 0; list-style: none;
+    display: flex; justify-content: space-between; align-items: center;
+    height: 10px;
+}
+.seam-station { position: relative; flex: none; }
+.seam-dot {
+    display: block;
+    width: 9px; height: 9px; border-radius: 9999px;
+    border: 2px solid var(--c-ink2); background: var(--c-paper);
+}
+.seam-row--pyxle .seam-dot { border-color: var(--c-accent); background: var(--c-accent); }
+.seam-label {
+    position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+    font-size: 10.5px; line-height: 1.15; letter-spacing: -0.01em;
+    color: var(--c-ink2); white-space: nowrap;
+}
+.seam-station:first-child .seam-label { left: 0; transform: none; }
+.seam-station:last-child  .seam-label { left: auto; right: 0; transform: none; }
+.seam-row--pyxle .seam-label { color: color-mix(in srgb, var(--c-accent) 78%, var(--c-ink)); }
+
+.seam-count { flex: none; padding-left: 0.75rem; }
+
+/* ── the choreography (JS on; released by .is-visible) ───────────── */
+html.js [data-reveal] .seam-line    { transform: scaleX(0); }
+html.js [data-reveal] .seam-station { opacity: 0; transform: scale(0.4); }
+html.js [data-reveal] .seam-count   { opacity: 0; }
+
+html.js [data-reveal].is-visible .seam-line {
+    transform: scaleX(1);
+    transition: transform calc(var(--last) * 300ms) cubic-bezier(0.22, 1, 0.36, 1);
+}
+html.js [data-reveal].is-visible .seam-station {
+    opacity: 1; transform: scale(1);
+    transition: opacity 260ms ease, transform 380ms cubic-bezier(0.34, 1.4, 0.6, 1);
+    transition-delay: calc(var(--i) * 300ms);
+}
+html.js [data-reveal].is-visible .seam-count {
+    opacity: 1;
+    transition: opacity 420ms ease;
+    transition-delay: calc(var(--i) * 300ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html.js [data-reveal] .seam-line,
+    html.js [data-reveal].is-visible .seam-line { transform: scaleX(1); transition: none; }
+    html.js [data-reveal] .seam-station,
+    html.js [data-reveal].is-visible .seam-station { opacity: 1; transform: none; transition: none; }
+    html.js [data-reveal] .seam-count,
+    html.js [data-reveal].is-visible .seam-count { opacity: 1; transition: none; }
+}
+
+/* ── mobile (≤900px): four vertical timelines ────────────────────── */
+@media (max-width: 900px) {
+    .seam-row { flex-direction: column; align-items: stretch; gap: 0.9rem; padding: 1.6rem 0; }
+    .seam-head { width: auto; }
+    .seam-track {
+        width: auto; max-width: none;
+        padding: 0 0 0 1.25rem;   /* left rail gutter */
+    }
+    .seam-line {
+        left: 3px; top: 2px;
+        width: 2px; height: 100%;
+        transform-origin: top center;
+    }
+    .seam-row--pyxle .seam-line { width: 2.5px; left: 2.75px; }
+    .seam-stations { flex-direction: column; align-items: stretch; height: auto; gap: 0.85rem; }
+    .seam-station { padding-left: 1rem; }
+    .seam-dot { position: absolute; left: -1.25rem; margin-top: 1px; }
+    .seam-station:first-child .seam-dot { left: -1.25rem; }
+    .seam-label {
+        position: static; transform: none; left: auto; right: auto;
+        font-size: 12px; white-space: normal;
+    }
+    .seam-station:first-child .seam-label,
+    .seam-station:last-child .seam-label { left: auto; right: auto; }
+    .seam-count { padding-left: 1.25rem; margin-top: 0.35rem; }
+    /* vertical growth on mobile */
+    html.js [data-reveal] .seam-line { transform: scaleY(0); }
+    html.js [data-reveal].is-visible .seam-line { transform: scaleY(1); }
+    @media (prefers-reduced-motion: reduce) {
+        html.js [data-reveal] .seam-line,
+        html.js [data-reveal].is-visible .seam-line { transform: scaleY(1); }
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   /compare — the capability matrix.
+   Pyxle's column is tinted and capped in accent so the eye reads it
+   as the only complete column. Marks: full (dot), partial (ring),
+   none (dash). No transforms on table rows; the whole figure reveals
+   as one via .mx-wrap[data-reveal].
+   ════════════════════════════════════════════════════════════════ */
+
+.mx-table { border-collapse: separate; border-spacing: 0; }
+.mx-table th, .mx-table td { padding: 0.95rem 0.6rem; }
+.mx-cap-h, .mx-cap { text-align: left; width: 42%; padding-left: 0; }
+.mx-col-h, .mx-cell { text-align: center; vertical-align: middle; width: 14.5%; }
+.mx-table thead th { vertical-align: bottom; padding-bottom: 1rem; border-bottom: 1px solid var(--c-rule); }
+.mx-table tbody tr { border-top: 1px solid var(--c-rule); }
+.mx-table tbody tr:first-child > * { border-top: 0; }
+.mx-cap { vertical-align: baseline; }
+
+/* the highlighted winning column */
+.mx-col-pyxle { background: color-mix(in srgb, var(--c-accent) 7%, transparent); }
+.mx-table thead th.mx-col-pyxle {
+    border-top: 2px solid var(--c-accent);
+    border-top-left-radius: 7px; border-top-right-radius: 7px;
+}
+.mx-tally .mx-col-pyxle {
+    border-bottom: 2px solid var(--c-accent);
+    border-bottom-left-radius: 7px; border-bottom-right-radius: 7px;
+}
+.mx-tally th, .mx-tally td { padding-top: 1.15rem; border-top: 1px solid var(--c-rule); }
+
+/* marks */
+.mx-mark { display: inline-block; vertical-align: middle; }
+.mx-full { width: 10px; height: 10px; border-radius: 9999px; background: var(--c-ink2); }
+.mx-full.mx-acct {
+    background: var(--c-accent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 16%, transparent);
+    width: 11px; height: 11px;
+}
+.mx-part { width: 10px; height: 10px; border-radius: 9999px; border: 1.5px solid var(--c-ink2); background: transparent; }
+.mx-none { width: 12px; height: 2px; border-radius: 2px; background: var(--c-ink2); opacity: 0.38; }
+
+@media (max-width: 640px) {
+    .mx-table th, .mx-table td { padding: 0.8rem 0.4rem; }
+    .mx-cap { width: 38%; }
+    .mx-col-h .font-display { font-size: 0.95rem; }
+}

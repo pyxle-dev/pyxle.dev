@@ -356,6 +356,9 @@ function TheFile() {
                     </Plate>
                 </div>
             </div>
+            <div data-reveal className="mt-12">
+                <EditorialLink href="/compare">See the same feature across four stacks →</EditorialLink>
+            </div>
         </GpSection>
     );
 }
@@ -491,7 +494,7 @@ function TheNumbers() {
                 </p>
                 <p data-reveal className="mt-3 font-mono text-xs leading-relaxed text-ink2" style={{ ['--reveal-delay']: '80ms' }}>
                     Beyond raw speed — the full picture against Django, FastAPI, and Next.js is in{' '}
-                    <Link href="/docs/guides/comparison" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">the comparison →</Link>
+                    <Link href="/compare" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">the comparison →</Link>
                 </p>
             </div>
         </GpSection>

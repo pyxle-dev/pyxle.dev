@@ -1,0 +1,376 @@
+import React from 'react';
+import { Link, Head } from 'pyxle/client';
+import {
+    useScrollReveal, CopyButton, CodeBlock, PMark,
+    InkButton, EditorialLink, Plate, GpSection, GpHead, GalleyFooter,
+} from './components/galley.jsx';
+
+/* ════════════════════════════════════════════════════════════════
+   COMPARE — /compare
+   The industry spent a decade splitting frontend from backend, then
+   the next one gluing it back (RSC, server actions, type codegen,
+   BFF layers) — all of it the seam fighting itself. Pyxle was built
+   without one. This page proves it two ways: a capability matrix
+   where Pyxle is the only complete column, and a custody ledger that
+   traces one real field across four stacks. Every Pyxle exhibit is a
+   byte captured from a real build; every competitor mark is
+   defensible against their own docs. Confident, forward, and true.
+   Loader-less, fully SSG.
+   ════════════════════════════════════════════════════════════════ */
+
+
+export const slots = {
+    'nav-extra': () => (
+        <a
+            href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/compare.pyxl"
+            target="_blank"
+            rel="noreferrer"
+            title="View this page's source"
+            className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
+        >
+            source ↗
+        </a>
+    ),
+};
+export const createSlots = () => slots;
+
+
+/* ── The capability matrix — Pyxle is the only complete column ───── */
+
+const COLS = [
+    { key: 'pyxle', name: 'Pyxle', sub: 'one file' },
+    { key: 'next', name: 'Next + FastAPI', sub: 'two services' },
+    { key: 'reflex', name: 'Reflex', sub: 'python-only' },
+    { key: 'django', name: 'Django', sub: 'templates' },
+];
+
+// mark: 2 = full · 1 = partial/wrapped · 0 = no
+const ROWS = [
+    { cap: 'Real React — npm-install anything', note: 'the whole ecosystem, no wrapper', marks: { pyxle: 2, next: 2, reflex: 1, django: 0 } },
+    { cap: 'Server logic in Python', note: '@server loaders, @action mutations', marks: { pyxle: 2, next: 2, reflex: 2, django: 2 } },
+    { cap: 'One service, one deploy', note: 'no CORS, no second runtime', marks: { pyxle: 2, next: 0, reflex: 1, django: 2 } },
+    { cap: 'No API contract to hand-keep', note: 'the loader’s return is the props', marks: { pyxle: 2, next: 0, reflex: 2, django: 2 } },
+    { cap: 'Streaming SSR on React 19', note: '<Suspense>, shell-first', marks: { pyxle: 2, next: 2, reflex: 1, django: 0 } },
+    { cap: 'One file per feature', note: 'loader, mutation, UI — colocated', marks: { pyxle: 2, next: 0, reflex: 2, django: 0 } },
+    { cap: 'AI-native surface', note: 'AGENTS.md scaffold · every page as Markdown · llms.txt', marks: { pyxle: 2, next: 0, reflex: 0, django: 0 } },
+];
+
+function Mark({ v, accent }) {
+    if (v === 2) return <span className={`mx-mark mx-full ${accent ? 'mx-acct' : ''}`} aria-label="yes" />;
+    if (v === 1) return <span className="mx-mark mx-part" aria-label="partial" />;
+    return <span className="mx-mark mx-none" aria-label="no" />;
+}
+
+function Matrix() {
+    return (
+        <div data-reveal className="mx-wrap mt-12 overflow-x-auto">
+            <table className="mx-table w-full min-w-[46rem] border-collapse">
+                <thead>
+                    <tr>
+                        <th scope="col" className="mx-cap-h" />
+                        {COLS.map((c) => (
+                            <th key={c.key} scope="col" className={`mx-col-h ${c.key === 'pyxle' ? 'mx-col-pyxle' : ''}`}>
+                                <span className={`block font-display text-[1.15rem] font-[560] tracking-[-0.01em] ${c.key === 'pyxle' ? 'text-acct' : 'text-ink'}`}>{c.name}</span>
+                                <span className="mt-0.5 block font-mono text-[10.5px] uppercase tracking-[0.12em] text-ink2">{c.sub}</span>
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {ROWS.map((r, i) => (
+                        <tr key={r.cap}>
+                            <th scope="row" className="mx-cap">
+                                <span className="block text-[15px] font-medium leading-snug text-ink">{r.cap}</span>
+                                <span className="mt-0.5 block font-mono text-[11px] leading-snug text-ink2">{r.note}</span>
+                            </th>
+                            {COLS.map((c) => (
+                                <td key={c.key} className={`mx-cell ${c.key === 'pyxle' ? 'mx-col-pyxle' : ''}`}>
+                                    <Mark v={r.marks[c.key]} accent={c.key === 'pyxle'} />
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                    <tr className="mx-tally" aria-hidden="true">
+                        <th scope="row" className="mx-cap"><span className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">Complete</span></th>
+                        {COLS.map((c) => {
+                            const full = ROWS.filter((r) => r.marks[c.key] === 2).length;
+                            return (
+                                <td key={c.key} className={`mx-cell ${c.key === 'pyxle' ? 'mx-col-pyxle' : ''}`}>
+                                    <span className={`font-mono text-lg font-medium tabular-nums ${c.key === 'pyxle' ? 'text-acct' : 'text-ink2'}`}>{full}<span className="text-[11px] text-ink2">/7</span></span>
+                                </td>
+                            );
+                        })}
+                    </tr>
+                </tbody>
+            </table>
+            <p className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] text-ink2">
+                <span className="inline-flex items-center gap-2"><span className="mx-mark mx-full mx-acct" /> full</span>
+                <span className="inline-flex items-center gap-2"><span className="mx-mark mx-part" /> partial or wrapped</span>
+                <span className="inline-flex items-center gap-2"><span className="mx-mark mx-none" /> not built in</span>
+                <span className="text-ink2/70">Each mark is defensible against that framework’s own docs. “Next + FastAPI” is the two-service stack Pyxle replaces — Next’s App Router collapses part of this in JavaScript, not Python.</span>
+            </p>
+        </div>
+    );
+}
+
+
+/* ── The custody ledger: one field, four journeys ────────────────── */
+
+const SEAM = [
+    { key: 'next', stack: 'Next.js + FastAPI', note: 'a schema, a generated client, and a contract two runtimes keep by hand', stations: ['Note', 'response_model', 'openapi.json', 'types.gen.ts', 'fetch', 'props'], count: '6 representations', drift: '3 places to drift' },
+    { key: 'reflex', stack: 'Reflex', note: 'the field crosses wearing the wrapper’s costume', stations: ['rx.State', 'diff over WS', 'wrapped var'], count: '3 representations', drift: '1 wrapper to cross' },
+    { key: 'django', stack: 'Django', note: 'short — until you want a real component model', stations: ['QuerySet', 'context', 'template'], count: '3 representations', drift: 'types end at the template' },
+    { key: 'pyxle', stack: 'Pyxle', note: 'the loader’s return value is the component’s props', stations: ['loader return', 'props'], count: '1 representation', drift: '0 places to drift' },
+];
+
+function SeamRow({ row, i }) {
+    const isPyxle = row.key === 'pyxle';
+    const last = row.stations.length - 1;
+    return (
+        <div className={`seam-row ${isPyxle ? 'seam-row--pyxle' : ''}`} style={{ ['--last']: last, ['--reveal-delay']: `${i * 70}ms` }}>
+            <div className="seam-head">
+                <span className={`font-mono text-[13px] ${isPyxle ? 'font-medium text-acct' : 'text-ink'}`}>{row.stack}</span>
+                <span className="mt-1 block max-w-[26ch] text-[12px] leading-snug text-ink2">{row.note}</span>
+            </div>
+            <div className="seam-track" role="img" aria-label={`${row.stations.join(' to ')} — ${row.count}, ${row.drift}`}>
+                <span className="seam-line" aria-hidden="true" />
+                <ol className="seam-stations">
+                    {row.stations.map((s, j) => (
+                        <li key={s} className="seam-station" style={{ ['--i']: j }}>
+                            <span className="seam-dot" aria-hidden="true" />
+                            <span className="seam-label font-mono">{s}</span>
+                        </li>
+                    ))}
+                </ol>
+            </div>
+            <div className="seam-count" style={{ ['--i']: row.stations.length }}>
+                <span className={`font-mono text-[13px] font-medium ${isPyxle ? 'text-acct' : 'text-ink'}`}>{row.count}</span>
+                <span className="mt-0.5 block font-mono text-[11px] text-ink2">{row.drift}</span>
+            </div>
+        </div>
+    );
+}
+
+
+/* ── Hero ────────────────────────────────────────────────────────── */
+
+function Hero() {
+    return (
+        <section className="relative">
+            <div className="mx-auto max-w-[76rem] px-5 pb-16 pt-28 sm:px-8 sm:pb-20 sm:pt-36">
+                <p className="font-mono text-xs uppercase tracking-[0.14em] text-ink2">
+                    Compare — Pyxle vs the field
+                </p>
+                <h1 className="mt-5 font-display text-[2.9rem] font-[560] leading-[1.03] tracking-[-0.015em] text-ink sm:text-[4.2rem] lg:text-[5.2rem]">
+                    Real React. Pure Python.
+                    <br />
+                    <span className="text-acct">No seam</span><span className="gp-dot-load ml-[0.06em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
+                    <span className="sr-only">.</span>
+                </h1>
+                <p className="mt-7 max-w-[62ch] text-pretty text-lg leading-[1.7] text-ink2">
+                    The industry spent a decade splitting the frontend from the backend — then the
+                    next one gluing it back. Server components, server actions, type generators, BFF
+                    layers: it’s all <span className="text-ink">the seam, fighting itself</span>.
+                    Pyxle was built without one — every stack is converging on where it already is.
+                </p>
+                <p className="mt-6 font-mono text-xs leading-relaxed text-ink2">
+                    one language you know · one file per feature · one service to deploy · shipping since v0.1, a release most weeks
+                </p>
+                <div className="mt-9 flex flex-wrap items-center gap-5">
+                    <InkButton href="/docs/getting-started/quick-start">Start building</InkButton>
+                    <EditorialLink href="#numbers">See the numbers ↓</EditorialLink>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+
+/* ── 01 · The matrix ─────────────────────────────────────────────── */
+
+function TheMatrix() {
+    return (
+        <GpSection n="01" id="matrix">
+            <GpHead
+                n="01"
+                eyebrow="The set"
+                title="The only column that’s all the way green."
+                lead="Every stack is great at something. Pyxle is the only one great at all of it at once — the full React ecosystem, real Python on the server, one file, one deploy, and an AI-native surface none of the others ship."
+            />
+            <Matrix />
+        </GpSection>
+    );
+}
+
+
+/* ── 02 · The custody ledger (the tax) ───────────────────────────── */
+
+function CustodyLedger() {
+    return (
+        <section id="ledger" className="relative">
+            <div className="mx-auto max-w-[80rem] px-5 py-20 sm:px-8 sm:py-28">
+                <div data-reveal="none" className="flex items-center gap-4">
+                    <span className="font-mono text-xs uppercase tracking-[0.14em] text-press">02 — The tax</span>
+                    <span className="gp-rule-x gp-from-left h-px flex-1 bg-rule" style={{ ['--rule-delay']: '150ms' }} aria-hidden="true" />
+                    <span className="hidden font-mono text-xs uppercase tracking-[0.14em] text-ink2 sm:block">One field, four journeys</span>
+                </div>
+
+                <div data-reveal="none" className="mt-12 max-w-2xl">
+                    <h2 className="font-display text-[2rem] font-[540] leading-[1.08] tracking-[-0.01em] text-ink sm:text-[2.6rem]">
+                        <span className="gp-lm"><span>The old stack makes your data wear six costumes.</span></span>
+                    </h2>
+                    <p className="mt-5 max-w-[60ch] text-pretty text-base leading-[1.7] text-ink2">
+                        Follow one field — a search <code className="text-[0.9em] text-acct">notes</code> list
+                        — from the database to your component. In a split stack it is re-typed,
+                        re-serialized, and re-validated at every border it crosses. In Pyxle the
+                        loader’s return value <span className="text-ink">is</span> the props. Watch the
+                        line that finishes first.
+                    </p>
+                </div>
+
+                <div data-reveal data-rt="late" className="seam-fig mt-14">
+                    {SEAM.map((row, i) => <SeamRow key={row.key} row={row} i={i} />)}
+                </div>
+
+                <p className="mt-8 max-w-[68ch] font-mono text-xs leading-relaxed text-ink2">
+                    Fig. 1 — chain of custody for <span className="text-ink">notes</span>. Station names
+                    are each framework’s own (<code className="text-acct">types.gen.ts</code> is the
+                    conventional name for the client types openapi-typescript generates;{' '}
+                    <code className="text-acct">rx.State</code> is Reflex’s; <code className="text-acct">context</code>{' '}
+                    is Django’s). The lines animate at one speed — a longer line has more stations to
+                    cross, not a slower clock.
+                </p>
+            </div>
+        </section>
+    );
+}
+
+
+/* ── 03 · The proof (real bytes + the numbers) ───────────────────── */
+
+function TheProof() {
+    return (
+        <GpSection n="03" id="numbers">
+            <GpHead
+                n="03"
+                eyebrow="The proof"
+                title="One costume. And it’s fast."
+                lead="The short seam isn’t just cleaner — it’s cheaper at runtime. Real bytes off a real build, then the numbers, wins first."
+            />
+            <div className="mt-12 grid gap-8 lg:grid-cols-2">
+                <Plate data-reveal label="GET /search?q=in — the whole document" meta="2,020 bytes" caption={<>Fig. 2 — the entire response. The field arrives still wearing its only costume: props, shipped once as inert JSON.</>}>
+                    <div className="duotone">
+                        <CodeBlock lang="html" className="p-5 text-[12px]" code={`<h1>3<!-- --> notes match “<!-- -->in<!-- -->”</h1>
+<ul><li>Kerning the long dash</li>
+    <li>Ochre ink, mixing notes</li>
+    <li>On margins and measure</li></ul>
+<script id="__PYXLE_PROPS__" type="application/json">
+  {"data":{"q":"in","notes":[{"id":2,"title":"Kerning the long dash"},
+   {"id":3,"title":"Ochre ink, mixing notes"},
+   {"id":4,"title":"On margins and measure"}],"total":3}}
+</script>
+<link rel="modulepreload" href="…/search-CXnHMteq.js" />
+⋯  x-request-id: 256151ee6c574687bd04dc4cdeb0c769`} />
+                    </div>
+                </Plate>
+                <Plate data-reveal label="the split, proven" caption={<>Fig. 3 — the loader’s server code, grepped for in the built client chunk. Absent by construction. The page’s own chunk: 2.6&nbsp;KB / 1.3&nbsp;KB gzip.</>}>
+                    <div className="duotone">
+                        <CodeBlock lang="bash" className="p-5 text-[12px]" code={`$ grep -c 'find_notes\\|remember\\|SavedSearch' \\
+    dist/assets/search-*.js
+0`} />
+                    </div>
+                </Plate>
+            </div>
+
+            {/* The wins, stated big */}
+            <div className="mt-14 max-w-4xl">
+                <dl className="grid gap-x-10 gap-y-8 sm:grid-cols-3">
+                    {[
+                        ['~2×', 'faster dynamic SSR than Next.js, per core'],
+                        ['2–3×', 'fewer bytes for the same DOM — no hydration blob'],
+                        ['1.31×', 'FastAPI’s throughput on database-query pages'],
+                    ].map(([n, d], i) => (
+                        <div key={d} data-reveal className="border-t border-rule pt-4" style={{ ['--reveal-delay']: `${i * 80}ms` }}>
+                            <dd className="font-mono text-[2.6rem] font-medium leading-none tracking-tight text-acct sm:text-[3.2rem]">{n}</dd>
+                            <dt className="mt-3 max-w-[24ch] text-sm leading-relaxed text-ink2">{d}</dt>
+                        </div>
+                    ))}
+                </dl>
+                <p data-reveal className="mt-10 max-w-[72ch] text-pretty text-base leading-[1.7] text-ink2">
+                    Pyxle matches FastAPI on trivial endpoints and <span className="text-ink">pulls
+                    ahead on real database work</span>; one flag scales it near-linearly across every
+                    core. Raw-JSON microbenchmarks belong to Node routers like Hono —{' '}
+                    <span className="text-ink">Pyxle is a full framework that renders React and runs
+                    your Python, and it’s still five figures per core.</span> Zero errors under load ·
+                    2,500+ tests · 95% coverage gate. Every number, the hardware, and the losses:{' '}
+                    <Link href="/benchmarks" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">/benchmarks →</Link>
+                </p>
+            </div>
+        </GpSection>
+    );
+}
+
+
+/* ── 04 · Where this goes (honesty + the future) ─────────────────── */
+
+const SHIPPED = 'streaming SSR · realtime & WebSockets · Pydantic-validated actions · caching, SSG & ISR · observability · background work · image optimization · multi-worker serving · Markdown-native pages';
+
+function WhereThisGoes() {
+    return (
+        <GpSection n="04" id="future">
+            <GpHead
+                n="04"
+                eyebrow="Where this goes"
+                title="This is the floor, not the ceiling."
+                lead="Pyxle is opinionated on purpose — and honest about it. If you’ll never write a line of JavaScript, use Reflex. If you need Django’s admin, use Django. For everyone building a real React product on a Python brain, Pyxle already does more, in less."
+            />
+            <div className="mt-12 max-w-3xl">
+                <div data-reveal className="border-t border-rule pt-6">
+                    <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">Shipped in its first year</p>
+                    <p className="mt-3 text-pretty text-base leading-[1.8] text-ink2">{SHIPPED}.</p>
+                </div>
+                <div data-reveal className="mt-8 border-t border-rule pt-6" style={{ ['--reveal-delay']: '90ms' }}>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">Next</p>
+                    <p className="mt-3 max-w-[62ch] text-pretty text-lg leading-[1.7] text-ink">
+                        <span className="text-acct">Pyxle Cloud</span> — push a Pyxle app and skip the
+                        server story entirely, with AI scaffolding in the mix.
+                    </p>
+                    <p className="mt-2 max-w-[58ch] text-pretty text-base leading-[1.7] text-ink2">
+                        In development. The one file becomes one command. See the whole trajectory on
+                        the <Link href="/roadmap" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">roadmap</Link> — the newsletter hears it first.
+                    </p>
+                </div>
+                <div data-reveal className="mt-12 flex flex-wrap items-center gap-5">
+                    <InkButton href="/docs/getting-started/quick-start">Start building</InkButton>
+                    <EditorialLink href="/benchmarks">See the benchmarks →</EditorialLink>
+                    <EditorialLink href="/playground">Try it in the browser →</EditorialLink>
+                </div>
+                <p data-reveal className="mt-10 font-display text-lg text-ink">Measured, not marketed.</p>
+            </div>
+        </GpSection>
+    );
+}
+
+
+/* ── The page ────────────────────────────────────────────────────── */
+
+export default function Compare() {
+    useScrollReveal();
+    return (
+        <div className="relative">
+            <Head>
+                <title>Compare - Pyxle vs Next.js + FastAPI, Reflex, Django</title>
+                <meta name="description" content="Real React, pure Python, no seam. The capability set only Pyxle completes — plus one real field traced through four stacks, and the benchmark wins, with the losses shown too. Measured, not marketed." />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
+                <meta name="theme-color" content="#101411" />
+                <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+            </Head>
+            <Hero />
+            <TheMatrix />
+            <CustodyLedger />
+            <TheProof />
+            <WhereThisGoes />
+            <GalleyFooter />
+        </div>
+    );
+}

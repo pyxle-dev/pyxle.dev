@@ -227,6 +227,7 @@ const SEARCH_KEYWORDS = {
 const SITE_PAGES = [
   { path: "/", priority: "1.0" },
   { path: "/docs", priority: "0.9" },
+  { path: "/compare", priority: "0.9" },
   { path: "/playground", priority: "0.8" },
   { path: "/plugins", priority: "0.8" },
   { path: "/roadmap", priority: "0.8" },
@@ -818,6 +819,7 @@ function build() {
   llms.push(
     `## More`,
     ``,
+    `- [Compare](${SITE_URL}/compare.md): Pyxle vs Next.js+FastAPI, Reflex, Django — one field traced through four stacks`,
     `- [Plugin directory](${SITE_URL}/plugins.md): official and community plugins`,
     `- [Benchmarks & methodology](${SITE_URL}/benchmarks.md): reproducible performance numbers`,
     `- [Interactive playground](${SITE_URL}/playground.md): run Pyxle in the browser`,

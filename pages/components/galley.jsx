@@ -217,7 +217,7 @@ export function GpHead({ n, eyebrow, title, lead }) {
    link columns and the typeset credit line. One per page. ──────── */
 
 const FOOTER_COLS = [
-    { h: 'Framework', links: [['Docs', '/docs'], ['Playground', '/playground'], ['Plugins', '/plugins'], ['Benchmarks', '/benchmarks'], ['Demos', '/#demos'], ['FAQ', '/docs/faq']] },
+    { h: 'Framework', links: [['Docs', '/docs'], ['Compare', '/compare'], ['Playground', '/playground'], ['Plugins', '/plugins'], ['Benchmarks', '/benchmarks'], ['Demos', '/#demos'], ['FAQ', '/docs/faq']] },
     { h: 'Learn', links: [['Getting started', '/docs/getting-started/installation'], ['Server actions', '/docs/core-concepts/server-actions'], ['For AI agents', '/docs/guides/for-ai-agents']] },
     { h: 'Project', links: [['Roadmap', '/roadmap'], ['GitHub', 'https://github.com/pyxle-dev/pyxle', true], ['Releases', 'https://github.com/pyxle-dev/pyxle/releases', true], ['Issues', 'https://github.com/pyxle-dev/pyxle/issues', true]] },
 ];
