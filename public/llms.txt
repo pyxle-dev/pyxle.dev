@@ -89,7 +89,7 @@
 
 ## Changelog
 
-- [Changelog](https://pyxle.dev/docs/changelog.md): Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include breaking changes — those are called out explicitly here. To upgrade, run `pip install --upgrade pyxle-framework`.
+- [Changelog](https://pyxle.dev/docs/changelog.md): Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include breaking changes — those are called out explicitly. To upgrade, run `pip install --upgrade pyxle-framework`.
 
 ## More
 
