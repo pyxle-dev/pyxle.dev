@@ -53,38 +53,39 @@ const ALL_FRAMEWORKS = [
     ...PYTHON_FRAMEWORKS,
     { key: "express", name: "Express", type: "API framework" },
     { key: "hono", name: "Hono", type: "Ultralight API" },
+    { key: "nextjs", name: "Next.js", type: "Full-stack (SSR + API)" },
 ];
 
 const TESTS = {
     form: {
         name: "Form Submission (POST)",
         desc: "Parse a JSON body, validate fields, return a response. Measures the request-processing pipeline.",
-        data: { pyxle: 52438, fastapi: 47125, django: 8576, flask: 21264, express: 42949, hono: 79278 },
+        data: { pyxle: 52438, fastapi: 47125, django: 8576, flask: 21264, express: 42949, hono: 79278, nextjs: 7805 },
     },
     json: {
         name: "JSON Serialization",
         desc: "Return a static JSON object. Measures pure framework and serialization overhead.",
-        data: { pyxle: 59766, fastapi: 61565, django: 9126, flask: 23809, express: 53164, hono: 212528 },
+        data: { pyxle: 59766, fastapi: 61565, django: 9126, flask: 23809, express: 53164, hono: 212528, nextjs: 8854 },
     },
     health: {
         name: "Health Check",
         desc: "A minimal endpoint. Measures raw framework routing overhead.",
-        data: { pyxle: 59785, fastapi: 63040, django: 9138, flask: 24094, express: 54058, hono: 214692 },
+        data: { pyxle: 59785, fastapi: 63040, django: 9138, flask: 24094, express: 54058, hono: 214692, nextjs: 8953 },
     },
     db: {
         name: "Single DB Query",
         desc: "Read one random row from SQLite with a persistent per-worker connection. The driver dominates here, not the framework.",
-        data: { pyxle: 29299, fastapi: 32319, django: 6970, flask: 21382, express: 47937, hono: 172870 },
+        data: { pyxle: 29299, fastapi: 32319, django: 6970, flask: 21382, express: 47937, hono: 172870, nextjs: 8667 },
     },
     queries5: {
         name: "Multiple Queries (5)",
         desc: "Read 5 random rows from SQLite. Measures query-loop performance.",
-        data: { pyxle: 24681, fastapi: 22013, django: 6298, flask: 18286, express: 41031, hono: 105988 },
+        data: { pyxle: 24681, fastapi: 22013, django: 6298, flask: 18286, express: 41031, hono: 105988, nextjs: 8121 },
     },
     queries20: {
         name: "Multiple Queries (20)",
         desc: "Read 20 random rows from SQLite. A heavier database workload where the query loop dominates.",
-        data: { pyxle: 15569, fastapi: 11862, django: 5432, flask: 14213, express: 26205, hono: 34547 },
+        data: { pyxle: 15569, fastapi: 11862, django: 5432, flask: 14213, express: 26205, hono: 34547, nextjs: 7601 },
     },
 };
 
