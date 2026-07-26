@@ -12,10 +12,15 @@ import {
 } from './components/galley.jsx';
 
 /* ════════════════════════════════════════════════════════════════
-   GALLEY PROOF — /roadmap, set as a print run in progress. One ink
-   line draws itself down the page as you scroll: solid through what
-   shipped, pulsing where the press is running, hollow into what's
-   ahead. Every shipped entry cites a real release.
+   GALLEY PROOF — /roadmap. Three sections and no more: what's done,
+   what's in progress, what's upcoming. One ink line draws itself down
+   the page as you scroll — solid through what shipped, pulsing where
+   the press is running, hollow into what's ahead.
+
+   Shipped entries stay one line each and cite their release; the
+   version chip links to that entry in the changelog, which is where
+   the detail belongs. Do not re-expand this into a section per
+   release — the changelog already is that.
    ════════════════════════════════════════════════════════════════ */
 
 export const slots = {
@@ -40,84 +45,27 @@ const ERAS = [
         n: '01',
         id: 'shipped',
         eyebrow: 'Printed',
-        title: 'What already shipped.',
-        lead: 'Every entry below is released, documented, and running in production — most of it on this very site.',
+        title: "What's done.",
+        lead: 'Every line below is released, documented, and running in production — most of it on this very site. Each cites its release; the version links to that entry in the changelog.',
         status: 'shipped',
         items: [
-            ['The one-file core', 'The .pyxl format: async loader, server actions, and the React component in a single file — server-rendered, hydrated, hot-reloading, file-based routing.', 'v0.1 → 0.2'],
-            ['A Django-style plugin system', 'Declare plugins in pyxle.config.json; they wire services, middleware, and their own schema at startup. WebSocket endpoints and the client navigation cache landed in the same release.', 'v0.3'],
-            ['The production story', 'Edge caching with per-route TTLs, sanitized production errors, layout loaders, and a faster static path.', 'v0.4.0'],
-            ['A dev server that keeps up', 'Route-shape changes — new pages, renamed loaders, layout moves — apply live, without restarts or cache-clearing rituals.', 'v0.4.2'],
-            ['Benchmarks in the open', 'Reproducible two-box benchmarks against six frameworks, load generator on its own hardware, losses shown alongside wins.', 'site'],
-            ['A security wave', 'HEAD output rebuilt through a sanitising allowlist, CSRF exemptions matched on path boundaries, oversized form posts failing loud.', 'v0.4.3'],
-            ['Multi-core serving', 'pyxle serve --workers N: independent server processes per core, sync endpoints threadpooled, small assets served from memory. This site runs it.', 'v0.4.3'],
-            ['Official plugins on PyPI', 'pyxle-db (SQLite, PostgreSQL, MySQL behind one explicit-SQL API), pyxle-auth (argon2id sessions, RBAC, API tokens), and pyxle-mail (transactional email over SMTP, Resend, or the console) — every plugin tested in CI, the database claims against live PostgreSQL and MySQL.', 'plugins 0.2'],
+            ['The one-file core', 'The .pyxl format: async loader, server actions, and the React component in a single file — server-rendered, hydrated, hot-reloading, with file-based routing.', 'v0.1 \u2192 0.2'],
+            ['Plugins, realtime & the nav cache', 'Declare plugins in pyxle.config.json and they wire services, middleware, and their own schema at startup. WebSocket endpoints and the client navigation cache landed alongside.', 'v0.3'],
+            ['The production story', 'Edge caching with per-route TTLs, sanitized production errors, layout loaders, a faster static path, and live route-shape changes with no restarts.', 'v0.4'],
+            ['Multi-core serving & a security wave', 'pyxle serve --workers N runs an independent server per core with small assets served from memory. HEAD output moved behind a sanitising allowlist and CSRF exemptions began matching on path boundaries.', 'v0.4.3'],
+            ['The depth release', 'The wave that took Pyxle from rendering pages to running apps: Pydantic-validated actions with OpenAPI output, streaming SSR through <Suspense>, caching with SSG and ISR, WebSocket pub/sub, background work, built-in observability, a Next.js-parity <Image>, a rate limiter, and a type-aware JSX side.', 'v0.5'],
+            ['Your app, in Markdown', 'Enable the llms feature and every page answers at its URL with .md appended, or to an Accept: text/markdown request — plus a generated /llms.txt index and discovery headers. This page has a twin; so does every doc.', 'v0.6'],
+            ['The hardened run', 'A release forged by testing: React 19 and Vite 7 in new projects with pyxle init asking what to include, concurrent streaming SSR with per-request isolation, a calmer dev server, shadcn/ui wired end to end.', 'v0.7'],
+            ['Studio & the debugger', 'A dev-only dashboard at /__pyxle/studio built into pyxle dev — routes, an interactive tester, a live request feed, metrics, resolved config — and breakpoints that bind on both sides of a .pyxl file at once, with tracebacks that finally name your source.', 'v0.8'],
+            ['Official plugins on PyPI', 'pyxle-db (SQLite, PostgreSQL and MySQL behind one explicit-SQL API), pyxle-auth (argon2id sessions, RBAC, API tokens) and pyxle-mail (SMTP, Resend or console) — every plugin tested in CI, the database claims against live PostgreSQL and MySQL.', 'plugins 0.2'],
+            ['Benchmarks in the open', 'Reproducible two-box benchmarks against six frameworks, the load generator on its own hardware, and the losses shown next to the wins.', 'site'],
         ],
     },
     {
         n: '02',
-        id: 'depth-release',
-        eyebrow: 'Recently printed',
-        title: 'v0.5 — the depth release.',
-        lead: 'One wave that takes Pyxle from "renders pages" to "runs production apps": caching, streaming, realtime, validation, observability, background work, and image optimization — built, documented, and dogfooded on this site.',
-        status: 'shipped',
-        items: [
-            ['Validated actions', 'Type-hint a Pydantic model on an @action and get parsing, coercion, and clean 422s for free — field errors flow straight into your <Form>. pyxle openapi emits an OpenAPI 3.1 document from the same models.', 'v0.5'],
-            ['Streaming SSR', 'Wrap a slow part in <Suspense> and the shell paints before the slowest loader finishes; a loading.pyxl convention gives any route an instant skeleton. The compiler opts a page in automatically — no flag.', 'v0.5'],
-            ['Caching, SSG & ISR', 'A {"data", "revalidate"} envelope (or a one-line CACHE directive) caches a render and refreshes it in the background — serve stale instantly, re-render once. pyxle build --static pre-renders the pages that never change; ETags give you free 304s.', 'v0.5'],
-            ['Realtime & auth, completed', 'WebSocket pub/sub channels and a useWebSocket hook on top of the existing endpoints; the pyxle-auth plugin gains sliding sessions, OAuth, JWT, and a useAuth() hook for the client.', 'v0.5'],
-            ['Background work', 'request.state.background runs work after the response is sent, and pyxle.tasks.enqueue fires off fire-and-forget jobs. This site sends its welcome email exactly this way.', 'v0.5'],
-            ['Observability, built in', 'A correlation id and timing on every request, an opt-in Prometheus metrics endpoint, structured access logs, real readiness probes, OpenTelemetry traces, and a live pyxle dev --dashboard — zero hard dependencies at the core.', 'v0.5'],
-            ['Image optimization', 'A Next.js-parity <Image>: responsive srcset through a CDN loader, blur-up placeholders, a priority hint for the LCP, and layout-shift-free loading — plus modulepreload hints and a pyxle build --analyze bundle report.', 'v0.5'],
-            ['A second security wave', 'A built-in token-bucket rate limiter, route policies that finally cover @action endpoints (not just pages), and a client-side error boundary so error.pyxl catches render faults in the browser too — not only on the server.', 'v0.5'],
-            ['Worker auto-sizing & TypeScript', 'pyxle serve --workers 0 sizes the pool to the available CPU cores; generated .d.ts declarations and a pyxle typecheck gate make the JSX side type-aware, with a clear compile error if TypeScript syntax sneaks into a client block.', 'v0.5'],
-        ],
-    },
-    {
-        n: '03',
-        id: 'ai-accessibility',
-        eyebrow: 'Last edition',
-        title: 'v0.6 — your app, in Markdown.',
-        lead: 'The AI tools your readers already work in want text, not HTML. One flag, and every page of a Pyxle app serves a clean Markdown twin — built, documented, and dogfooded on this very site.',
-        status: 'shipped',
-        items: [
-            ['Every page is also Markdown', 'Enable the llms feature and any page answers at its URL with .md appended — or to an Accept: text/markdown request. Where the Markdown comes from is yours: a co-located .md file, a to_markdown handler in the page, or one llms.py for a whole route subtree, with a wrap_markdown hook to frame every page for the agent reading it.', 'v0.6'],
-            ['llms.txt, discovery & agent search', 'A generated /llms.txt index, Link and X-Llms-Txt discovery headers on every response, and on this site a /api/docs-search endpoint that returns matching pages as Markdown links. This page has a .md twin; so does every doc.', 'v0.6'],
-        ],
-    },
-    {
-        n: '04',
-        id: 'hardened-run',
-        eyebrow: 'Just printed',
-        title: 'v0.7 — the hardened run.',
-        lead: 'A release forged by testing: every feature verified end to end before the presses rolled. New projects get a modern stack and a say in what they ship; the dev server got calm, fast, and honest.',
-        status: 'shipped',
-        items: [
-            ['A modern stack, chosen at init', 'React 19 and Vite 7 in every new project, and pyxle init now asks — arrow-key prompts for Tailwind CSS (opt-in: decline it and plain CSS + CSS Modules are first-class), shadcn/ui, and your import alias. pyxle init . scaffolds into the directory you are already in.', 'v0.7'],
-            ['Streaming SSR, concurrently', 'Streaming pages used to render one visitor at a time — each first byte waited for the previous stream to finish. SSR workers now interleave renders, with per-request state isolated by AsyncLocalStorage so tokens and head tags can never cross visitors, and pyxle serve auto-sizes its worker pool.', 'v0.7'],
-            ['A calmer dev server', 'Curated output by default with --verbose for the firehose, your server logs forwarded to the browser console, build failures on the overlay, no more hot-reload loops, public/ served live the way Next.js does it, and dev.watch/dev.ignore when you need more.', 'v0.7'],
-            ['shadcn/ui, end to end', 'The scaffold pre-wires components.json and the @/ alias — resolved by Vite and the SSR runtime alike — and ESM-first dependency resolution keeps CommonJS-built libraries like lucide-react from tripping the server render.', 'v0.7'],
-            ['Hardened under inspection', 'Per-app CSRF cookies (two dev servers stop fighting), multipart uploads through CSRF, RFC-9110 Markdown negotiation, error.pyxl under layouts with loaders, a pyxle check that passes out of the box — each one verified end to end, then shipped.', 'v0.7'],
-        ],
-    },
-    {
-        n: '05',
-        id: 'studio-debugger',
-        eyebrow: 'Hot off the press',
-        title: 'v0.8 — Studio & the debugger.',
-        lead: 'The tools to see and step through a Pyxle app, built into the framework: a live dashboard, and breakpoints that bind right inside your .pyxl files — on the Python and the React side at once.',
-        status: 'shipped',
-        items: [
-            ['Pyxle Studio', 'A dev-only dashboard at /__pyxle/studio, built into pyxle dev: every route with its loaders and actions, an interactive tester that runs them with real inputs, a live request feed, latency metrics, the resolved config, and pyxle check in the browser — nothing to install.', 'v0.8'],
-            ['Breakpoints in .pyxl', 'Set a breakpoint on a line in a @server loader and on a line in the JSX below it — both bind. pyxle dev --inspect hosts a debugpy server; dev source maps carry the React half; and the Pyxle Language Tools extension makes it F5 in VS Code for the Python side, with a real Stop button, plus a one-click launch for the React side.', 'v0.8'],
-            ['Tracebacks that point at .pyxl', 'The line mapping that powers the debugger also fixes tracebacks: a loader or action error now names your .pyxl file and line, not a compiled module under .pyxle-build.', 'v0.8'],
-        ],
-    },
-    {
-        n: '06',
         id: 'in-motion',
         eyebrow: 'On the press',
-        title: 'In motion right now.',
+        title: "What's in progress.",
         lead: 'Started, public, and moving — these have pages you can act on today.',
         status: 'now',
         items: [
@@ -126,10 +74,10 @@ const ERAS = [
         ],
     },
     {
-        n: '07',
+        n: '03',
         id: 'ahead',
         eyebrow: 'The next pull',
-        title: 'Where this is going.',
+        title: "What's upcoming.",
         lead: 'Planned and intended, in rough order — undated on purpose. When something here starts moving, it moves up a section.',
         status: 'planned',
         items: [
@@ -146,6 +94,18 @@ const ERAS = [
         ],
     },
 ];
+
+/* A clean ``vX.Y[.Z]`` release tag links to its changelog entry. The
+   changelog's heading anchors are the full three-part version with the dots
+   removed (0.4.3 -> #043, 0.8.0 -> #080), so a two-part tag is normalised to
+   ``.0`` first — that keeps the chip reading "v0.8" while the link resolves.
+   Anything that is not a framework release ("v0.1 → 0.2" from before the
+   changelog, "site", "plugins 0.2") stays plain text. */
+function changelogHref(tag) {
+    const m = /^v(\d+)\.(\d+)(?:\.(\d+))?$/.exec(tag || '');
+    if (!m) return null;
+    return `/docs/changelog#${m[1]}${m[2]}${m[3] ?? '0'}`;
+}
 
 /* ── timeline machinery ──────────────────────────────────────── */
 
@@ -194,7 +154,17 @@ function Milestone({ item, status, index }) {
             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                 <h3 className="font-display text-[1.35rem] font-[540] leading-snug text-ink">{title}</h3>
                 {!isLink && tagOrHref && (
-                    <span className="rounded-full border border-rule px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink2">{tagOrHref}</span>
+                    changelogHref(tagOrHref) ? (
+                        <a
+                            href={changelogHref(tagOrHref)}
+                            title={`${tagOrHref} in the changelog`}
+                            className="focus-ring rounded-full border border-rule px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink2 transition-colors hover:border-accent hover:text-acct"
+                        >
+                            {tagOrHref}
+                        </a>
+                    ) : (
+                        <span className="rounded-full border border-rule px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink2">{tagOrHref}</span>
+                    )
                 )}
                 {status === 'now' && (
                     <span className="rounded-full border border-accent px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-acct">live</span>
@@ -238,83 +208,6 @@ function Timeline() {
     );
 }
 
-/* ── Release ladder ──────────────────────────────────────────────
-   The shipping cadence, made visible: a version rail with per-release
-   feature counts. Doubles as jump-nav into the run below (the era
-   sections use content-visibility, so fragment links scroll in JS).
-   The span in the strip below reads first version to latest: 0.1.1 was
-   tagged 2 April 2026, so keep the phrasing true when a node is added. */
-
-const LADDER = [
-    { v: '0.1', label: 'one-file core', n: 1, href: '#shipped' },
-    { v: '0.3', label: 'plugins · realtime', n: 3, href: '#shipped' },
-    { v: '0.4', label: 'production · multi-core', n: 6, href: '#shipped' },
-    { v: '0.5', label: 'the depth release', n: 9, href: '#depth-release' },
-    { v: '0.6', label: 'markdown-native', n: 2, href: '#ai-accessibility' },
-    { v: '0.7', label: 'the hardened run', n: 5, href: '#hardened-run' },
-    { v: '0.8', label: 'studio & debugger', n: 3, href: '#studio-debugger', latest: true },
-];
-
-function scrollToId(e, href) {
-    e.preventDefault();
-    const el = document.getElementById(href.slice(1));
-    if (!el) return;
-    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
-    history.replaceState(null, '', href);
-}
-
-function LadderNode({ href, dot, v, label, sub, vClass }) {
-    return (
-        <li className="flex flex-1 flex-col items-center text-center">
-            <a href={href} onClick={(e) => scrollToId(e, href)} className="focus-ring group flex w-full flex-col items-center gap-2 rounded px-1 py-1">
-                <span className="flex h-4 items-center">{dot}</span>
-                <span className={`font-mono text-[13px] tabular-nums ${vClass}`}>{v}</span>
-                <span className="max-w-[10ch] font-mono text-[10px] leading-tight text-ink2">{label}</span>
-                <span className="font-mono text-[10px] text-press">{sub}</span>
-            </a>
-        </li>
-    );
-}
-
-function ReleaseLadder() {
-    const total = LADDER.reduce((s, r) => s + r.n, 0);
-    return (
-        <div data-reveal className="mt-9">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">The print run so far</p>
-                <p className="font-mono text-[11px] text-ink2">
-                    <span className="text-acct">{total}</span> features · <span className="text-acct">{LADDER[0].v} → {LADDER[LADDER.length - 1].v}</span> in under four months
-                </p>
-            </div>
-            <div className="mt-5 overflow-x-auto pb-1">
-                <ol className="relative flex min-w-[660px] items-start">
-                    <span aria-hidden="true" className="absolute left-6 right-6 top-[12px] h-px bg-rule" />
-                    {LADDER.map((r) => (
-                        <LadderNode
-                            key={r.v}
-                            href={r.href}
-                            v={r.v}
-                            label={r.label}
-                            sub={`${r.n} shipped`}
-                            vClass={r.latest ? 'font-medium text-acct' : 'text-ink'}
-                            dot={<span className={`relative z-10 block rounded-full border-2 border-paper bg-accent ${r.latest ? 'h-4 w-4 ring-2 ring-accent/30' : 'h-3 w-3'}`} aria-hidden="true" />}
-                        />
-                    ))}
-                    <LadderNode
-                        href="#ahead"
-                        v="next"
-                        label="what's ahead"
-                        sub="planned"
-                        vClass="text-ink2"
-                        dot={<span className="relative z-10 block h-3 w-3 rounded-full border-2 border-dashed border-rule bg-paper" aria-hidden="true" />}
-                    />
-                </ol>
-            </div>
-        </div>
-    );
-}
-
 /* ── Hero ────────────────────────────────────────────────────── */
 
 function Hero() {
@@ -334,7 +227,10 @@ function Hero() {
                     Every shipped line cites its release. Nothing ahead carries a
                     date it can't keep.
                 </p>
-                <ReleaseLadder />
+                <p data-reveal className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">
+                    <span><span className="text-acct">0.1 → 0.8</span> in under four months</span>
+                    <EditorialLink href="/docs/changelog">Read the changelog →</EditorialLink>
+                </p>
             </div>
         </section>
     );
