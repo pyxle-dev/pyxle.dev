@@ -111,27 +111,16 @@ const SCALING = [
     { test: "Five-query page", one: 1961, eight: 24681 },
 ];
 
-const KEY_TAKEAWAYS = [
-    {
-        title: "~2.2× Next.js at dynamic SSR",
-        desc: "Re-rendering the full page on every request — per core, the apples-to-apples match for Pyxle's @server loader and Next.js's force-dynamic — Pyxle serves 2.1–2.3× Next.js's throughput at every complexity, from a marketing home to a 300-row table, at roughly half the median latency. And it ships the same DOM in 2.5–3.2× fewer bytes: Next.js inlines React Server Component hydration data into every response. An API route through the same app: 5.5× faster than Next's.",
-    },
-    {
-        title: "Shoulder to shoulder with FastAPI — ahead on real work",
-        desc: "On a plain JSON response Pyxle runs within 3% of FastAPI (59.8k req/s to 61.6k) while carrying a full-stack middleware pipeline FastAPI doesn't — server-side rendering, server actions, GZip. The moment a request touches the database it pulls ahead: 24.7k req/s on a five-query page to FastAPI's 22.0k, 15.6k to 11.9k on twenty, and it takes the form-POST test 52.4k to 47.1k. Tails stay tight — p99 in the low single-digit milliseconds.",
-    },
-    {
-        title: "Scales across every core with one flag",
-        desc: "pyxle serve --workers 8 lifts JSON throughput ~5× (11.8k → 59.8k) — and database endpoints more, because a single worker leaves cores idle waiting on SQLite. Pyxle out-scales FastAPI on every endpoint in the suite. No load balancer, no shared state to configure.",
-    },
-    {
-        title: "Raw serialization belongs to the Node ultralights — by design",
-        desc: "Hono clears 200k+ req/s on JSON, an order of magnitude above every Python framework here — V8's HTTP pipeline and native C++ SQLite bindings are hard to beat when there's nothing else to do. Pyxle isn't chasing that number. It's the only framework on the board that renders React on the server, runs your Python, and still holds five-figure throughput per core.",
-    },
-    {
-        title: "Zero errors, and the losses printed in full",
-        desc: "The load generator runs on a separate box, so the harness can never cap the results — a same-box generator competes for the server's cores and compresses the field toward its own ceiling. Every cell was served with zero errors, zero timeouts, zero non-2xx — and the workloads Pyxle loses (raw JSON and DB reads to FastAPI, everything to Hono) are shown at the same size as the wins.",
-    },
+// The five takeaways as a scoreboard — the numeral carries the point;
+// the tables and bars below are the accessible detail. Kept honest: a
+// range where the data is a range, the losses stated as a fact.
+const SCOREBOARD = [
+    { n: "~2.2×", label: "Next.js throughput at dynamic SSR, per core" },
+    { n: "2–3×", label: "smaller HTML for the same DOM — no hydration blob" },
+    { n: "±3%", label: "of FastAPI on JSON — ahead once real work appears, behind on a single-row read" },
+    { n: "~5×", label: "more throughput with one flag: pyxle serve --workers 8" },
+    { n: "0", label: "errors, timeouts, or non-2xx across the whole suite" },
+    { n: "Hono", label: "owns raw JSON — a Node ultralight, and we say so" },
 ];
 
 /* ── Lighthouse score gauge ──────────────────────────────────
@@ -250,24 +239,69 @@ function Findings() {
             <GpHead
                 n="02"
                 eyebrow="Findings"
-                title="Key takeaways."
+                title="Six numbers, before the tables."
+                lead="Every one is backed by a chart or table further down — including the one we lose."
             />
-            <div className="mt-12 max-w-3xl">
-                {KEY_TAKEAWAYS.map((t, i) => (
-                    <div key={t.title} data-reveal className="flex gap-6 border-t border-rule py-7 last:border-b" style={{ ['--reveal-delay']: `${(i % 2) * 90}ms` }}>
-                        <span className="shrink-0 pt-1 font-mono text-sm text-press" aria-hidden="true">{i + 1}</span>
-                        <div className="min-w-0">
-                            <h3 className="font-display text-[1.35rem] font-[540] leading-snug tracking-[-0.01em] text-ink">{t.title}</h3>
-                            <p className="mt-3 max-w-[58ch] text-pretty text-base leading-[1.7] text-ink2">{t.desc}</p>
-                        </div>
+            <dl className="mt-14 grid gap-x-10 gap-y-11 sm:grid-cols-2 lg:grid-cols-3">
+                {SCOREBOARD.map((s, i) => (
+                    <div key={s.label} data-reveal className="border-t border-rule pt-5" style={{ ['--reveal-delay']: `${(i % 3) * 80}ms` }}>
+                        <dd className="font-display text-[3rem] font-[560] leading-[0.95] tracking-[-0.02em] text-acct tabular-nums sm:text-[3.4rem]">{s.n}</dd>
+                        <dt className="mt-3 max-w-[24ch] text-sm leading-relaxed text-ink2">{s.label}</dt>
                     </div>
                 ))}
-            </div>
+            </dl>
         </GpSection>
     );
 }
 
 /* ── 03 · SSR ledger ─────────────────────────────────────────── */
+
+// The payload fact, drawn to scale within each pair (Next.js = full width):
+// the same DOM, in a fraction of the bytes, because Pyxle ships no RSC blob.
+const PAYLOADS = [
+    { page: "Landing page", pyxle: 5.4, next: 13.7 },
+    { page: "300-row data table", pyxle: 145, next: 332 },
+];
+
+function PayloadBars() {
+    return (
+        <div data-reveal className="mt-14 max-w-2xl">
+            <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">Bytes on the wire — same DOM, per response</p>
+            <div className="mt-6 flex flex-col gap-8">
+                {PAYLOADS.map((p, gi) => {
+                    const rows = [
+                        { name: "Pyxle", val: p.pyxle, isPyxle: true },
+                        { name: "Next.js", val: p.next, isPyxle: false },
+                    ];
+                    return (
+                        <div key={p.page}>
+                            <div className="flex items-baseline justify-between gap-3">
+                                <span className="text-sm font-medium text-ink">{p.page}</span>
+                                <span className="font-mono text-[11px] text-acct">{Math.round((p.pyxle / p.next) * 100)}% the bytes</span>
+                            </div>
+                            <div className="mt-3 flex flex-col gap-2">
+                                {rows.map((r, i) => {
+                                    const pct = Math.max(3, (r.val / p.next) * 100);
+                                    const style = { width: `${pct}%`, minWidth: '0.25rem', ['--rule-delay']: `${gi * 120 + i * 70}ms` };
+                                    if (!r.isPyxle) { style.background = 'var(--c-ink2)'; style.opacity = 0.35; }
+                                    return (
+                                        <div key={r.name} className="flex items-center gap-3">
+                                            <span className={`w-16 shrink-0 text-right font-mono text-[12px] ${r.isPyxle ? 'font-medium text-acct' : 'text-ink2'}`}>{r.name}</span>
+                                            <span className="flex-1">
+                                                <span className={`gp-rule-x gp-from-left block h-2 ${r.isPyxle ? 'bg-accent' : ''}`} style={style} />
+                                            </span>
+                                            <span className="w-16 shrink-0 whitespace-nowrap text-right font-mono text-[12px] tabular-nums text-ink">{r.val} KB</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
 
 function SsrLedger() {
     return (
@@ -310,13 +344,12 @@ function SsrLedger() {
                     </tbody>
                 </table>
             </div>
-            <p data-reveal className="mt-6 max-w-[78ch] font-mono text-xs leading-relaxed text-ink2">
+            <PayloadBars />
+            <p data-reveal className="mt-10 max-w-[78ch] font-mono text-xs leading-relaxed text-ink2">
                 Per core, at 100 concurrent connections. Both frameworks render React on the
-                server with full HTML document assembly — Pyxle via a persistent Node.js worker
-                pool, Next.js via React Server Components. The pages are equivalent, not
-                byte-identical: Next.js serializes the component tree into every response as
-                RSC hydration data, shipping 2–3× more bytes for the same DOM (landing page
-                5.4 KB vs 13.7 KB; 300-row table 145 KB vs 332 KB).{' '}
+                server — Pyxle via a persistent Node.js worker pool, Next.js via React Server
+                Components, which serialize the component tree into every response as the RSC
+                hydration data the bars above measure.{' '}
                 <strong className="font-semibold text-ink">The fair
                 caveat:</strong> this measures pages that <em>must</em> render per request
                 (personalized, authenticated, real-time). Genuinely static content is served
@@ -420,27 +453,12 @@ function ApiThroughput() {
                 ))}
             </div>
 
-            {/* An editorial aside between two drawn hairlines. */}
-            <div data-reveal="none" className="mt-12 max-w-3xl">
-                <span className="gp-rule-x block h-px bg-rule" aria-hidden="true" />
-                <div className="py-7">
-                    <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">Reading these results</p>
-                    <p className="mt-4 max-w-[68ch] text-pretty text-sm leading-[1.8] text-ink2">
-                        Pyxle is a <strong className="font-semibold text-ink">full-stack framework</strong> serving
-                        these endpoints through its production middleware stack, and it runs
-                        step-for-step with FastAPI — a few percent behind on the trivial endpoints
-                        (JSON, health, single-row read), and ahead the moment real work appears:
-                        both multi-query pages and the form POST. Its tails stay tight — p99 around
-                        2 ms on JSON and POST, a fraction of Express's and Flask's 8–15 ms.
-                        {showAllFrameworks ? (
-                            <> Across runtimes the picture is honest, not flattering: the ultralight Node routers are in a different league on raw work — Hono clears 200k req/s on JSON, because per core V8's HTTP pipeline and native C++ SQLite bindings (<code className="text-[0.9em] text-acct">better-sqlite3</code>) are hard to beat when there's nothing else to do. Pyxle leads the Python field on the query-heavy and form tests and holds far tighter tails than Express and Flask. The DB rows measure the driver more than the framework; cross-runtime, they're context, not a like-for-like target.</>
-                        ) : null}
-                        {' '}The headline: you get SSR, server actions, and Python's whole ecosystem
-                        in one framework, <span className="text-ink">on par with the fastest pure-API Python framework — and ahead of it on real database work</span>.
-                    </p>
-                </div>
-                <span className="gp-rule-x block h-px bg-rule" style={{ ['--rule-delay']: '120ms' }} aria-hidden="true" />
-            </div>
+            <p data-reveal className="mt-8 max-w-[64ch] font-mono text-xs leading-relaxed text-ink2">
+                Pyxle serves these through its full production middleware stack — ahead of
+                FastAPI on form POST and the multi-query pages, a few percent behind on the
+                trivial endpoints and about 10% on the single-row read. The Node ultralights own
+                raw JSON by an order of magnitude — that's the toggle above, shown, not hidden.
+            </p>
         </GpSection>
     );
 }
@@ -579,7 +597,7 @@ function Lighthouse() {
                 <figcaption className="mt-3 flex flex-col gap-3 font-mono text-xs leading-relaxed text-ink2 sm:flex-row sm:items-baseline sm:justify-between">
                     <span>Fig. — Google Lighthouse, desktop preset, against the production build of <code className="text-ink">pyxle.dev</code>.</span>
                     <span className="shrink-0">
-                        <EditorialLink href="https://pagespeed.web.dev/analysis?url=https%3A%2F%2Fpyxle.dev" external>
+                        <EditorialLink href="https://pagespeed.web.dev/analysis?form_factor=desktop&url=https%3A%2F%2Fpyxle.dev" external>
                             Verify on PageSpeed Insights ↗
                         </EditorialLink>
                     </span>

@@ -52,6 +52,7 @@ const ROWS = [
     { cap: 'No API contract to hand-keep', note: 'the loader’s return is the props', marks: { pyxle: 2, next: 0, reflex: 2, django: 2 } },
     { cap: 'Streaming SSR on React 19', note: '<Suspense>, shell-first', marks: { pyxle: 2, next: 2, reflex: 1, django: 0 } },
     { cap: 'One file per feature', note: 'loader, mutation, UI — colocated', marks: { pyxle: 2, next: 0, reflex: 2, django: 0 } },
+    { cap: 'Breakpoints in one file, both halves', note: 'Python loaders and React, in the same .pyxl', marks: { pyxle: 2, next: 0, reflex: 0, django: 0 } },
     { cap: 'AI-native surface', note: 'AGENTS.md scaffold · every page as Markdown · llms.txt', marks: { pyxle: 2, next: 0, reflex: 0, django: 0 } },
 ];
 
@@ -96,7 +97,7 @@ function Matrix() {
                             const full = ROWS.filter((r) => r.marks[c.key] === 2).length;
                             return (
                                 <td key={c.key} className={`mx-cell ${c.key === 'pyxle' ? 'mx-col-pyxle' : ''}`}>
-                                    <span className={`font-mono text-lg font-medium tabular-nums ${c.key === 'pyxle' ? 'text-acct' : 'text-ink2'}`}>{full}<span className="text-[11px] text-ink2">/7</span></span>
+                                    <span className={`font-mono text-lg font-medium tabular-nums ${c.key === 'pyxle' ? 'text-acct' : 'text-ink2'}`}>{full}<span className="text-[11px] text-ink2">/{ROWS.length}</span></span>
                                 </td>
                             );
                         })}
@@ -118,7 +119,7 @@ function Matrix() {
 
 const SEAM = [
     { key: 'next', stack: 'Next.js + FastAPI', note: 'a schema, a generated client, and a contract two runtimes keep by hand', stations: ['Note', 'response_model', 'openapi.json', 'types.gen.ts', 'fetch', 'props'], count: '6 representations', drift: '3 places to drift' },
-    { key: 'reflex', stack: 'Reflex', note: 'the field crosses wearing the wrapper’s costume', stations: ['rx.State', 'diff over WS', 'wrapped var'], count: '3 representations', drift: '1 wrapper to cross' },
+    { key: 'reflex', stack: 'Reflex', note: 'the field re-wrapped as the framework’s own state var', stations: ['rx.State', 'diff over WS', 'wrapped var'], count: '3 representations', drift: '1 wrapper to cross' },
     { key: 'django', stack: 'Django', note: 'short — until you want a real component model', stations: ['QuerySet', 'context', 'template'], count: '3 representations', drift: 'types end at the template' },
     { key: 'pyxle', stack: 'Pyxle', note: 'the loader’s return value is the component’s props', stations: ['loader return', 'props'], count: '1 representation', drift: '0 places to drift' },
 ];
@@ -167,11 +168,10 @@ function Hero() {
                     <span className="text-acct">No seam</span><span className="gp-dot-load ml-[0.06em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
                     <span className="sr-only">.</span>
                 </h1>
-                <p className="mt-7 max-w-[62ch] text-pretty text-lg leading-[1.7] text-ink2">
-                    The industry spent a decade splitting the frontend from the backend — then the
-                    next one gluing it back. Server components, server actions, type generators, BFF
-                    layers: it’s all <span className="text-ink">the seam, fighting itself</span>.
-                    Pyxle was built without one — every stack is converging on where it already is.
+                <p className="mt-7 max-w-[52ch] text-pretty text-lg leading-[1.7] text-ink2">
+                    Server components, type generators, BFF layers — every modern stack spends
+                    real work stitching the frontend back to the backend.{' '}
+                    <span className="text-ink">Pyxle has no seam to stitch.</span>
                 </p>
                 <p className="mt-6 font-mono text-xs leading-relaxed text-ink2">
                     one language you know · one file per feature · one service to deploy · shipping since v0.1, a release most weeks
@@ -217,14 +217,13 @@ function CustodyLedger() {
 
                 <div data-reveal="none" className="mt-12 max-w-2xl">
                     <h2 className="font-display text-[2rem] font-[540] leading-[1.08] tracking-[-0.01em] text-ink sm:text-[2.6rem]">
-                        <span className="gp-lm"><span>The old stack makes your data wear six costumes.</span></span>
+                        <span className="gp-lm"><span>The old stack re-types the same field six times.</span></span>
                     </h2>
-                    <p className="mt-5 max-w-[60ch] text-pretty text-base leading-[1.7] text-ink2">
-                        Follow one field — a search <code className="text-[0.9em] text-acct">notes</code> list
-                        — from the database to your component. In a split stack it is re-typed,
-                        re-serialized, and re-validated at every border it crosses. In Pyxle the
-                        loader’s return value <span className="text-ink">is</span> the props. Watch the
-                        line that finishes first.
+                    <p className="mt-5 max-w-[56ch] text-pretty text-base leading-[1.7] text-ink2">
+                        Follow one search <code className="text-[0.9em] text-acct">notes</code> field
+                        from the database to your component: re-typed, re-serialized, and re-validated
+                        at every border it crosses. In Pyxle the loader’s return value{' '}
+                        <span className="text-ink">is</span> the props.
                     </p>
                 </div>
 
@@ -254,11 +253,11 @@ function TheProof() {
             <GpHead
                 n="03"
                 eyebrow="The proof"
-                title="One costume. And it’s fast."
+                title="One representation. And it’s fast."
                 lead="The short seam isn’t just cleaner — it’s cheaper at runtime. Real bytes off a real build, then the numbers, wins first."
             />
             <div className="mt-12 grid gap-8 lg:grid-cols-2">
-                <Plate data-reveal label="GET /search?q=in — the whole document" meta="2,020 bytes" caption={<>Fig. 2 — the entire response. The field arrives still wearing its only costume: props, shipped once as inert JSON.</>}>
+                <Plate data-reveal label="GET /search?q=in — the whole document" meta="2,020 bytes" caption={<>Fig. 2 — the entire response. The field arrives as what it always was: props, shipped once as inert JSON.</>}>
                     <div className="duotone">
                         <CodeBlock lang="html" className="p-5 text-[12px]" code={`<h1>3<!-- --> notes match “<!-- -->in<!-- -->”</h1>
 <ul><li>Kerning the long dash</li>

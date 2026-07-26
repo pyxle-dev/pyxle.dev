@@ -146,9 +146,12 @@ export function EditorialLink({ href, children, external = false }) {
 
 /* ── A "plate" — code printed on the page like a photographic
    plate, dark in both themes, with a figure caption beneath. ────── */
-export function Plate({ label, meta, caption, children, className = '' }) {
+export function Plate({ label, meta, caption, children, className = '', ...rest }) {
     return (
-        <figure className={className}>
+        // min-w-0: as a flex/grid child the inner <pre>'s long lines must not
+        // expand the cell (a paint-contained ancestor would clip it, not
+        // scroll) — the pre's own overflow-x-auto handles horizontal scroll.
+        <figure className={`min-w-0 ${className}`} {...rest}>
             <div className="rounded-[10px] border border-plateb bg-paper p-[3px] shadow-[0_1px_2px_rgba(20,25,21,0.06)] dark:shadow-none">
                 <div className="overflow-hidden rounded-[7px] bg-plate">
                     {label && (

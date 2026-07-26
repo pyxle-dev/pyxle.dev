@@ -10,6 +10,8 @@ If it runs Python and Node, it runs Pyxle.
 - [Installation](https://pyxle.dev/docs/getting-started/installation.md)
 - [Quick start](https://pyxle.dev/docs/getting-started/quick-start.md) — build your first app
 - [.pyxl files](https://pyxle.dev/docs/core-concepts/pyxl-files.md) — the core format
+- [Pyxle Studio](https://pyxle.dev/docs/guides/studio.md) — the dashboard built into `pyxle dev`
+- [Debugging .pyxl files](https://pyxle.dev/docs/guides/debugging-pyxl.md) — breakpoints in the loader and the component
 - [Pyxle for AI coding agents](https://pyxle.dev/docs/guides/for-ai-agents.md)
 
 ## Explore

@@ -102,6 +102,19 @@ const ERAS = [
     },
     {
         n: '05',
+        id: 'studio-debugger',
+        eyebrow: 'Hot off the press',
+        title: 'v0.8 — Studio & the debugger.',
+        lead: 'The tools to see and step through a Pyxle app, built into the framework: a live dashboard, and breakpoints that bind right inside your .pyxl files — on the Python and the React side at once.',
+        status: 'shipped',
+        items: [
+            ['Pyxle Studio', 'A dev-only dashboard at /__pyxle/studio, built into pyxle dev: every route with its loaders and actions, an interactive tester that runs them with real inputs, a live request feed, latency metrics, the resolved config, and pyxle check in the browser — nothing to install.', 'v0.8'],
+            ['Breakpoints in .pyxl', 'Set a breakpoint on a line in a @server loader and on a line in the JSX below it — both bind. pyxle dev --inspect hosts a debugpy server; dev source maps carry the React half; and the Pyxle Language Tools extension makes it F5 in VS Code for the Python side, with a real Stop button, plus a one-click launch for the React side.', 'v0.8'],
+            ['Tracebacks that point at .pyxl', 'The line mapping that powers the debugger also fixes tracebacks: a loader or action error now names your .pyxl file and line, not a compiled module under .pyxle-build.', 'v0.8'],
+        ],
+    },
+    {
+        n: '06',
         id: 'in-motion',
         eyebrow: 'On the press',
         title: 'In motion right now.',
@@ -113,7 +126,7 @@ const ERAS = [
         ],
     },
     {
-        n: '06',
+        n: '07',
         id: 'ahead',
         eyebrow: 'The next pull',
         title: 'Where this is going.',
@@ -125,7 +138,7 @@ const ERAS = [
             ['Capability contracts', 'The DatabaseLike idea, generalised: framework-defined interfaces for mail, storage, cache, and more, so providers (Postmark, SES, S3, R2…) are swappable by config, not code. Pyxle ships the interface; the community ships the adapters — one recommended pick per capability, alternatives behind it.'],
             ['The ecosystem quests', 'Mail, storage, jobs, observability — the plugins the ideas page calls for, built by the community or by us.', '/docs/plugins/ideas', 'Browse the ideas'],
             ['TypeScript, all the way through', 'The type-aware JSX side — generated .d.ts declarations and a pyxle typecheck gate — shipped in v0.5. Next is writing .tsx directly in your .pyxl, with loader-data types generated from the Python side: the request that comes up most, answered end to end.'],
-            ['The debugger — pyxle studio', 'A local dashboard that shows the app the way the framework sees it: every route with its loaders and actions, fire test requests at them, watch cache state, and an overlay that maps any element on screen back to the .pyxl that rendered it.'],
+            ['The component inspector', 'The overlay the debugger did not ship: click any element on screen and jump to the .pyxl that rendered it, plus a bundle-size treemap for the client build.'],
             ['Deeper editor tooling', 'Diagnostics, completions, and go-to-definition that cross the Python↔JSX boundary; pyxle check growing into a real linter.'],
             ['The Pyxle blog', 'Engineering notes and honest write-ups — how the SSR pool works, what the benchmarks taught us, what broke.'],
             ['1.0 — the stability line', 'The release where minor versions stop being allowed to break you. It lands when the plugin API has proven itself, not on a date.'],
@@ -225,6 +238,83 @@ function Timeline() {
     );
 }
 
+/* ── Release ladder ──────────────────────────────────────────────
+   The shipping cadence, made visible: a version rail with per-release
+   feature counts. Doubles as jump-nav into the run below (the era
+   sections use content-visibility, so fragment links scroll in JS).
+   The span in the strip below reads first version to latest: 0.1.1 was
+   tagged 2 April 2026, so keep the phrasing true when a node is added. */
+
+const LADDER = [
+    { v: '0.1', label: 'one-file core', n: 1, href: '#shipped' },
+    { v: '0.3', label: 'plugins · realtime', n: 3, href: '#shipped' },
+    { v: '0.4', label: 'production · multi-core', n: 6, href: '#shipped' },
+    { v: '0.5', label: 'the depth release', n: 9, href: '#depth-release' },
+    { v: '0.6', label: 'markdown-native', n: 2, href: '#ai-accessibility' },
+    { v: '0.7', label: 'the hardened run', n: 5, href: '#hardened-run' },
+    { v: '0.8', label: 'studio & debugger', n: 3, href: '#studio-debugger', latest: true },
+];
+
+function scrollToId(e, href) {
+    e.preventDefault();
+    const el = document.getElementById(href.slice(1));
+    if (!el) return;
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    history.replaceState(null, '', href);
+}
+
+function LadderNode({ href, dot, v, label, sub, vClass }) {
+    return (
+        <li className="flex flex-1 flex-col items-center text-center">
+            <a href={href} onClick={(e) => scrollToId(e, href)} className="focus-ring group flex w-full flex-col items-center gap-2 rounded px-1 py-1">
+                <span className="flex h-4 items-center">{dot}</span>
+                <span className={`font-mono text-[13px] tabular-nums ${vClass}`}>{v}</span>
+                <span className="max-w-[10ch] font-mono text-[10px] leading-tight text-ink2">{label}</span>
+                <span className="font-mono text-[10px] text-press">{sub}</span>
+            </a>
+        </li>
+    );
+}
+
+function ReleaseLadder() {
+    const total = LADDER.reduce((s, r) => s + r.n, 0);
+    return (
+        <div data-reveal className="mt-9">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">The print run so far</p>
+                <p className="font-mono text-[11px] text-ink2">
+                    <span className="text-acct">{total}</span> features · <span className="text-acct">{LADDER[0].v} → {LADDER[LADDER.length - 1].v}</span> in under four months
+                </p>
+            </div>
+            <div className="mt-5 overflow-x-auto pb-1">
+                <ol className="relative flex min-w-[660px] items-start">
+                    <span aria-hidden="true" className="absolute left-6 right-6 top-[12px] h-px bg-rule" />
+                    {LADDER.map((r) => (
+                        <LadderNode
+                            key={r.v}
+                            href={r.href}
+                            v={r.v}
+                            label={r.label}
+                            sub={`${r.n} shipped`}
+                            vClass={r.latest ? 'font-medium text-acct' : 'text-ink'}
+                            dot={<span className={`relative z-10 block rounded-full border-2 border-paper bg-accent ${r.latest ? 'h-4 w-4 ring-2 ring-accent/30' : 'h-3 w-3'}`} aria-hidden="true" />}
+                        />
+                    ))}
+                    <LadderNode
+                        href="#ahead"
+                        v="next"
+                        label="what's ahead"
+                        sub="planned"
+                        vClass="text-ink2"
+                        dot={<span className="relative z-10 block h-3 w-3 rounded-full border-2 border-dashed border-rule bg-paper" aria-hidden="true" />}
+                    />
+                </ol>
+            </div>
+        </div>
+    );
+}
+
 /* ── Hero ────────────────────────────────────────────────────── */
 
 function Hero() {
@@ -240,11 +330,11 @@ function Hero() {
                     and&nbsp;ahead<span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
                     <span className="sr-only">.</span>
                 </h1>
-                <p className="mt-7 max-w-[58ch] text-pretty text-lg leading-[1.7] text-ink2">
-                    What shipped, what's on the press, and what's queued for the next
-                    pull — every finished line cites its release, and nothing ahead
-                    carries a date it can't keep.
+                <p className="mt-7 max-w-[52ch] text-pretty text-lg leading-[1.7] text-ink2">
+                    Every shipped line cites its release. Nothing ahead carries a
+                    date it can't keep.
                 </p>
+                <ReleaseLadder />
             </div>
         </section>
     );
@@ -257,12 +347,7 @@ function Closing() {
                 <h2 className="font-display text-[2rem] font-[540] leading-[1.1] text-ink sm:text-[2.4rem]">
                     <span className="gp-lm"><span>The fastest way to move this page.</span></span>
                 </h2>
-                <p className="mx-auto mt-5 max-w-[52ch] text-base leading-[1.7] text-ink2">
-                    The items in motion are community-shaped: a founding plugin slot,
-                    or a comment on the Phase B RFC, moves the roadmap more than
-                    anything else you could do today.
-                </p>
-                <div className="mt-9 flex flex-wrap items-center justify-center gap-5">
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-5">
                     <InkButton href="/plugins">Claim a founding slot</InkButton>
                     <EditorialLink href="/docs/plugins/rfc-plugin-pages">Comment on the RFC</EditorialLink>
                 </div>
