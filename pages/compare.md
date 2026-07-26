@@ -14,8 +14,9 @@ Pyxle is the only stack great at all of it at once. Each mark is defensible agai
 | No API contract to hand-keep | ● | — | ● | ● |
 | Streaming SSR on React 19 | ● | ● | ○ | — |
 | One file per feature | ● | — | ● | — |
+| Breakpoints in one file, both halves (Python loaders and React, same `.pyxl`) | ● | — | — | — |
 | AI-native surface (AGENTS.md, `.md` pages, `llms.txt`) | ● | — | — | — |
-| **Complete** | **7/7** | 3/7 | 3/7 | 3/7 |
+| **Complete** | **8/8** | 3/8 | 3/8 | 3/8 |
 
 ## The tax — one field, four journeys
 

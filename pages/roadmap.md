@@ -2,7 +2,7 @@
 
 Where Pyxle is headed. The live, always-current roadmap is at https://pyxle.dev/roadmap
 
-Pyxle is in active beta (`0.x`). The framework already ships a broad feature set — file-based routing, `@server`/`@action`, SSR with streaming `<Suspense>`, layouts, caching/SSG/ISR, WebSockets and realtime, Pydantic-validated actions, observability, background tasks, image optimization, multi-worker serving, AI accessibility (`.md` + `llms.txt`), and an official plugin ecosystem (auth, db, mail).
+Pyxle is in active beta (`0.x`). The framework already ships a broad feature set — file-based routing, `@server`/`@action`, SSR with streaming `<Suspense>`, layouts, caching/SSG/ISR, WebSockets and realtime, Pydantic-validated actions, observability, background tasks, image optimization, multi-worker serving, Studio (a dashboard built into `pyxle dev`), breakpoint debugging of `.pyxl` files in both halves, AI accessibility (`.md` + `llms.txt`), and an official plugin ecosystem (auth, db, mail).
 
 ## What's new
 

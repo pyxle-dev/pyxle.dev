@@ -39,3 +39,9 @@ data/
 
 # Internal docs
 DEPLOYMENT.md
+
+# macOS AppleDouble metadata files
+._*
+
+# Internal one-off ops scripts — kept locally, never shipped in the public repo
+scripts/backfill_welcome_emails.py

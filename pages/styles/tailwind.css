@@ -496,6 +496,11 @@ html.dark .preview-scope input { border-color: rgba(255,255,255,0.12); }
         transform: none;
         visibility: visible;
     }
+
+    /* "Just shipped" announcement — hidden flash-free once dismissed. A boot
+       script sets the class on <html> before paint, so a returning visitor who
+       dismissed it never sees a flash of the banner. */
+    html.pyxle-ann-dismissed .just-shipped { display: none !important; }
 }
 
 /* ── Duotone-plus code plates ─────────────────────────────────────

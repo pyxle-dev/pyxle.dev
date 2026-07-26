@@ -14,7 +14,7 @@ async def load_plugins_page(request):
 import React from 'react';
 import { Head } from 'pyxle/client';
 import {
-    useScrollReveal, CopyButton, InkButton, EditorialLink,
+    useScrollReveal, CopyButton, CodeBlock, Plate, InkButton, EditorialLink,
     GpSection, GpHead, GalleyFooter,
 } from './components/galley.jsx';
 
@@ -43,26 +43,58 @@ const SUBMIT_URL = 'https://github.com/pyxle-dev/pyxle-plugins/issues/new?templa
 
 /* ── Hero ────────────────────────────────────────────────────── */
 
+// Show the claim, don't just make it: a plugin is one line in the config,
+// and it wires itself at startup. Margin tags name what each line turns on.
+const PLUGIN_CONFIG = `{
+  "plugins": [
+    "pyxle-db",
+    "pyxle-auth",
+    "pyxle-mail"
+  ]
+}`;
+
+const WIRING_TAGS = [
+    { top: '34%', label: 'request.state.db' },
+    { top: '45%', label: 'session middleware' },
+    { top: '57%', label: 'send_email()' },
+];
+
 function Hero() {
     return (
         <section className="relative">
             <div className="mx-auto max-w-[76rem] px-5 pb-14 pt-28 sm:px-8 sm:pb-20 sm:pt-36">
-                <p className="font-mono text-xs uppercase tracking-[0.14em] text-ink2">
-                    The ecosystem
-                </p>
-                <h1 className="mt-5 font-display text-[2.9rem] font-[560] leading-[1.04] tracking-[-0.015em] text-ink sm:text-[4.2rem] lg:text-[5.2rem]">
-                    Built to be
-                    <br />
-                    built&nbsp;on<span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
-                    <span className="sr-only">.</span>
-                </h1>
-                <p className="mt-7 max-w-[58ch] text-pretty text-lg leading-[1.7] text-ink2">
-                    Pyxle plugins are one config line: declare them in{' '}
-                    <span className="font-mono text-[0.92em] text-ink">pyxle.config.json</span>{' '}
-                    and they wire themselves at startup. Three official plugins ship today —
-                    and <span className="text-ink">five founding slots</span> in this
-                    directory are reserved for the community.
-                </p>
+                <div className="grid items-center gap-x-12 gap-y-12 lg:grid-cols-12">
+                    <div className="lg:col-span-6">
+                        <p className="font-mono text-xs uppercase tracking-[0.14em] text-ink2">
+                            The ecosystem
+                        </p>
+                        <h1 className="mt-5 font-display text-[2.7rem] font-[560] leading-[1.05] tracking-[-0.015em] text-ink sm:text-[3.6rem] lg:text-[4rem]">
+                            Built to be
+                            <br />
+                            built&nbsp;on<span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
+                            <span className="sr-only">.</span>
+                        </h1>
+                        <p className="mt-6 max-w-[46ch] text-pretty text-lg leading-[1.7] text-ink2">
+                            A plugin is one line of config. Declare it, and it wires itself at
+                            startup — a request-scoped database, session middleware, a mailer.
+                            Three ship today; <span className="text-ink">five founding slots</span> are
+                            open to the community.
+                        </p>
+                    </div>
+                    <div className="min-w-0 lg:col-span-6">
+                        <Plate label="pyxle.config.json" meta="declare · wired" caption={<>Each line turns a service on at startup — no glue code between the config and the request.</>}>
+                            <div className="duotone relative">
+                                <CodeBlock code={PLUGIN_CONFIG} lang="json" className="p-5 text-[13px]" />
+                                {WIRING_TAGS.map((m) => (
+                                    <span key={m.label} className="absolute right-3 hidden items-center gap-2 lg:flex" style={{ top: m.top }} aria-hidden="true">
+                                        <span className="h-px w-5" style={{ background: 'var(--c-press)', opacity: 0.6 }} />
+                                        <span className="font-mono text-[11px] italic text-press">{m.label}</span>
+                                    </span>
+                                ))}
+                            </div>
+                        </Plate>
+                    </div>
+                </div>
             </div>
         </section>
     );
@@ -81,7 +113,16 @@ function PluginCard({ plugin, badge, delay }) {
                 <h3 className="font-mono text-[15px] font-semibold text-ink">{plugin.name}</h3>
                 <span className="rounded-full border border-rule px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink2">{badge}</span>
             </div>
-            <p className="mt-3 flex-1 text-pretty text-[15px] leading-[1.65] text-ink2">{plugin.description}</p>
+            <div className="flex-1">
+                <p className="mt-3 text-pretty text-[15px] leading-[1.65] text-ink2">{plugin.description}</p>
+                {plugin.tags && plugin.tags.length > 0 && (
+                    <ul className="mt-4 flex flex-wrap gap-1.5">
+                        {plugin.tags.slice(0, 5).map((t) => (
+                            <li key={t} className="rounded-full border border-rule px-2 py-0.5 font-mono text-[10.5px] tracking-[0.02em] text-ink2">{t}</li>
+                        ))}
+                    </ul>
+                )}
+            </div>
             <div className="mt-5 flex items-center justify-between gap-3 rounded-[6px] bg-plate px-3.5 py-2.5">
                 <code className="truncate font-mono text-[12.5px] text-[#D7DCD4]">pip install {plugin.name}</code>
                 <CopyButton text={`pip install ${plugin.name}`} />
@@ -109,13 +150,6 @@ function Official({ registry }) {
                     <PluginCard key={p.name} plugin={p} badge={p.category} delay={i * 80} />
                 ))}
             </div>
-            <p className="mt-8 max-w-[60ch] text-[15px] leading-[1.7] text-ink2">
-                As the ecosystem grows, this directory organises by what you're
-                trying to do — Mail, Storage, Caching, Background Jobs — with a
-                recommended pick and the alternatives in each. The aim isn't the most
-                plugins; it's <span className="text-ink">one obvious way to do most
-                things, with room to choose differently.</span>
-            </p>
         </GpSection>
     );
 }
@@ -192,10 +226,9 @@ function Founding({ registry }) {
                 ))}
             </div>
             <p className="mt-6 max-w-[64ch] font-mono text-xs leading-relaxed text-ink2">
-                Ship under your own package name — the bare <span className="text-ink">pyxle-*</span> namespace
-                is reserved for official plugins, and a cohort plugin may be granted its
-                canonical name. Community plugins are listed under their author's name and
-                are not security-audited by the Pyxle team. The bar is public; reviews are honest.
+                Ship under your own package name — <span className="text-ink">pyxle-*</span> is
+                reserved for official plugins. Community plugins aren't security-audited by the
+                Pyxle team; the bar is public and reviews are honest.
             </p>
         </GpSection>
     );

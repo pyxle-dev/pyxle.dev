@@ -138,6 +138,7 @@ async def _subscriber_row(email: str):
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useAction, Link, Head, Image } from 'pyxle/client';
 import { LivePlayground } from './components/live-playground.jsx';
+import { tokenizeBlock } from './components/code-highlighter.jsx';
 import {
     useScrollReveal, CopyButton, CodeBlock, PMark,
     InkButton, EditorialLink, Plate, GpSection, GpHead, GalleyFooter,
@@ -155,92 +156,147 @@ import {
 
 /* ── Hero ────────────────────────────────────────────────────────── */
 
-const HERO_CONTENTS = [
-    ['01', 'The file', 'the-file'],
-    ['02', 'Interactive', 'playground'],
-    ['03', 'In the box', 'in-the-box'],
-    ['04', 'The numbers', 'numbers'],
-    ['05', 'For the agents', 'agents'],
-    ['06', 'As Markdown', 'markdown'],
-    ['07', 'In the wild', 'demos'],
-    ['08', 'Start', 'start'],
+/* The hero specimen — a whole feature, small enough to read at a glance.
+   Deliberately shorter than the complete Fig. 1 in section 01: the hero
+   shows THAT it's one file; section 01 proves it isn't an excerpt. */
+const HERO_SPECIMEN = `# likes.pyxl
+
+@server
+async def load(req):
+    return {"likes": await db.count()}
+
+@action
+async def like(req):
+    return {"likes": await db.bump()}
+
+
+export default function Likes({ data }) {
+  const like = useAction('like')
+  return <button onClick={() => like()}>♥ {data.likes}</button>
+}`;
+
+/* Proofreader's margin tags, aligned to the three regions of the file.
+   Ochre marginalia (the site's one annotation ink), shown ≥lg where the
+   plate has room; the plate reads fine without them on smaller screens.
+   Percentages are calibrated to the specimen's rendered lines. */
+const HERO_TAGS = [
+    { top: '18%', label: 'loads' },
+    { top: '42%', label: 'mutates' },
+    { top: '71%', label: 'renders' },
 ];
 
-/* Fragment navigation no-ops on sections with content-visibility:auto
-   (the gp-cv perf hint), so the contents links scroll programmatically.
-   The href stays for semantics and middle-click/copy-link. */
-function scrollToSection(e, id) {
-    e.preventDefault();
-    const el = document.getElementById(id);
-    if (!el) return;
-    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
-    history.replaceState(null, '', `#${id}`);
+/* A printed insert slip: an editorial "just shipped" announcement, set between
+   hairline rules with an ochre margin tag and an emerald period. It renders in
+   the SSR HTML (so it's there for the static hero, no-JS, and crawlers); a boot
+   script hides it flash-free for anyone who has dismissed this exact release,
+   and the dismiss control persists that choice. Bump ANN_KEY for the next one. */
+const ANN_KEY = 'pyxle-ann-0_8';
+const ANN_BOOT = `try{if(localStorage.getItem('${ANN_KEY}')==='1'){document.documentElement.classList.add('pyxle-ann-dismissed');}}catch(e){}`;
+
+function JustShipped() {
+    const dismiss = useCallback(() => {
+        try { localStorage.setItem(ANN_KEY, '1'); } catch (e) {}
+        document.documentElement.classList.add('pyxle-ann-dismissed');
+    }, []);
+    return (
+        <>
+            <script dangerouslySetInnerHTML={{ __html: ANN_BOOT }} />
+            {/* border-b only: the fixed masthead's own bottom rule serves as
+               the banner's top rule when it sits flush beneath it. */}
+            <div className="just-shipped border-b border-rule">
+                <div className="mx-auto flex max-w-[76rem] flex-wrap items-center gap-x-4 gap-y-1.5 px-5 py-2.5 sm:px-8">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-press">Just shipped</span>
+                    <span className="hidden h-3.5 w-px bg-rule sm:block" aria-hidden="true" />
+                    <p className="text-[13px] leading-snug text-ink2">
+                        <span className="font-[520] text-ink">Pyxle Studio</span> and the{' '}
+                        <code className="text-[0.92em] text-acct">.pyxl</code> debugger<span className="text-accent">.</span>{' '}
+                        <span className="hidden sm:inline">A live dashboard, and breakpoints right in your files.</span>
+                    </p>
+                    <span className="ml-auto flex items-center gap-4">
+                        <Link href="/docs/guides/studio" className="focus-ring rounded font-mono text-[12px] text-acct underline decoration-1 underline-offset-4 transition-[text-decoration-thickness] hover:decoration-2">Studio</Link>
+                        <Link href="/docs/guides/debugging-pyxl" className="focus-ring rounded font-mono text-[12px] text-acct underline decoration-1 underline-offset-4 transition-[text-decoration-thickness] hover:decoration-2">Debugger</Link>
+                        <button
+                            type="button"
+                            onClick={dismiss}
+                            aria-label="Dismiss announcement"
+                            className="focus-ring -mr-1 rounded p-1 text-ink2 transition-colors hover:text-ink"
+                        >
+                            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                                <path d="M3.5 3.5l7 7M10.5 3.5l-7 7" strokeLinecap="round" />
+                            </svg>
+                        </button>
+                    </span>
+                </div>
+            </div>
+        </>
+    );
 }
 
 function Hero({ version }) {
     return (
-        <section className="relative">
-            <div className="mx-auto max-w-[76rem] px-5 pb-16 pt-28 sm:px-8 sm:pb-24 sm:pt-36">
-                <div className="grid gap-12 lg:grid-cols-12">
-                    {/* The whole hero paints statically — instant, like the
-                       page was simply already there. Only the brand gestures
-                       perform: the P draws itself and the period lands. */}
-                    <div className="lg:col-span-9">
+        // pt-16 clears the fixed h-16 masthead so the announcement sits flush
+        // beneath it; the hero content adds its own breathing room below.
+        <section className="relative pt-16">
+            <JustShipped />
+            <div className="mx-auto max-w-[76rem] px-5 pb-16 pt-12 sm:px-8 sm:pb-24 sm:pt-20">
+                {/* The whole hero paints statically — instant, like the page
+                   was simply already there. Only the brand gestures perform:
+                   the P draws itself and the period lands. The pitch — "one
+                   file" — isn't asserted in a paragraph; the file is right
+                   there beside the headline. */}
+                <div className="grid items-center gap-x-12 gap-y-12 lg:grid-cols-12">
+                    <div className="lg:col-span-6">
                         <PMark load id="hero" dur={600} dotDelay={650} />
                         <p className="mt-10 font-mono text-xs uppercase tracking-[0.14em] text-ink2">
                             Pyxle — an open-source, full-stack Python framework
                         </p>
-                        <h1 className="mt-5 font-display text-[2.9rem] font-[560] leading-[1.04] tracking-[-0.015em] text-ink sm:text-[4.2rem] lg:text-[5.2rem]">
+                        <h1 className="mt-5 font-display text-[2.7rem] font-[560] leading-[1.05] tracking-[-0.015em] text-ink sm:text-[3.6rem] lg:text-[4rem]">
                             Python &amp; React.
                             <br />
-                            One&nbsp;file<span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
+                            <span className="whitespace-nowrap text-acct">One file</span><span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
                             <span className="sr-only">.</span>
                         </h1>
-                        <p className="mt-7 max-w-[56ch] text-pretty text-lg leading-[1.7] text-ink2">
-                            The async loader, the server actions, and the React component that
-                            uses them live together in a single{' '}
+                        <p className="mt-6 max-w-[42ch] text-pretty text-lg leading-[1.7] text-ink2">
+                            A feature's Python and its React in one{' '}
                             <code className="text-[0.9em] text-acct">.pyxl</code> file —
-                            server-rendered, hydrated, hot-reloading. Standard ASGI underneath,
-                            with no special deploy story.
+                            server-rendered, hydrated, and no API layer to keep in sync.
                         </p>
-                        <div className="mt-9 flex flex-wrap items-center gap-5">
+                        <div className="mt-8 flex flex-wrap items-center gap-5">
                             <InkButton href="/docs/getting-started/installation">Get started</InkButton>
                             <EditorialLink href="/playground">Open the playground →</EditorialLink>
                         </div>
-                        <p className="mt-7 font-mono text-xs text-ink2">
-                            MIT{version ? ` · v${version}` : ''} ·{' '}
-                            <Link href="/benchmarks" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">
-                                ~2× faster SSR than Next.js →
-                            </Link>
-                        </p>
-                    </div>
-
-                    {/* Right rail — a manuscript's table of contents up top,
-                       the pip colophon anchored at the bottom. */}
-                    <div className="flex flex-col justify-between gap-12 lg:col-span-3">
-                        <nav aria-label="Contents" className="hidden pt-3 lg:block">
-                            <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">Contents</p>
-                            <ol className="mt-4">
-                                {HERO_CONTENTS.map(([n, label, id]) => (
-                                    <li key={n}>
-                                        <a href={`#${id}`} onClick={(e) => scrollToSection(e, id)} className="focus-ring group flex items-baseline gap-3 rounded py-1.5">
-                                            <span className="font-mono text-[11px] text-press" aria-hidden="true">{n}</span>
-                                            <span className="gp-leader group-hover:border-accent" aria-hidden="true" />
-                                            <span className="font-mono text-[12px] text-ink2 transition-colors group-hover:text-ink">{label}</span>
-                                        </a>
-                                    </li>
-                                ))}
-                            </ol>
-                        </nav>
-                        <div className="border-t border-rule pt-5">
+                        <div className="mt-8 border-t border-rule pt-5">
                             <div className="flex items-center gap-3 font-mono text-[13px] text-ink">
                                 <span className="select-none text-acct">$</span>
                                 <span className="truncate">pip install pyxle-framework</span>
                                 <span className="ml-auto"><CopyButton text="pip install pyxle-framework" /></span>
                             </div>
-                            <p className="mt-3 font-mono text-[11px] text-ink2">Python 3.10+ · Node · any ASGI host</p>
+                            <p className="mt-3 font-mono text-[11px] leading-relaxed text-ink2">
+                                MIT{version ? ` · v${version}` : ''} · Python 3.10+ · any ASGI host ·{' '}
+                                <Link href="/benchmarks" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">
+                                    ~2× faster SSR than Next.js →
+                                </Link>
+                            </p>
                         </div>
+                    </div>
+
+                    {/* The specimen — the whole feature, shown not told. */}
+                    <div className="min-w-0 lg:col-span-6">
+                        <Plate
+                            label="likes.pyxl"
+                            meta="one file"
+                            caption={<>The whole feature — it <span className="text-ink">loads</span>, <span className="text-ink">mutates</span>, and <span className="text-ink">renders</span>, with no API in between.</>}
+                        >
+                            <div className="duotone relative">
+                                <CodeBlock code={HERO_SPECIMEN} className="p-5 text-[12.5px]" />
+                                {HERO_TAGS.map((m) => (
+                                    <span key={m.label} className="absolute right-3 hidden items-center gap-2 lg:flex" style={{ top: m.top }} aria-hidden="true">
+                                        <span className="h-px w-5" style={{ background: 'var(--c-press)', opacity: 0.6 }} />
+                                        <span className="font-mono text-[11px] italic text-press">{m.label}</span>
+                                    </span>
+                                ))}
+                            </div>
+                        </Plate>
                     </div>
                 </div>
             </div>
@@ -315,7 +371,7 @@ function TheFile() {
                 n="01"
                 eyebrow="The file"
                 title="Eight files was never the point."
-                lead="A feature in a typical React-plus-API stack: a route handler, a validator, a types file, a client hook, a fetch wrapper, a skeleton, the component, and the page that mounts it — stitched together by convention and hope. In Pyxle, the same feature is one file. One read tells you everything it does."
+                lead="The usual React-plus-API stack scatters one feature across eight files, stitched together by convention and hope. In Pyxle it's one file — one read tells you everything it does."
             />
 
             <div className="mt-14 grid items-start gap-12 lg:grid-cols-12">
@@ -402,11 +458,15 @@ function Centerfold() {
 
 /* ── 03 · The index (what's in the box) ──────────────────────────── */
 
+/* [name, gloss, doc] — a third entry sets the name in an editorial link;
+   the two newest parts carry one so the index is also the way in. */
 const INDEX_ROWS = [
     ['File-based routing', "drop a file in pages/ — it's a route"],
     ['SSR + hydration', 'HTML first, interactive after'],
     ['Hot reload', 'Vite HMR, Python changes included'],
     ['Server actions', '@action replaces the API layer'],
+    ['Studio', 'a dashboard for routes, loaders & actions', '/docs/guides/studio'],
+    ['The debugger', 'breakpoints in .pyxl — Python and React', '/docs/guides/debugging-pyxl'],
     ['Plugins', 'auth, database, and your own'],
     ['ASGI underneath', 'uvicorn today, any host tomorrow'],
 ];
@@ -422,29 +482,133 @@ function TheIndex() {
             />
 
             <div className="mt-12 max-w-3xl">
-                {INDEX_ROWS.map(([name, desc], i) => (
+                {INDEX_ROWS.map(([name, desc, doc], i) => (
                     <div
                         key={name}
                         data-reveal
                         className="group flex items-baseline gap-4 py-3.5"
                         style={{ ['--reveal-delay']: `${(i % 2) * 90}ms` }}
                     >
-                        <span className="font-display text-xl font-[540] tracking-[-0.01em] text-ink sm:text-2xl">{name}</span>
+                        <span className="font-display text-xl font-[540] tracking-[-0.01em] text-ink sm:text-2xl">
+                            {doc
+                                ? <Link href={doc} className="focus-ring rounded underline decoration-rule decoration-2 underline-offset-[6px] transition-colors hover:decoration-accent">{name}</Link>
+                                : name}
+                        </span>
                         <span className="gp-leader group-hover:border-accent" aria-hidden="true" />
                         <span className="text-right font-mono text-xs text-ink2 transition-colors group-hover:text-ink sm:text-[13px]">{desc}</span>
                     </div>
                 ))}
-                <p data-reveal className="mt-10 max-w-[58ch] text-pretty text-base leading-[1.7] text-ink2">
-                    Standard ASGI means there is no special deploy story.{' '}
-                    <span className="text-ink">If it runs Python and Node, it runs Pyxle.</span>
-                </p>
             </div>
         </GpSection>
     );
 }
 
 
-/* ── 04 · The numbers (a typeset ledger) ─────────────────────────── */
+/* ── 04 · Studio & the debugger (the dev surface, shown) ─────────── */
+
+/* The debug specimen: one .pyxl, two breakpoints — one inside the Python
+   loader, one inside the React component below it. */
+const DEBUG_SPECIMEN = `# post.pyxl
+
+@server
+async def load(request):
+    pid = request.path_params["id"]
+    post = await db.post(pid)
+    return {"post": post}
+
+
+export default function Post({ data }) {
+  const words = data.post.body.split(' ').length
+  return <h1>{data.post.title} · {words} words</h1>
+}`;
+
+/* The two lines that carry a gutter dot — matched on their content, so a
+   re-typeset specimen can never strand a mark on the wrong line. */
+const BREAKPOINT_LINES = new Set([
+    '    post = await db.post(pid)',
+    "  const words = data.post.body.split(' ').length",
+]);
+
+/* The listing prints its own gutter: a breakpoint dot on those two lines,
+   an empty cell on every other, so the marks sit on their lines by
+   construction rather than by calibration. */
+function DebugListing() {
+    const lines = DEBUG_SPECIMEN.split('\n');
+    return (
+        <pre className="overflow-x-auto p-5 font-mono text-[12.5px] leading-[1.9]">
+            <code>
+                {tokenizeBlock(DEBUG_SPECIMEN, 'pyxl').map((tokens, i) => (
+                    <React.Fragment key={i}>
+                        <span
+                            aria-hidden="true"
+                            className={`mr-3 inline-block h-2 w-2 rounded-full align-middle ${BREAKPOINT_LINES.has(lines[i]) ? 'bg-[#E5534B]' : ''}`}
+                        />
+                        {tokens.map((t, j) => <span key={j} className={t.cls}>{t.text}</span>)}
+                        {'\n'}
+                    </React.Fragment>
+                ))}
+            </code>
+        </pre>
+    );
+}
+
+function StudioAndDebugger() {
+    return (
+        <GpSection n="04" id="studio-debugger">
+            <div className="grid gap-12 lg:grid-cols-12">
+                <div className="order-1 min-w-0 lg:col-span-6">
+                    <GpHead
+                        n="04"
+                        eyebrow="Studio & the debugger"
+                        title="Two breakpoints, one file."
+                        lead="Set one in the @server loader and one in the React component below it — both bind, in the same .pyxl. The VS Code extension contributes each half as its own F5 launch: Backend runs your dev server under the Python debugger, Frontend attaches the browser to it."
+                    />
+                    <p data-reveal className="mt-8 max-w-[54ch] text-pretty text-base leading-[1.7] text-ink2">
+                        The same run serves <span className="text-ink">Studio</span> at{' '}
+                        <code className="text-[0.9em] text-acct">/__pyxle/studio</code> — every route with
+                        its loaders and actions, a tester that runs them against the live server, and the
+                        request feed as it happens. Dev-only by construction: a production{' '}
+                        <code className="text-[0.9em] text-acct">pyxle serve</code> doesn't contain it.
+                    </p>
+                    <div data-reveal className="mt-8 border-t border-rule pt-5">
+                        <div className="flex items-center gap-3 font-mono text-[13px] text-ink">
+                            <span className="select-none text-acct">$</span>
+                            <span className="truncate">pyxle studio</span>
+                            <span className="ml-auto"><CopyButton text="pyxle studio" /></span>
+                        </div>
+                        <p className="mt-3 font-mono text-[11px] leading-relaxed text-ink2">
+                            routes · tester · request feed · latency · resolved config · pyxle check
+                        </p>
+                        <p className="mt-4 font-mono text-[11px] leading-relaxed text-ink2">
+                            Already on Pyxle? <span className="text-ink">pip install --upgrade pyxle-framework</span>
+                        </p>
+                    </div>
+                    <p data-reveal className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3">
+                        <EditorialLink href="/docs/guides/studio">Studio, panel by panel →</EditorialLink>
+                        <EditorialLink href="/docs/guides/debugging-pyxl">Debug a .pyxl file →</EditorialLink>
+                    </p>
+                </div>
+
+                <div className="order-2 min-w-0 lg:col-span-6">
+                    <div data-reveal style={{ ['--reveal-delay']: '100ms' }}>
+                        <Plate
+                            label="post.pyxl"
+                            meta="two breakpoints"
+                            caption={<>Fig. 3 — the <span className="text-ink">loader</span> breakpoint pauses the request in Python; the <span className="text-ink">component</span> breakpoint pauses the render in the browser. Same file, no compiled output to chase.</>}
+                        >
+                            <div className="duotone">
+                                <DebugListing />
+                            </div>
+                        </Plate>
+                    </div>
+                </div>
+            </div>
+        </GpSection>
+    );
+}
+
+
+/* ── 05 · The numbers (a typeset ledger) ─────────────────────────── */
 
 // From the July 2026 off-box EC2 run on Pyxle 0.7.1 (2× c7i.2xlarge,
 // oha on its own box; SSR measured per core, API at 8 workers) — see /benchmarks.
@@ -465,9 +629,9 @@ function CircledZero() {
 
 function TheNumbers() {
     return (
-        <GpSection n="04" id="numbers">
+        <GpSection n="05" id="numbers">
             <GpHead
-                n="04"
+                n="05"
                 eyebrow="The numbers"
                 title="Measured, not marketed."
                 lead="Same hardware, same load generator, both frameworks tuned in good faith. When a setup is unfair to a competitor, we fix the setup — not the chart."
@@ -502,7 +666,7 @@ function TheNumbers() {
 }
 
 
-/* ── 05 · For the agents ─────────────────────────────────────────── */
+/* ── 06 · For the agents ─────────────────────────────────────────── */
 
 function ContextStrip() {
     /* One continuous stroke vs. eight broken segments — context per
@@ -527,20 +691,20 @@ function ContextStrip() {
                     </svg>
                 </div>
             </div>
-            <figcaption className="mt-3 font-mono text-xs text-ink2">Fig. 4 — context per feature read.</figcaption>
+            <figcaption className="mt-3 font-mono text-xs text-ink2">Fig. 5 — context per feature read.</figcaption>
         </figure>
     );
 }
 
 function ForAgents() {
     return (
-        <GpSection n="05" id="agents">
+        <GpSection n="06" id="agents">
             <div className="grid gap-12 lg:grid-cols-12">
                 <div className="order-2 min-w-0 lg:order-1 lg:col-span-6">
                     <div data-reveal style={{ ['--reveal-delay']: '100ms' }}>
                         <Plate
                             label="terminal"
-                            caption={<>Fig. 3 — <span className="text-ink">pyxle check</span>, verbatim. Structured diagnostics, an exit code an agent can branch on.</>}
+                            caption={<>Fig. 4 — <span className="text-ink">pyxle check</span>, verbatim. Structured diagnostics, an exit code an agent can branch on.</>}
                         >
                             {/* A real transcript — reproduce it by running
                                `pyxle check` on a project with these two bugs. */}
@@ -564,22 +728,13 @@ function ForAgents() {
 
                 <div className="order-1 min-w-0 lg:order-2 lg:col-span-6">
                     <GpHead
-                        n="05"
+                        n="06"
                         eyebrow="For the agents"
                         title="One file is also how an agent reads."
                         lead="Context windows are budgets. A Pyxle feature is one read — loader, mutations, and UI in a single pass, not a scavenger hunt across eight files before the first edit."
                     />
-                    <div data-reveal="none" className="my-9 max-w-xl">
-                        <span className="gp-rule-x block h-px bg-rule" aria-hidden="true" />
-                        <p className="py-5 font-display text-[1.5rem] font-[460] leading-snug tracking-[-0.01em] text-ink sm:text-[1.75rem]">
-                            “One read = the whole feature.”
-                        </p>
-                        <span className="gp-rule-x block h-px bg-rule" style={{ ['--rule-delay']: '120ms' }} aria-hidden="true" />
-                    </div>
-                    <p data-reveal className="max-w-[58ch] text-pretty text-base leading-[1.7] text-ink2">
-                        <code className="text-[0.9em] text-acct">pyxle check</code> emits structured,
-                        grep-able diagnostics — section, line, message, file — with an exit code an
-                        agent can branch on. And it is all Python — the language models write best.
+                    <p data-reveal className="mt-8 max-w-[54ch] text-pretty text-base leading-[1.7] text-ink2">
+                        And it's all Python — the language models write best.
                     </p>
                     <p data-reveal className="mt-7">
                         <EditorialLink href="/docs/guides/for-ai-agents">Read the full case →</EditorialLink>
@@ -591,37 +746,20 @@ function ForAgents() {
 }
 
 
-/* ── 06 · As Markdown (readable by machines) ─────────────────────── */
+/* ── 07 · As Markdown (readable by machines) ─────────────────────── */
 
 function ReadableAsMarkdown() {
     return (
-        <GpSection n="06" id="markdown">
+        <GpSection n="07" id="markdown">
             <div className="grid gap-12 lg:grid-cols-12">
                 <div className="order-1 min-w-0 lg:col-span-6">
                     <GpHead
-                        n="06"
+                        n="07"
                         eyebrow="Markdown, built in"
                         title="Every page is also Markdown."
                         lead="Your readers increasingly arrive with an AI in the loop — and it wants text, not your HTML. Flip one flag and every page serves a clean Markdown twin: append .md to any URL, or send Accept: text/markdown. This page included."
                     />
-                    <div data-reveal="none" className="my-9 max-w-xl">
-                        <span className="gp-rule-x block h-px bg-rule" aria-hidden="true" />
-                        <p className="py-5 font-display text-[1.5rem] font-[460] leading-snug tracking-[-0.01em] text-ink sm:text-[1.75rem]">
-                            “Append{' '}
-                            <code className="font-mono text-[0.82em] text-acct">.md</code>. Read the page.”
-                        </p>
-                        <span className="gp-rule-x block h-px bg-rule" style={{ ['--rule-delay']: '120ms' }} aria-hidden="true" />
-                    </div>
-                    <p data-reveal className="max-w-[58ch] text-pretty text-base leading-[1.7] text-ink2">
-                        You decide where each page's Markdown comes from — a co-located{' '}
-                        <code className="text-[0.9em] text-acct">.md</code> file, a{' '}
-                        <code className="text-[0.9em] text-acct">to_markdown</code> handler, or one{' '}
-                        <code className="text-[0.9em] text-acct">llms.py</code> for a whole section. An{' '}
-                        <code className="text-[0.9em] text-acct">llms.txt</code> index and discovery
-                        headers come free — it is how a developer pastes your docs into Claude or
-                        Cursor and gets clean context, not tag soup.
-                    </p>
-                    <p data-reveal className="mt-7">
+                    <p data-reveal className="mt-8">
                         <EditorialLink href="/docs/guides/llms">How it works →</EditorialLink>
                     </p>
                 </div>
@@ -630,7 +768,7 @@ function ReadableAsMarkdown() {
                     <div data-reveal style={{ ['--reveal-delay']: '100ms' }}>
                         <Plate
                             label="terminal"
-                            caption={<>Fig. 5 — any URL, plus <span className="text-ink">.md</span>. Turned on with one line: <span className="text-ink">"llms": true</span>.</>}
+                            caption={<>Fig. 6 — any URL, plus <span className="text-ink">.md</span>. Turned on with one line: <span className="text-ink">"llms": true</span>.</>}
                         >
                             <pre className="duotone overflow-x-auto p-5 font-mono text-[12.5px] leading-[1.9]">
                                 <code>
@@ -655,7 +793,7 @@ function ReadableAsMarkdown() {
 }
 
 
-/* ── 07 · In the wild (live specimens) ───────────────────────────── */
+/* ── 08 · In the wild (live specimens) ───────────────────────────── */
 
 const DEMOS = [
     { name: 'Flux', tagline: 'SaaS analytics', href: 'https://flux.pyxle.app', kind: 'chart' },
@@ -759,10 +897,10 @@ function FeaturedPulse() {
 
 function InTheWild() {
     return (
-        <GpSection n="07" id="demos">
+        <GpSection n="08" id="demos">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <GpHead
-                    n="07"
+                    n="08"
                     eyebrow="In the wild"
                     title="Built with Pyxle, running live."
                     lead="One reference app that uses every feature, plus a few small specimens — each a handful of .pyxl files, deployed the boring way. Open the source next to the live app; the whole feature really is in one file."
@@ -806,7 +944,7 @@ function InTheWild() {
 }
 
 
-/* ── 08 · Start (a recipe) + the newsletter coda ─────────────────── */
+/* ── 09 · Start (a recipe) + the newsletter coda ─────────────────── */
 
 const RECIPE = [
     ['pip install pyxle-framework', 'installs the compiler, server, and CLI'],
@@ -933,9 +1071,9 @@ function GetStarted() {
     }, []);
 
     return (
-        <GpSection n="08" id="start">
+        <GpSection n="09" id="start">
             <GpHead
-                n="08"
+                n="09"
                 eyebrow="Start"
                 title="Four commands. The fourth is a running app."
             />
@@ -1080,6 +1218,7 @@ export default function Page({ data }) {
                 <TheFile />
                 <Centerfold />
                 <TheIndex />
+                <StudioAndDebugger />
                 <TheNumbers />
                 <ForAgents />
                 <ReadableAsMarkdown />

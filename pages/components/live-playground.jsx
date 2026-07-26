@@ -53,6 +53,12 @@ const VENDOR_FILES = [
     'pyxle/compiler/parser.py',
 ];
 
+// Budget for the one-time Pyodide download + init. A stalled CDN fetch can
+// leave the worker neither resolving nor throwing; without this the pane would
+// sit on "booting Python…" indefinitely. Generous — Pyodide is ~10 MB and slow
+// links are real — but finite, so a stall fails loudly instead of hanging.
+const BOOT_TIMEOUT_MS = 60000;
+
 export const DEFAULT_SOURCE = `# counter.pyxl
 
 # Count lives in Python. The @action
@@ -324,6 +330,17 @@ export function LivePlayground({
         return () => window.removeEventListener('message', onMsg);
     }, [sendInit]);
 
+    // Boot watchdog: if Python hasn't reported ready within the budget (a
+    // stalled Pyodide download that never resolves or throws), fail loudly so
+    // the pane shows an actionable message instead of "booting…" forever.
+    useEffect(() => {
+        if (pyStatus !== 'booting') return undefined;
+        const t = setTimeout(() => {
+            setPyStatus((s) => (s === 'booting' ? 'failed' : s));
+        }, BOOT_TIMEOUT_MS);
+        return () => clearTimeout(t);
+    }, [pyStatus]);
+
     // Keep the sandbox's theme in sync with the host's dark/light toggle.
     useEffect(() => {
         if (typeof document === 'undefined') return undefined;
@@ -423,13 +440,25 @@ export function LivePlayground({
                     )}
                     {showBooting && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-                            <span className="relative flex h-2.5 w-2.5">
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-70" />
-                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-400" />
-                            </span>
-                            <p className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
-                                booting Python… <span className="opacity-60">(one-time, a few seconds)</span>
-                            </p>
+                            {pyStatus === 'failed' ? (
+                                <>
+                                    <span className="h-2.5 w-2.5 rounded-full bg-red-400/80" aria-hidden="true" />
+                                    <p className="max-w-[36ch] font-mono text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+                                        Couldn't load the in-browser Python runtime — a one-time ~10&nbsp;MB download. Check your connection, then{' '}
+                                        <button type="button" onClick={() => window.location.reload()} className="rounded text-emerald-500 underline decoration-1 underline-offset-2 hover:decoration-2">reload</button>.
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="relative flex h-2.5 w-2.5">
+                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-70" />
+                                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-400" />
+                                    </span>
+                                    <p className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                                        booting Python… <span className="opacity-60">(one-time, a few seconds)</span>
+                                    </p>
+                                </>
+                            )}
                         </div>
                     )}
                     {showDefault && (
