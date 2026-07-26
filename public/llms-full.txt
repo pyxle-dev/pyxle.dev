@@ -5013,6 +5013,14 @@ In production (`debug=false`) error responses are intentionally generic — no
 stack traces or file paths in the body. The full detail goes to the **server
 log** instead. Check your process manager's logs (e.g. `journalctl -u myapp`).
 
+## Breakpoints in .pyxl files
+
+Beyond `pdb`, Pyxle has a full breakpoint-debugging story: `pyxle dev --inspect`
+hosts a debug server so VS Code (or any DAP client) can pause a request at a
+breakpoint set **directly in a `.pyxl` file** — Python loaders/actions on the
+server side, and the React half through the browser. That workflow has its own
+guide: [Debugging `.pyxl` files](https://pyxle.dev/docs/guides/debugging-pyxl.md).
+
 ## Debugging a loader or action (the Python side)
 
 `@server` and `@action` functions are plain `async` functions — debug them like
@@ -5092,10 +5100,12 @@ Reading them demystifies "where did my code go":
 - `.pyxle-build/client/…​` — the **JavaScript** half: your component, ready for
   Vite.
 
-The line numbers in a Python traceback point at the compiled `.py`; the compiler
-preserves your code verbatim below the injected header, so mapping back to your
-`.pyxl` is a small, constant offset. The build directory is disposable —
-delete it and the next `pyxle dev`/`build` regenerates it.
+In development, Python tracebacks already point at your `.pyxl` file and line
+(see [Debugging `.pyxl` files](https://pyxle.dev/docs/guides/debugging-pyxl.md)). A traceback from a
+**production build** points at the compiled `.py`; the compiler preserves your
+code verbatim below the injected header, so mapping back to your `.pyxl` is a
+small, constant offset. The build directory is disposable — delete it and the
+next `pyxle dev`/`build` regenerates it.
 
 ## Static checks
 
@@ -5120,9 +5130,260 @@ Two commands catch problems before you run the page:
 
 ## Next steps
 
+- [Debugging `.pyxl` files](https://pyxle.dev/docs/guides/debugging-pyxl.md) — breakpoints in `.pyxl` source with VS Code or any DAP client
 - [Error Handling](https://pyxle.dev/docs/guides/error-handling.md) — `LoaderError`, error boundaries, 404s
 - [Testing](https://pyxle.dev/docs/guides/testing.md) — unit-test loaders and actions
 - [Client Components](https://pyxle.dev/docs/guides/client-components.md) — browser-only code and `<ClientOnly>`
+
+---
+
+Source: https://pyxle.dev/docs/guides/debugging-pyxl.md
+
+# Debugging .pyxl files
+
+Set a breakpoint directly in your `.pyxl` source — on a line inside a `@server` loader *and* on a line inside the JSX below it — and both bind. `pyxle dev --inspect` exposes the Python half to any debugger, dev source maps expose the React half to the browser, and the VS Code extension turns each into one launch: **F5** for the Python side, a second configuration for the React side. No custom debugger, no compiled-file archaeology.
+
+---
+
+## Quick start (VS Code)
+
+1. Install the **Pyxle Language Tools** extension (0.3.0 or later). For Python-side breakpoints, also install the **Python** extension (`ms-python.python`) — the debugger prompts you if it's missing and still debugs the React side without it.
+2. Make sure your project uses **pyxle-framework 0.8.0 or newer** (the debugger relies on line mapping shipped in 0.8.0). Nothing else to install: debugpy ships with the framework.
+3. Open a `.pyxl` file and press **F5**. With no `launch.json` yet, Pyxle asks which half to debug — **Backend — Python** or **Frontend — React**. Pick one, or commit the configurations to skip the prompt:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    { "type": "pyxle", "request": "launch", "name": "Debug Pyxle app" },
+    { "type": "pyxle", "request": "launch", "name": "Debug Pyxle app (React browser)", "server": false }
+  ]
+}
+```
+
+Choosing **Backend** runs your dev server under the Python debugger — one clean debug session that VS Code owns. A breakpoint in a loader or action pauses the request in VS Code with the `.pyxl` frame in the stack. Once the server is ready, your app opens in the browser. **Stop**, **Restart**, and **Pause** all act on that single session — Stop tears the whole server (Vite, SSR workers) down with it. It needs the **Python** extension (`ms-python.python`); the debugger offers to install it if it's missing.
+
+**To debug the React half too**, run the **"Debug Pyxle app (React browser)"** configuration (it's just `"server": false`) — a standalone Chrome session pointed at the running dev server. A breakpoint you set in the component pauses there, in the same `.pyxl` file you set the loader breakpoint in. It's a *separate* session on purpose: keeping the browser out of the Python session's toolbar means each side has clean, unambiguous Stop / Restart / Pause.
+
+If the Frontend session had to start its own `pyxle dev` (nothing was running), **stopping it offers to stop that server too** — a one-click "Stop server". Restarting the Frontend session keeps the server up (no prompt). If instead it attached to a server something else started (Backend, or a `pyxle dev` you ran yourself), stopping Frontend leaves that server running untouched — you stop it where you started it.
+
+To debug **both** halves, start **Backend** first — it runs the dev server — then start **Frontend**, which attaches its browser to that same server. That way Stop on either side does the right thing: stopping Frontend leaves the server (Backend owns it), stopping Backend tears it down. Frontend on its own works standalone too; just don't start Backend on top of a Frontend-started server, or they'll race for the port (the second one fails to bind with an "address already in use" error — stop the first, then start the other).
+
+The launch configuration accepts a few knobs:
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `cwd` | `${workspaceFolder}` | Pyxle project root (contains `pages/` and `pyxle.config.json`). |
+| `server` | `true` | Run the dev server under the Python debugger so breakpoints in loaders and actions bind. Set `false` to debug **only** the React side in a standalone Chrome session. |
+| `browser` | `true` | When debugging Python, open the app in your browser once the server is ready. |
+| `url` | dev server root | Page to open. |
+| `args` | `[]` | Extra arguments passed to `pyxle dev` (e.g. `["--port", "3000"]`). |
+| `justMyCode` | `true` | Keep stepping inside your own code. Set `false` to step into framework internals. |
+
+To attach to an already-running server instead of launching one, use `"request": "attach"` (see [Attaching from any DAP client](#attaching-from-any-dap-client)).
+
+The extension also contributes a **"Pyxle: Open Studio"** command, which opens the running server's [Studio dashboard](https://pyxle.dev/docs/guides/studio.md) from the command palette.
+
+---
+
+## How it works
+
+There is no bespoke Pyxle debugger — the feature is two stock debuggers plus line mapping, which is why it works so broadly:
+
+- **The Python half** (`@server` loaders, `@action` handlers). The compiler embeds a line map in every generated server module, and in development the server imports those modules with `co_filename` and line numbers remapped to the original `.pyxl` source. To [debugpy](https://github.com/microsoft/debugpy) the running code simply *is* your `.pyxl` file, so breakpoints set there bind natively. The default launch runs the dev server under debugpy directly; `--inspect` instead hosts a debugpy server for clients to attach to.
+- **The React half** (the JSX in the same file). The compiler writes a source-map sidecar for each generated `.jsx` module, and the dev Vite config includes a small dev-only plugin that attaches those maps pointing back at the real `.pyxl` file on disk. VS Code's built-in js-debug resolves that file and binds breakpoints in it; browser devtools map every position the same way.
+
+Both mappings exist only in development. A production build ships neither.
+
+---
+
+## CLI reference
+
+The debugger flags live on `pyxle dev` (and `pyxle studio`, which accepts `--inspect` and `--inspect-port`):
+
+```bash
+pyxle dev --inspect
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--inspect` / `--no-inspect` | `false` | Host a debugpy debug server inside the dev-server process, bound to `127.0.0.1`. debugpy ships with the framework. |
+| `--inspect-port` | `5678` | Port for the debug server. When it's busy, Pyxle falls back to an ephemeral port and records the actual endpoint in the discovery file, so editor attach flows keep working. |
+| `--inspect-wait` / `--no-inspect-wait` | `false` | With `--inspect`: block startup until a debugger attaches — for breakpoints in code that runs during boot. |
+
+Only the dev-server process is debugged: the debugger environment is never injected into subprocesses (Vite, SSR workers, or anything a loader shells out to).
+
+---
+
+## Attaching from any DAP client
+
+debugpy speaks the Debug Adapter Protocol, so VS Code is a convenience, not a requirement. From neovim (`nvim-dap`), Emacs (`dape`), or any other DAP client, attach to the endpoint `--inspect` printed — the equivalent of:
+
+```json
+{
+  "type": "debugpy",
+  "request": "attach",
+  "connect": { "host": "127.0.0.1", "port": 5678 }
+}
+```
+
+Set breakpoints in `.pyxl` files by their real path. Because the server's code objects already carry `.pyxl` filenames, no path mappings or source translations are needed — stack frames, stepping, and `evaluate` in a paused loader all just work.
+
+---
+
+## Tracebacks point at .pyxl now
+
+The same line mapping improves life with no debugger attached at all: in development, a Python traceback from a loader or action names your `.pyxl` file and line — not a compiled module under `.pyxle-build/`. The terminal, the browser error overlay, and your logs all agree on where the error actually is.
+
+---
+
+## The discovery file
+
+While running, the dev server writes `.pyxle-build/dev-server.json` describing itself, and removes it on shutdown. This is what editor tooling (like the VS Code extension's F5 flow and "Open Studio") reads instead of guessing ports:
+
+| Key | Type | Meaning |
+|-----|------|---------|
+| `pid` | `integer` | Dev-server process id. |
+| `version` | `string` | Pyxle version. |
+| `startedAt` | `number` | Unix timestamp of server start. |
+| `projectRoot` | `string` | Absolute path of the project. |
+| `server` | `object` | `{ "host", "port" }` of the Starlette server. |
+| `vite` | `object` | `{ "host", "port" }` of the Vite dev server. |
+| `url` | `string` | Browser-reachable base URL. |
+| `studio` | `string` \| `null` | Studio dashboard URL (`null` when Studio is disabled). |
+| `debugpy` | `object` \| `null` | `{ "host", "port" }` of the debug server (`null` without `--inspect`). |
+
+The file is written atomically, and a failed write never takes down the server.
+
+---
+
+## Caveats
+
+Worth knowing before you rely on it:
+
+- **A paused breakpoint pauses the whole server.** `pyxle dev` is a single process, so while you sit at a breakpoint every in-flight request waits. That's the right trade-off for development — and one reason production never hosts a debugger.
+- **`justMyCode` defaults to `true`.** Stepping stays inside your own code; set it to `false` in the launch configuration to step into Pyxle's internals.
+- **React debugging happens in the browser, not the SSR worker.** Your component renders first in the Node SSR process, but the debugger doesn't attach there — it's the same code with the same source maps in the browser, which is where you debug it. (Server-render `console.log` output still prints to the `pyxle dev` terminal — see [Debugging](https://pyxle.dev/docs/guides/debugging.md#debugging-rendering-the-nodessr-side).)
+- **Production is untouched.** `pyxle serve` never remaps line numbers and never hosts debugpy, regardless of flags or config.
+- **debugpy ships with the framework** — `--inspect` works on a default install, no extra needed.
+
+---
+
+## Troubleshooting
+
+**"No module named pyxle" when you press F5.** VS Code has a Python interpreter selected that doesn't have pyxle installed — a common split when pyxle lives in one environment (a virtualenv, pyenv, or system Python) while VS Code points at another. The launch runs `python -m pyxle dev` under the *selected* interpreter, so it has to be the one where `pyxle` is installed. The extension checks this before launching and, when it doesn't match, offers a **Select Interpreter** button; you can also run **Python: Select Interpreter** from the command palette and pick the environment your terminal's `pyxle` command uses (`which pyxle` / `where pyxle` shows it). This is the same interpreter selection every Python project needs — nothing pyxle-specific.
+
+---
+
+## See also
+
+- [Debugging](https://pyxle.dev/docs/guides/debugging.md) — the wider guide: reading errors, `pdb`, the SSR side, common symptoms
+- [Pyxle Studio](https://pyxle.dev/docs/guides/studio.md) — the dev dashboard; `pyxle studio --inspect` runs both
+- [CLI reference → `pyxle dev`](https://pyxle.dev/docs/reference/cli.md#pyxle-dev) — every dev-server flag
+- [Editor setup](https://pyxle.dev/docs/guides/editor-setup.md) — installing the VS Code extension and language server
+
+---
+
+Source: https://pyxle.dev/docs/guides/studio.md
+
+# Pyxle Studio
+
+Pyxle Studio is the dashboard built into `pyxle dev` — one local page that shows everything the development server knows about your app: every route with its loader and actions, an interactive tester that runs them with real inputs, a live request feed, latency metrics, the effective configuration, and `pyxle check` diagnostics. Nothing to install, nothing to configure, and **dev-only by construction** — a production `pyxle serve` process doesn't contain it.
+
+```bash
+pyxle studio
+```
+
+---
+
+## Opening Studio
+
+Two ways in:
+
+- **`pyxle studio [directory]`** — runs the same development server as `pyxle dev` and opens your browser on the dashboard once it's ready. It takes the server flags (`--host`, `--port`, `--vite-host`, `--vite-port`, `--ssr-workers`, `--tailwind/--no-tailwind`, `--config`, `--verbose`), the debugger flags `--inspect` and `--inspect-port`, and `--open/--no-open`. The command also enables the dashboard for that run even when the config turns it off. Full flag list: [CLI reference](https://pyxle.dev/docs/reference/cli.md#pyxle-studio).
+- **Any running `pyxle dev`** already serves it — visit `http://localhost:8000/__pyxle/studio`.
+
+Studio updates itself live: the request feed streams over Server-Sent Events, and a hot rebuild refreshes the route data, so you can keep it open in a second window while you work.
+
+---
+
+## The panels
+
+### Routes
+
+The route table as the server actually resolved it. For every page: its URL pattern and source file, the `@server` loader (name and line), each `@action` with the **real endpoint URL** it's served at, any `websocket` handler, the cache posture (the loader's `revalidate` and the route's edge TTL from the [`cache`](https://pyxle.dev/docs/reference/configuration.md#edge-caching) block), the layout loaders that run above the page, and its `loading.pyxl`/`error.pyxl` boundaries. API routes are listed below the pages.
+
+Every source reference is a click-to-open link into your editor — `vscode://` deep links by default, with Cursor or copy-the-path selectable from the header.
+
+### Tester
+
+Run any loader or action against the live server without writing a scratch page. The two halves are deliberately different in how faithful they are:
+
+- **Loaders run in-process.** Pick a page, fill in its path params and query string, and Studio calls the `@server` function directly, timed. Every result shape renders as it would resolve — a plain data dict, a cache-shaped `{"data": ..., "revalidate": N}` return, a raised `LoaderError` (status and message), or a timeout. The synthesized request is deliberately minimal — no cookies, no session, no caller headers — the tester exercises the *loader*, not a login flow.
+- **Actions go through their real HTTP endpoint**, exactly like a browser would. Studio generates an input form from the action's [Pydantic body model](https://pyxle.dev/docs/core-concepts/server-actions.md#validating-request-bodies-with-pydantic)'s JSON schema (a free-form JSON editor when there isn't one) and POSTs to the action's URL — so the CSRF token, Pydantic validation, and any [`routeMiddleware.actions`](https://pyxle.dev/docs/guides/middleware.md#route-level-hooks) auth hooks are all exercised. A `401` from your auth hook or a `422` field map in the tester is precisely what a client would get. The response view also surfaces the `x-pyxle-invalidate` header, so you can confirm an action's `invalidate_routes(...)` is telling the client cache what you meant.
+
+### Requests
+
+A live feed of the requests your dev server is handling — method, path, status, duration, the route target that handled it, and the request's correlation id — streamed as they happen. It's a bounded window (the most recent 200), not a log store. Studio's own traffic is excluded from both the feed **and** the metrics, so the dashboard never counts itself.
+
+### Metrics
+
+A view over the same in-process [metrics registry](https://pyxle.dev/docs/guides/observability.md#metrics) the observability stack records into: request, SSR-render, loader, and action latency histograms, request totals, and server uptime. No exporter or Prometheus setup needed in dev — this is the zero-config way to see where a slow page spends its time.
+
+### Config
+
+The effective merged settings and every config block (`cors`, `csrf`, `cache`, `observability`, …) as the server is actually running them — the fastest answer to "did my config change take effect?". Secret-shaped values (keys matching `secret`, `token`, `password`, `apiKey`, …) are redacted before they reach the browser.
+
+### Check
+
+The same three-level diagnostics as [`pyxle check`](https://pyxle.dev/docs/reference/cli.md#pyxle-check) — Python syntax and structure, Python semantics, JSX — run on demand from the browser, with each finding linking straight to the offending file and line in your editor.
+
+---
+
+## Configuration
+
+Studio is configured under the `"studio"` block in `pyxle.config.json`. It's on by default in development; a bare boolean is accepted as shorthand (`"studio": false` turns it off).
+
+```json
+{
+  "studio": {
+    "enabled": true,
+    "allowedHosts": ["my-machine.local"]
+  }
+}
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `studio` | `object` \| `boolean` | `{}` | Studio settings. `false` disables the dashboard; `true` (or omitting the block) enables it. |
+| `studio.enabled` | `boolean` | `true` | Serve the dashboard at `/__pyxle/studio` under `pyxle dev`. The `pyxle studio` command re-enables it for that run even when this is `false`. |
+| `studio.allowedHosts` | `string[]` | `[]` | Extra hostnames allowed to reach Studio, extending the built-in `Host`-header allowlist (loopback names and the configured server host are always allowed). |
+
+---
+
+## Security model
+
+Studio displays your app's internals, so even as a local tool it is hardened:
+
+- **Dev-only by construction.** The code that mounts Studio only exists in the debug-mode dev server. `pyxle serve` never constructs it, so no configuration mistake can expose the dashboard in production.
+- **A `Host`-header allowlist on every Studio endpoint** — the standard defence against DNS rebinding, where an attacker's domain resolves to `127.0.0.1` so their page can read your local server. Only loopback names (`localhost`, `127.0.0.1`, `[::1]`) and the configured server host are accepted; add `allowedHosts` entries when you genuinely reach the dev server through another name (a LAN IP while testing on a phone, a `*.local` alias).
+- **Mutating endpoints are `POST` and require `Content-Type: application/json`**, so a cross-site form or no-CORS fetch can't invoke the tester — and with [CSRF protection](https://pyxle.dev/docs/guides/security.md#csrf-protection) enabled (the default), they ride the app's double-submit token too.
+- **Secrets are redacted** in the config view, and every Studio response is served `Cache-Control: no-store`.
+
+---
+
+## The reserved `__pyxle` namespace
+
+The `/__pyxle` URL prefix is reserved for framework endpoints — Studio lives under it, and the dev server's Vite asset proxy never forwards paths beneath it to Vite. Don't create pages or API routes that map into it.
+
+---
+
+## See also
+
+- [Debugging `.pyxl` files](https://pyxle.dev/docs/guides/debugging-pyxl.md) — breakpoints in `.pyxl` source; `pyxle studio --inspect` combines both tools
+- [Observability](https://pyxle.dev/docs/guides/observability.md) — the metrics registry Studio reads, and production-grade exporters
+- [CLI reference → `pyxle studio`](https://pyxle.dev/docs/reference/cli.md#pyxle-studio) — every flag
+- [Configuration reference → Studio](https://pyxle.dev/docs/reference/configuration.md#studio) — the config block
 
 ---
 
@@ -6307,7 +6568,8 @@ Source: https://pyxle.dev/docs/guides/editor-setup.md
 
 Pyxle Language Tools brings first-class IDE support to `.pyxl` files — syntax
 highlighting, diagnostics, completions, hover documentation, go-to-definition,
-and formatting. Everything works out of the box with a single install.
+formatting, and breakpoint debugging, plus a **Pyxle: Open Studio** command.
+Everything works out of the box with a single install.
 
 > **Beta release.** The language toolkit is production-usable but still
 > evolving. [Report issues on GitHub.](https://github.com/pyxle-dev/pyxle-langkit/issues)
@@ -6423,6 +6685,30 @@ Each section is formatted independently, preserving the file structure.
 Enhanced syntax coloring beyond the TextMate grammar — decorators,
 function parameters, built-in calls, and constants get distinct colors
 based on AST analysis.
+
+### Debugging
+
+Set a breakpoint directly in a `.pyxl` file — on a line inside a
+`@server` loader *and* on a line inside the JSX below it — and press
+**F5**. The extension contributes a `pyxle` debug type with two launch
+configurations: one runs your dev server under the Python debugger, the
+other debugs the React half in a standalone browser session.
+
+Debugging ships in extension version **0.3.0** and needs
+**pyxle-framework 0.8.0 or newer** — the launch runs `python -m pyxle`,
+which earlier framework versions don't provide. Python-side breakpoints
+also require the Python extension (`ms-python.python`); the debugger
+offers to install it if it's missing.
+
+Full walkthrough: [Debugging .pyxl files](https://pyxle.dev/docs/guides/debugging-pyxl.md).
+
+### Open Studio
+
+The **Pyxle: Open Studio** command (from the command palette) opens the
+running dev server's [Pyxle Studio](https://pyxle.dev/docs/guides/studio.md) dashboard — routes, an
+interactive loader/action tester, live requests, metrics, and config. It
+reads the server's discovery file, so it finds the right port without
+asking.
 
 ---
 
@@ -7406,7 +7692,7 @@ Honesty builds trust. Here's where Pyxle isn't the right choice:
   Astro or Eleventy are simpler.
 - **A pure JSON API.** If you're building a backend-only service
   with no UI, FastAPI is simpler.
-- **A mature production framework.** Pyxle is young (0.7.x).
+- **A mature production framework.** Pyxle is young (0.8.x).
   It's genuinely usable and under active development, but it
   doesn't have the decade of battle-testing that Django,
   Next.js, or Rails have. Best fit: greenfield projects,
@@ -8080,6 +8366,9 @@ pyxle dev [directory] [options]
 | `--print-config` / `--no-print-config` | `false` | Print merged configuration before starting |
 | `--tailwind` / `--no-tailwind` | `true` | Auto-start the **legacy** standalone Tailwind v3 CLI watcher when a hand-written `tailwind.config.*` is present. Tailwind **v4** projects (the scaffold default when you opt into Tailwind) run through the `@tailwindcss/vite` plugin and ignore this flag. |
 | `--dashboard` / `--no-dashboard` | `false` | Periodically print a live [observability](https://pyxle.dev/docs/guides/observability.md#dev-dashboard) panel (request/SSR metrics) to the terminal |
+| `--inspect` / `--no-inspect` | `false` | Host a debugpy debug server (bound to `127.0.0.1`) so VS Code or any DAP client can set breakpoints directly in `.pyxl` files — see [Debugging .pyxl files](https://pyxle.dev/docs/guides/debugging-pyxl.md). debugpy ships with the framework. |
+| `--inspect-port` | `5678` | Port for the debug server (with `--inspect`). Falls back to an ephemeral port when busy; the actual endpoint is recorded in `.pyxle-build/dev-server.json`. |
+| `--inspect-wait` / `--no-inspect-wait` | `false` | With `--inspect`: wait for a debugger to attach before starting the server — for breakpoints in code that runs during boot. |
 | `--verbose` / `-v` | `false` | Restore full output: the raw Vite log firehose, debug-level internals, and `DEBUG` server logs in the browser console. Equivalent to the global `pyxle -v dev`. |
 
 **Examples:**
@@ -8119,6 +8408,40 @@ without leaving the browser. By default only `INFO` and above from your own
 loggers are forwarded; `--verbose` additionally forwards `DEBUG` records and the
 framework's own internal loggers. This is strictly a development feature — it
 never runs under `pyxle serve` and never appears in the production bundle.
+
+## `pyxle studio`
+
+Run the dev server and open the [Pyxle Studio](https://pyxle.dev/docs/guides/studio.md) dashboard.
+
+```bash
+pyxle studio [directory] [options]
+```
+
+`pyxle studio` runs the same development server as `pyxle dev` — Studio is part of it, served at `/__pyxle/studio` — and opens your browser on the dashboard once the server is ready. Debug mode is forced on (Studio is dev-only), and the dashboard is enabled for this run even when the config sets `"studio": false`.
+
+| Argument / Flag | Default | Description |
+|----------------|---------|-------------|
+| `directory` | `.` | Project directory |
+| `--host` | `127.0.0.1` | Starlette server bind address |
+| `--port` | `8000` | Starlette server port |
+| `--vite-host` | `127.0.0.1` | Vite dev server bind address |
+| `--vite-port` | `5173` | Vite dev server port |
+| `--ssr-workers` | `1` | Number of persistent SSR worker processes (`0` = per-request subprocess mode) |
+| `--config` | -- | Path to `pyxle.config.json` |
+| `--tailwind` / `--no-tailwind` | `true` | Auto-start the legacy Tailwind v3 watcher when a hand-written `tailwind.config.*` is present (same behavior as `pyxle dev`) |
+| `--open` / `--no-open` | `true` | Open the Studio dashboard in the system browser once the server is ready |
+| `--inspect` / `--no-inspect` | `false` | Host a debugpy debug server for `.pyxl` breakpoint debugging — see [Debugging .pyxl files](https://pyxle.dev/docs/guides/debugging-pyxl.md) |
+| `--inspect-port` | `5678` | Port for the debug server (with `--inspect`; falls back to an ephemeral port when busy) |
+| `--verbose` / `-v` | `false` | Restore full output (raw Vite logs, debug internals). Equivalent to `pyxle -v studio`. |
+
+**Examples:**
+
+```bash
+pyxle studio                     # dev server + dashboard in the browser
+pyxle studio --no-open           # dashboard enabled, but don't launch a browser
+pyxle studio --inspect           # dashboard + debugger in one command
+pyxle studio ./my-app --port 3000
+```
 
 ## `pyxle build`
 
@@ -8373,6 +8696,10 @@ Pyxle is configured via `pyxle.config.json` in the project root. All fields are 
   "llms": {
     "enabled": false,
     "autoConvert": false
+  },
+  "studio": {
+    "enabled": true,
+    "allowedHosts": []
   },
   "dev": {
     "watch": [],
@@ -8656,6 +8983,27 @@ Serve a clean **markdown** rendition of every page — at its URL with `.md` app
 **Where the markdown comes from** is *not* config — it lives in your project, resolved in this order (first hit wins): a co-located `<page>.md` file → a `to_markdown` handler in the page's server module → a `to_markdown` in the nearest ancestor `llms.py` (covers a route subtree; `pages/llms.py` is app-wide) → `autoConvert` (if on) → otherwise the `.md` URL redirects to the page. A root `pages/llms.py` may also define `wrap_markdown(ctx, markdown)` to frame every `.md` response with a header/footer. Likewise `/llms.txt` comes from a static `public/llms.txt`, else a `llms_txt` function in the root `pages/llms.py`, else a generated index. See the [guide](https://pyxle.dev/docs/guides/llms.md).
 
 > **Deploying handlers.** Co-located `.md` files and `llms.py` handlers are part of your source, so they must be present alongside `pages/` when you `pyxle serve`. (A page's own `to_markdown`, compiled into the build, works regardless.)
+
+## Studio
+
+[Pyxle Studio](https://pyxle.dev/docs/guides/studio.md) — the web dashboard `pyxle dev` serves at `/__pyxle/studio` (routes, an interactive loader/action tester, a live request feed, metrics, config, and `pyxle check` diagnostics). **On by default in development.** Studio is dev-only by construction: the code path that serves it only exists in the debug-mode dev server, so `pyxle serve` never exposes it regardless of this setting.
+
+```json
+{
+  "studio": {
+    "enabled": true,
+    "allowedHosts": ["my-machine.local"]
+  }
+}
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `studio` | `object` \| `boolean` | `{}` | Studio settings. `false` disables the dashboard; `true` (or omitting the block) enables it. |
+| `studio.enabled` | `boolean` | `true` | Serve the dashboard at `/__pyxle/studio` under `pyxle dev`. The [`pyxle studio`](https://pyxle.dev/docs/reference/cli.md#pyxle-studio) command enables it for that run even when this is `false`. |
+| `studio.allowedHosts` | `string[]` | `[]` | Extra hostnames accepted by Studio's `Host`-header allowlist (the DNS-rebinding guard). Loopback names and the configured server host are always allowed; add an entry when reaching the dev server through another name (a LAN IP, a `*.local` alias). |
+
+Shorthand to disable: `"studio": false`. See the [Studio guide](https://pyxle.dev/docs/guides/studio.md) for the panels and the full security model.
 
 ## Development
 
@@ -17394,7 +17742,7 @@ Those frameworks let you build the UI in pure Python; Pyxle has you write real R
 
 ### Is Pyxle production-ready?
 
-Pyxle is in **beta** (the `0.7.x` series). The core features are implemented and tested (2,500+ tests, with a 95% coverage gate enforced in CI), but the API may change before 1.0. Use it for new projects and experiments, but be prepared for breaking changes.
+Pyxle is in **beta** (the `0.8.x` series). The core features are implemented and tested (2,500+ tests, with a 95% coverage gate enforced in CI), but the API may change before 1.0. Use it for new projects and experiments, but be prepared for breaking changes.
 
 ### What Python version do I need?
 
@@ -17609,6 +17957,16 @@ Source: https://pyxle.dev/docs/changelog.md
 # Changelog
 
 Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include breaking changes — those are called out explicitly. To upgrade, run `pip install --upgrade pyxle-framework`.
+
+## 0.8.0
+
+- **Pyxle Studio — a dashboard built into `pyxle dev`.** Served at `/__pyxle/studio`: every route with its loader, actions, cache posture, and boundaries; an interactive tester (loaders run in-process, actions go through their real endpoint — CSRF, validation, and auth hooks included); a live request feed; latency metrics; the effective config (secrets redacted); and in-browser `pyxle check`. Dev-only by construction, with a `Host`-header allowlist. [Pyxle Studio](https://pyxle.dev/docs/guides/studio.md).
+- **New `pyxle studio` command.** Runs the dev server and opens the browser on the dashboard, enabling it for that run even when the config opts out. [CLI](https://pyxle.dev/docs/reference/cli.md#pyxle-studio).
+- **Breakpoint debugging directly in `.pyxl` files.** Set a breakpoint on a line inside a `@server` loader *and* on a line inside the JSX below it — both bind. Compiled server modules are remapped to their `.pyxl` sources, so the Python debugger binds natively; dev source maps chain through Vite so the React half binds in the browser. debugpy ships with the framework — nothing extra to install. [Debugging .pyxl files](https://pyxle.dev/docs/guides/debugging-pyxl.md).
+- **One-key debugging from VS Code.** Pyxle Language Tools 0.3.0 contributes a `pyxle` debug type: press F5 to run your dev server under the debugger — one clean session with a real Stop button that tears the whole server down — and open your app. A separate "Debug Pyxle app (React browser)" configuration debugs the React side in a standalone browser session. Plus a "Pyxle: Open Studio" command. [Debugging .pyxl files](https://pyxle.dev/docs/guides/debugging-pyxl.md#quick-start-vs-code).
+- **`pyxle dev --inspect` for attach-style debugging.** Hosts a debugpy server bound to `127.0.0.1` so any DAP client — or a remote VS Code — can attach to a running dev server. The server writes `.pyxle-build/dev-server.json` (ports, debugpy endpoint) for editor tooling and removes it on shutdown. [Debugging .pyxl files](https://pyxle.dev/docs/guides/debugging-pyxl.md).
+- **Dev tracebacks now point at `.pyxl` sources.** A loader/action error names your `.pyxl` file and line instead of the compiled module under `.pyxle-build/`. [Debugging](https://pyxle.dev/docs/guides/debugging.md).
+- **Breaking: `/__pyxle` is now a reserved URL namespace.** The dev server's Vite asset proxy never forwards paths under it, so an app route under `/__pyxle` no longer resolves in `pyxle dev` (it still serves in production, where the namespace is unused). Move any such route before upgrading. [Pyxle Studio](https://pyxle.dev/docs/guides/studio.md#the-reserved-__pyxle-namespace).
 
 ## 0.7.5
 
