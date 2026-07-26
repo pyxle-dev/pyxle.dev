@@ -214,7 +214,7 @@ function JustShipped() {
                     </p>
                     <span className="ml-auto flex items-center gap-4">
                         <Link href="/docs/guides/studio" className="focus-ring rounded font-mono text-[12px] text-acct underline decoration-1 underline-offset-4 transition-[text-decoration-thickness] hover:decoration-2">Studio</Link>
-                        <Link href="/docs/guides/debugging-pyxl" className="focus-ring rounded font-mono text-[12px] text-acct underline decoration-1 underline-offset-4 transition-[text-decoration-thickness] hover:decoration-2">Debugger</Link>
+                        <Link href="/docs/guides/debugging" className="focus-ring rounded font-mono text-[12px] text-acct underline decoration-1 underline-offset-4 transition-[text-decoration-thickness] hover:decoration-2">Debugger</Link>
                         <button
                             type="button"
                             onClick={dismiss}
@@ -466,7 +466,7 @@ const INDEX_ROWS = [
     ['Hot reload', 'Vite HMR, Python changes included'],
     ['Server actions', '@action replaces the API layer'],
     ['Studio', 'a dashboard for routes, loaders & actions', '/docs/guides/studio'],
-    ['The debugger', 'breakpoints in .pyxl — Python and React', '/docs/guides/debugging-pyxl'],
+    ['The debugger', 'breakpoints in .pyxl — Python and React', '/docs/guides/debugging'],
     ['Plugins', 'auth, database, and your own'],
     ['ASGI underneath', 'uvicorn today, any host tomorrow'],
 ];
@@ -579,13 +579,24 @@ function StudioAndDebugger() {
                         <p className="mt-3 font-mono text-[11px] leading-relaxed text-ink2">
                             routes · tester · request feed · latency · resolved config · pyxle check
                         </p>
-                        <p className="mt-4 font-mono text-[11px] leading-relaxed text-ink2">
-                            Already on Pyxle? <span className="text-ink">pip install --upgrade pyxle-framework</span>
+                    </div>
+                    <div data-reveal className="mt-5 border-t border-rule pt-5">
+                        <div className="flex items-center gap-3 font-mono text-[13px] text-ink">
+                            <span className="select-none text-acct">$</span>
+                            <span className="truncate">code --install-extension pyxle.pyxle-language-tools</span>
+                            <span className="ml-auto"><CopyButton text="code --install-extension pyxle.pyxle-language-tools" /></span>
+                        </div>
+                        <p className="mt-3 font-mono text-[11px] leading-relaxed text-ink2">
+                            F5 needs the extension · already on Pyxle?{' '}
+                            <span className="text-ink">pip install --upgrade pyxle-framework</span>
                         </p>
                     </div>
                     <p data-reveal className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3">
+                        <EditorialLink href="/docs/guides/debugging">Debug a .pyxl file →</EditorialLink>
                         <EditorialLink href="/docs/guides/studio">Studio, panel by panel →</EditorialLink>
-                        <EditorialLink href="/docs/guides/debugging-pyxl">Debug a .pyxl file →</EditorialLink>
+                        <EditorialLink href="https://marketplace.visualstudio.com/items?itemName=pyxle.pyxle-language-tools" external>
+                            Get the VS Code extension ↗
+                        </EditorialLink>
                     </p>
                 </div>
 
