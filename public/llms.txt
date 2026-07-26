@@ -36,7 +36,6 @@
 - [Error Handling](https://pyxle.dev/docs/guides/error-handling.md): Pyxle provides structured error handling through error exceptions, error boundaries, and not-found pages.
 - [Testing](https://pyxle.dev/docs/guides/testing.md): Pyxle apps are mostly plain Python — your `@server` loaders and `@action` handlers are ordinary `async` functions, and your business logic is whatever Python you write. That means you can test with th
 - [Debugging](https://pyxle.dev/docs/guides/debugging.md): A Pyxle app has two runtimes: **Python** (your `@server` loaders, `@action` handlers, and the request pipeline) and **Node.js** (the SSR worker that renders your React components to HTML). Knowing whi
-- [Debugging .pyxl files](https://pyxle.dev/docs/guides/debugging-pyxl.md): Set a breakpoint directly in your `.pyxl` source — on a line inside a `@server` loader *and* on a line inside the JSX below it — and both bind. `pyxle dev --inspect` exposes the Python half to any deb
 - [Pyxle Studio](https://pyxle.dev/docs/guides/studio.md): Pyxle Studio is the dashboard built into `pyxle dev` — one local page that shows everything the development server knows about your app: every route with its loader and actions, an interactive tester
 - [Client Components](https://pyxle.dev/docs/guides/client-components.md): Pyxle provides built-in React components and hooks importable from `pyxle/client`.
 - [Security](https://pyxle.dev/docs/guides/security.md): Pyxle includes CSRF protection, CORS support, and HEAD element sanitisation out of the box.
