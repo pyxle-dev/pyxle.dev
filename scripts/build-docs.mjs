@@ -68,6 +68,12 @@ const NAV_STRUCTURE = [
     ],
   },
   {
+    category: "Examples",
+    slug: "examples",
+    flat: true,
+    items: [{ file: "examples.md", slug: "examples" }],
+  },
+  {
     category: "Guides",
     slug: "guides",
     items: [
@@ -171,6 +177,7 @@ const NAV_STRUCTURE = [
 // (e.g. the comparison page is titled "Pyxle vs. other frameworks", so
 // someone searching "comparison" needs the alias to find it).
 const SEARCH_KEYWORDS = {
+  "examples": ["example", "examples", "demo", "sample app", "recharts", "chart", "charting", "real app", "starter", "reference app"],
   "getting-started/introduction": ["intro", "introduction", "what is pyxle", "overview", "getting started"],
   "getting-started/installation": ["install", "setup", "pip install", "requirements", "node", "prerequisites"],
   "getting-started/quick-start": ["quickstart", "tutorial", "first app", "hello world", "scaffold", "pyxle init"],
