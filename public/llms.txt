@@ -17,6 +17,10 @@
 - [Server Actions](https://pyxle.dev/docs/core-concepts/server-actions.md): Server actions let your React components call Python functions on the server. They are the mutation counterpart to `@server` loaders -- loaders read data, actions write data.
 - [Layouts](https://pyxle.dev/docs/core-concepts/layouts.md): Layouts wrap pages in shared UI -- navigation bars, sidebars, footers, and other elements that persist across page navigations.
 
+## Examples
+
+- [Example applications](https://pyxle.dev/docs/examples.md): Two complete, runnable applications live in the [`examples/`](https://github.com/pyxle-dev/pyxle/tree/main/examples) directory of the repository. They are not decoration. Each one exists to answer a q
+
 ## Guides
 
 - [Pyxle vs. other frameworks](https://pyxle.dev/docs/guides/comparison.md): Pyxle isn't the only way to build a full-stack app in Python, and it isn't the right tool for every job. This page is an honest map of the landscape — what each alternative is genuinely great at, and

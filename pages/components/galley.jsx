@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'pyxle/client';
 import { tokenizeBlock } from './code-highlighter.jsx';
+import { track } from './analytics.jsx';
 
 /* ════════════════════════════════════════════════════════════════
    GALLEY — the shared design-system primitives for pyxle.dev.
@@ -53,6 +54,11 @@ export function CopyButton({ text }) {
             navigator.clipboard.writeText(text);
             setCopied(true);
             setTimeout(() => setCopied(false), 1600);
+            // Copying an install command is the highest-intent signal on the
+            // site — a visitor who does this is about to actually run Pyxle.
+            // Every copyable command routes through here, so one call covers
+            // the lot and tells us which one people reach for.
+            track('command_copied', { command: text });
         }
     };
     return (
