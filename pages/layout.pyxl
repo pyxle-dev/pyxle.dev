@@ -13,6 +13,7 @@ import '@fontsource-variable/fraunces/opsz.css';
 import '@fontsource-variable/schibsted-grotesk';
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { Link, usePathname, Slot } from 'pyxle/client';
+import Analytics from './components/analytics.jsx';
 
 const ThemeContext = createContext({ theme: 'dark', toggle: () => {} });
 
@@ -235,6 +236,7 @@ export default function RootLayout({ children, data }) {
     return (
         <ThemeContext.Provider value={{ theme, toggle }}>
             <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+            <Analytics />
             <div className="min-h-screen overflow-x-clip bg-paper text-ink antialiased transition-colors duration-300">
                 <SiteNav version={data && data.version} />
                 {children}
