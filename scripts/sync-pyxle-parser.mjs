@@ -6,7 +6,8 @@
  * The landing-page hero runs the user's .pyxl through the actual Pyxle
  * parser inside Pyodide, so the split + loader detection are *exactly*
  * what the framework does. This script copies the canonical
- * `pyxle/compiler/parser.py` + `exceptions.py` byte-for-byte from the
+ * `pyxle/compiler/parser.py`, `exceptions.py` + `head_elements.py`
+ * byte-for-byte from the
  * sibling `pyxle` repo into `public/pyodide-pyxle/…`, and writes:
  *   • empty `__init__.py` package stubs (so the relative imports resolve)
  *   • a stub `jsx_parser.py` — the real one shells out to a Node/Babel
@@ -37,7 +38,7 @@ if (!existsSync(join(SRC, 'parser.py'))) {
 mkdirSync(OUT, { recursive: true });
 
 // 1. Real, byte-for-byte compiler sources.
-for (const f of ['parser.py', 'exceptions.py']) {
+for (const f of ['parser.py', 'exceptions.py', 'head_elements.py']) {
     const src = readFileSync(join(SRC, f), 'utf8');
     writeFileSync(join(OUT, f), src);
     console.log(`  copied  pyxle/compiler/${f}  (${src.length} bytes)`);

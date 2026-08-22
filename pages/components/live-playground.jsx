@@ -49,6 +49,7 @@ const VENDOR_FILES = [
     'pyxle/runtime.py',
     'pyxle/compiler/__init__.py',
     'pyxle/compiler/exceptions.py',
+    'pyxle/compiler/head_elements.py',
     'pyxle/compiler/jsx_parser.py',
     'pyxle/compiler/parser.py',
 ];
