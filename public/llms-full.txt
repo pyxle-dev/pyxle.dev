@@ -5789,16 +5789,30 @@ Like error boundaries, not-found pages follow directory scoping -- a `not-found.
 
 ## Dev mode error overlay
 
-During development (`pyxle dev`), errors also appear in a browser overlay with:
+During development (`pyxle dev`), a **fault** also appears in a browser overlay
+with:
 
 - The error message and stack trace
 - Breadcrumbs showing which stage failed (loader, renderer, hydration)
 - File path and line number
 
-The overlay communicates via WebSocket and updates in real time as you fix errors.
-It also **survives a reload**: the current error is replayed to the page when it
-reconnects, so an error raised while no tab was open — or one you reloaded past —
-still shows.
+An error you raised on purpose does **not** open it. A `LoaderError` with a
+status below 500 — a 404 for a post that does not exist, a 403 for a page the
+visitor may not see — is a response you wrote, so the overlay stays out of the
+way and your `error.pyxl` renders, which is the whole point of raising it. The
+same rule the server log already follows: an intentional sub-500 is not a server
+error.
+
+The overlay belongs to the page that failed. It is shown only while you are on
+the URL whose render failed, so a broken `/reports` never covers a working `/` —
+it renders full-screen, and an overlay on the wrong page would swallow that
+page's clicks. A failure that is not tied to one URL, such as a failed rebuild,
+does break every page and still shows on all of them.
+
+It communicates via WebSocket and updates in real time as you fix errors. It also
+**survives a reload**: unresolved errors are replayed when the page reconnects,
+so a fault raised while no tab was open — or one you reloaded past — still shows.
+Navigating away from the broken page clears it.
 
 ## A page that will not compile
 
@@ -16757,9 +16771,14 @@ connected client.
 Event types:
 
 - `"error"` — sent when a build fails or a runtime error occurs.
-  Includes the error message, stack, and "breadcrumbs" describing
-  which stage of the request pipeline failed (loader, render, head
-  evaluation, etc.).
+  Includes the error message, stack, "breadcrumbs" describing which
+  stage of the request pipeline failed (loader, render, head
+  evaluation, etc.), and the URL whose render failed. An error the
+  author *chose* — a loader raising `LoaderError` with a status below
+  500 — is not sent at all: it is a response, not a crash, and the
+  overlay is a crash reporter. The route is cleared instead, so a route
+  that used to fail for real and now answers a deliberate 404 stops
+  replaying its old error.
 - `"clear"` — sent when a previously-failing route succeeds. The
   client uses this to dismiss any visible error overlay.
 - `"reload"` — sent after a successful rebuild — including a rebuild
@@ -16768,10 +16787,22 @@ Event types:
 
 An error is not a one-off broadcast: the manager keeps the current
 error for each route (keyed by route path, plus `(rebuild)` for build
-failures) and replays the most recent one to every client that connects
-afterwards. A reload closes the socket that was told about the error and
-opens a new one, so without the replay a reload made the error vanish
-while the fault remained. `"clear"` for a route drops that route's entry
+failures) and replays **every** unresolved one, oldest first, to each
+client that connects afterwards. A reload closes the socket that was
+told about the error and opens a new one, so without the replay a reload
+made the error vanish while the fault remained. Replaying all of them
+rather than only the newest is what stops a broken route being hidden
+whenever some *other* route breaks after it.
+
+The client shows at most one overlay: the most recent error that applies
+to the page it is actually on. An error carries the concrete URL that
+failed, and is displayed only while the browser is at that URL — so a
+broken `/reports` cannot cover `/`, which matters because the overlay
+renders full-screen at the top layer and would otherwise swallow that
+page's clicks. A payload with no URL is not tied to one page — a failed
+rebuild really does break every page — and still shows everywhere. The
+client re-evaluates on client-side navigation, so navigating away from a
+broken page clears it. `"clear"` for a route drops that route's entry
 and only that one, so a healthy render of `/` never silences a build
 failure in `pages/about.pyxl`.
 The socket accepts the origins in
@@ -19898,6 +19929,45 @@ Source: https://pyxle.dev/docs/changelog.md
 # Changelog
 
 Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include breaking changes — those are called out explicitly. To upgrade, run `pip install --upgrade pyxle-framework`.
+
+## 0.9.3
+
+- **Fix: the root `vite.config.js` now loads *after* a build too.** 0.9.2 stopped
+  a freshly scaffolded project's root config from throwing
+  `ERR_MODULE_NOT_FOUND` before the first build, and it did — but it left a
+  second failure in its place. The generated config it defers to sets
+  `const clientRoot = __dirname`, and a scaffolded project's `package.json`
+  declares `"type": "module"`, so that identifier does not exist there. Nothing
+  caught it because Vite injects `__dirname` when it *bundles* the config it is
+  handed directly, which is exactly how `pyxle dev` and `pyxle build` load it;
+  the root config instead reaches the generated one through a runtime dynamic
+  `import()`, which no bundler rewrites. So from 0.9.2 any tool that reads the
+  project's Vite config got `__dirname is not defined in ES module scope` on a
+  project that had been built. **Vitest could not start at all** — the failure
+  surfaces as a stack trace pointing inside `.pyxle-build/`, a directory you did
+  not write. Measured with Vite's own `loadConfigFromFile`: 0.9.1 failed before a
+  build and worked after; 0.9.2 was the exact inverse. Both states now work, and
+  `vitest run` goes from unable to start to passing. (`shadcn` is unaffected by *this*
+  bug — it does not read the Vite config at all.) `clientRoot` is derived
+  from `import.meta.url`, and a test asserts the generated config contains no
+  `__dirname` in code.
+
+- **Fix: `shadcn/ui` components are styled. Tailwind now scans your own source
+  directories.** Vite's root is the generated client directory, which holds the
+  *compiled* pages and nothing else, and Tailwind v4 auto-detects its sources
+  from that root. So a utility class used only in your own `components/` — which
+  is exactly where `shadcn/ui` puts every component it installs — was never
+  generated, and the component rendered **unstyled, with no error anywhere**:
+  `npx shadcn@latest add button` reported success and the button came out with
+  no background. Adding `@source "../../components"` to your stylesheet did not
+  help either, because the stylesheet is copied into the build directory, so
+  that path resolved inside it and silently matched nothing. Pyxle now rewrites
+  the directives at copy time, pointing Tailwind at the directories your
+  `jsconfig.json` declares (`pages` excluded — it is already under the Vite
+  root). Verified in a browser on a scaffolded shadcn project: a class present
+  only in `components/ui/button.jsx` now generates, in `pyxle dev` and in the
+  production bundle. Plain-CSS projects are untouched — nothing is injected into
+  a stylesheet that does not import Tailwind.
 
 ## 0.9.2
 
