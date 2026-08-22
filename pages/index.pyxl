@@ -274,7 +274,7 @@ function Hero({ version }) {
                             <p className="mt-3 font-mono text-[11px] leading-relaxed text-ink2">
                                 MIT{version ? ` · v${version}` : ''} · Python 3.10+ · any ASGI host ·{' '}
                                 <Link href="/benchmarks" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">
-                                    ~2× faster SSR than Next.js →
+                                    ~2.2× faster SSR than Next.js →
                                 </Link>
                             </p>
                         </div>
@@ -664,6 +664,7 @@ function TheNumbers() {
                     </div>
                 </dl>
                 <p data-reveal className="mt-6 font-mono text-xs leading-relaxed text-ink2">
+                    Measured July 2026 on Pyxle 0.7.1, and not re-measured for the 0.9 line.{' '}
                     Reproduce them yourself — full methodology, hardware, and harness at{' '}
                     <Link href="/benchmarks" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">/benchmarks →</Link>
                 </p>

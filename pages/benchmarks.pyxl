@@ -220,6 +220,13 @@ function Method() {
                     pinned by the shared benchmark environment), Hono 4.12, Express 5.2,
                     Next.js 16.2 (React 19.2), FastAPI 0.139, Django 5.2, Flask 3.1, Node 22.23.
                 </p>
+                <p data-reveal className="mt-5 max-w-[68ch] text-pretty text-base leading-[1.7] text-ink2">
+                    These numbers have <strong className="font-medium text-ink">not</strong> been
+                    re-measured for the 0.9 line. Re-running the suite needs the two-box setup
+                    described above, and we would rather leave a figure we actually took — saying
+                    plainly which version it came from — than publish an estimate of what a newer
+                    release would do.
+                </p>
                 <p data-reveal className="mt-5 font-mono text-xs text-ink2">
                     Harness:{' '}
                     <a href="https://github.com/pyxle-dev/benchmarks" target="_blank" rel="noreferrer" className={noteLinkCls}>

@@ -285,7 +285,7 @@ function TheProof() {
             <div className="mt-14 max-w-4xl">
                 <dl className="grid gap-x-10 gap-y-8 sm:grid-cols-3">
                     {[
-                        ['~2×', 'faster dynamic SSR than Next.js, per core'],
+                        ['~2.2×', 'faster dynamic SSR than Next.js, per core'],
                         ['2–3×', 'fewer bytes for the same DOM — no hydration blob'],
                         ['1.31×', 'FastAPI’s throughput on database-query pages'],
                     ].map(([n, d], i) => (
@@ -303,6 +303,9 @@ function TheProof() {
                     your Python, and it’s still five figures per core.</span> Zero errors under load ·
                     2,500+ tests · 95% coverage gate. Every number, the hardware, and the losses:{' '}
                     <Link href="/benchmarks" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">/benchmarks →</Link>
+                </p>
+                <p data-reveal className="mt-4 max-w-[72ch] font-mono text-xs leading-relaxed text-ink2">
+                    Measured July 2026 on Pyxle 0.7.1, and not re-measured for the 0.9 line.
                 </p>
             </div>
         </GpSection>
