@@ -95,4 +95,37 @@ def parse_jsx_components(jsx_code, *, target_components=None):
 writeFileSync(join(OUT, 'jsx_parser.py'), JSX_STUB);
 console.log('  wrote   pyxle/compiler/jsx_parser.py (browser stub)');
 
+// 4. The sandbox fetches these files by name from its own hardcoded list in
+//    pages/components/live-playground.jsx. Two lists that must agree, and a
+//    comment is not enough: vendoring a file the sandbox never fetches leaves
+//    the parser importing a module that is missing from Pyodide's filesystem,
+//    which surfaces only as "sandbox offline" in a browser. Fail here instead.
+const WRITTEN = [
+    'pyxle/__init__.py',
+    'pyxle/runtime.py',
+    'pyxle/compiler/__init__.py',
+    ...['parser.py', 'exceptions.py', 'head_elements.py', 'jsx_parser.py']
+        .map((f) => `pyxle/compiler/${f}`),
+].sort();
+
+const playgroundPath = join(__dirname, '..', 'pages', 'components', 'live-playground.jsx');
+const playground = readFileSync(playgroundPath, 'utf8');
+const listMatch = playground.match(/const VENDOR_FILES = \[([\s\S]*?)\]/);
+if (!listMatch) {
+    console.error('✗ Could not find VENDOR_FILES in pages/components/live-playground.jsx.');
+    process.exit(1);
+}
+const declared = [...listMatch[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
+
+const missing = WRITTEN.filter((f) => !declared.includes(f));
+const extra = declared.filter((f) => !WRITTEN.includes(f));
+if (missing.length || extra.length) {
+    console.error('\n✗ VENDOR_FILES in live-playground.jsx is out of sync with what was vendored.');
+    if (missing.length) console.error(`  vendored but never fetched: ${missing.join(', ')}`);
+    if (extra.length) console.error(`  fetched but not vendored:   ${extra.join(', ')}`);
+    console.error('  The sandbox would boot without these, so the parser import fails at runtime.');
+    process.exit(1);
+}
+console.log(`  checked VENDOR_FILES — ${declared.length} files, in sync`);
+
 console.log('\n✓ Vendored Pyxle parser → public/pyodide-pyxle/');
