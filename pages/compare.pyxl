@@ -198,6 +198,13 @@ function TheMatrix() {
                 lead="Every stack is great at something. Pyxle is the only one great at all of it at once — the full React ecosystem, real Python on the server, one file, one deploy, and an AI-native surface none of the others ship."
             />
             <Matrix />
+            <p data-reveal="none" className="mt-8 max-w-[68ch] text-pretty text-base leading-[1.7] text-ink2">
+                These eight rows are Pyxle’s own design axes, so a full column is a
+                statement of intent rather than a verdict. For the other side of it —
+                what Reflex, Django, NiceGUI, Streamlit and Next + FastAPI are each
+                genuinely better at, and when to reach for one of them instead — read{' '}
+                <Link href="/docs/guides/comparison" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">the long-form comparison guide →</Link>.
+            </p>
         </GpSection>
     );
 }
