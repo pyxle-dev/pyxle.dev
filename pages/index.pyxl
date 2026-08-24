@@ -830,10 +830,10 @@ function DemoPreview({ kind }) {
         ];
         return (
             <div
-                className="flex h-28 w-full items-center justify-center bg-[#e9e2d6]"
+                className="flex h-28 w-full items-stretch bg-[#f2ece0]"
                 aria-hidden="true"
             >
-                <div className="flex h-[84%] w-[78%] flex-col rounded-[3px] bg-[#f5f1e8] px-3 py-2 shadow-[0_1px_2px_rgba(60,45,30,0.10)]">
+                <div className="flex h-full w-full flex-col justify-center bg-[#f5f1e8] px-5 py-3">
                     <span className="font-display text-[17px] leading-none tracking-[-0.02em] text-[#241b12]">
                         Today<span className="text-[#c0492e]">.</span>
                     </span>
