@@ -57,6 +57,7 @@ const ERAS = [
             ['Your app, in Markdown', 'Enable the llms feature and every page answers at its URL with .md appended, or to an Accept: text/markdown request — plus a generated /llms.txt index and discovery headers. This page has a twin; so does every doc.', 'v0.6'],
             ['The hardened run', 'A release forged by testing: React 19 and Vite 7 in new projects with pyxle init asking what to include, concurrent streaming SSR with per-request isolation, a calmer dev server, shadcn/ui wired end to end.', 'v0.7'],
             ['Studio & the debugger', 'A dev-only dashboard at /__pyxle/studio built into pyxle dev — routes, an interactive tester, a live request feed, metrics, resolved config — and breakpoints that bind on both sides of a .pyxl file at once, with tracebacks that finally name your source.', 'v0.8'],
+            ['The honest dev loop', 'The release that made failure visible: a page that will not compile is no longer reported as a 404, a JSX typo fails the rebuild instead of logging a green tick, a rebuild error names the file that broke, one bad file no longer freezes hot reload for the whole project, and the error overlay survives a page reload. Plus a Recharts example driven straight from a Python loader, and a starter page that proves it hydrated.', 'v0.9'],
             ['Official plugins on PyPI', 'pyxle-db (SQLite, PostgreSQL and MySQL behind one explicit-SQL API), pyxle-auth (argon2id sessions, RBAC, API tokens) and pyxle-mail (SMTP, Resend or console) — every plugin tested in CI, the database claims against live PostgreSQL and MySQL.', 'plugins 0.2'],
             ['Benchmarks in the open', 'Reproducible two-box benchmarks against six frameworks, the load generator on its own hardware, and the losses shown next to the wins.', 'site'],
         ],
@@ -228,7 +229,7 @@ function Hero() {
                     date it can't keep.
                 </p>
                 <p data-reveal className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">
-                    <span><span className="text-acct">0.1 → 0.8</span> in under four months</span>
+                    <span><span className="text-acct">0.1 → 0.9</span> in under five months</span>
                     <EditorialLink href="/docs/changelog">Read the changelog →</EditorialLink>
                 </p>
             </div>
