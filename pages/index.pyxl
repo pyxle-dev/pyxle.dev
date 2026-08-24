@@ -808,6 +808,7 @@ function ReadableAsMarkdown() {
 /* ── 08 · In the wild (live specimens) ───────────────────────────── */
 
 const DEMOS = [
+    { name: 'Today', tagline: 'No email to sign up', href: 'https://today.pyxle.app', kind: 'today' },
     { name: 'Flux', tagline: 'SaaS analytics', href: 'https://flux.pyxle.app', kind: 'chart' },
     { name: 'Chroma', tagline: 'Color palette', href: 'https://chroma.pyxle.app', kind: 'palette' },
     { name: 'Glyph', tagline: 'Generative art', href: 'https://glyph.pyxle.app', kind: 'spiro' },
@@ -816,6 +817,28 @@ const DEMOS = [
 /* Miniature of each app — a photograph of the real thing, so the
    specimens keep their own colors inside the plate frame. */
 function DemoPreview({ kind }) {
+    // today — the app's own front door: warm paper, a serif wordmark, one red
+    // full stop. Drawn from a screenshot of the running app so the plate is a
+    // photograph of the real thing, like the others.
+    if (kind === 'today') {
+        return (
+            <div
+                className="flex h-28 w-full items-center justify-center bg-[#e9e2d6]"
+                aria-hidden="true"
+            >
+                <div className="flex h-[76%] w-[68%] flex-col justify-center rounded-[3px] bg-[#f5f1e8] px-4 shadow-[0_1px_2px_rgba(60,45,30,0.10)]">
+                    <span className="font-mono text-[6px] uppercase tracking-[0.18em] text-[#a3937c]">
+                        Good evening
+                    </span>
+                    <span className="font-display text-[22px] leading-none tracking-[-0.02em] text-[#2b2118]">
+                        Today<span className="text-[#c0492e]">.</span>
+                    </span>
+                    <span className="mt-[3px] h-[3px] w-[52%] rounded-full bg-[#ddd2c0]" />
+                    <span className="mt-[4px] h-[3px] w-[38%] rounded-full bg-[#ddd2c0]" />
+                </div>
+            </div>
+        );
+    }
     if (kind === 'palette') {
         return (
             <div className="flex h-28 w-full" aria-hidden="true">
