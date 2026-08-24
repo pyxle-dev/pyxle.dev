@@ -808,7 +808,7 @@ function ReadableAsMarkdown() {
 /* ── 08 · In the wild (live specimens) ───────────────────────────── */
 
 const DEMOS = [
-    { name: 'Today', tagline: 'No email to sign up', href: 'https://today.pyxle.app', kind: 'today' },
+    { name: 'Today', tagline: 'To-do list, no email', href: 'https://today.pyxle.app', kind: 'today' },
     { name: 'Flux', tagline: 'SaaS analytics', href: 'https://flux.pyxle.app', kind: 'chart' },
     { name: 'Chroma', tagline: 'Color palette', href: 'https://chroma.pyxle.app', kind: 'palette' },
     { name: 'Glyph', tagline: 'Generative art', href: 'https://glyph.pyxle.app', kind: 'spiro' },
@@ -817,24 +817,46 @@ const DEMOS = [
 /* Miniature of each app — a photograph of the real thing, so the
    specimens keep their own colors inside the plate frame. */
 function DemoPreview({ kind }) {
-    // today — the app's own front door: warm paper, a serif wordmark, one red
-    // full stop. Drawn from a screenshot of the running app so the plate is a
-    // photograph of the real thing, like the others.
+    // today — the list itself, not its login screen: warm paper, the serif
+    // wordmark with its red full stop, two done rows struck through and two
+    // still open. Drawn from a screenshot of the running app, so the plate stays
+    // a photograph of the real thing like Chroma's palette and Flux's chart.
     if (kind === 'today') {
+        const rows = [
+            { done: true, w: '62%' },
+            { done: true, w: '48%' },
+            { done: false, w: '70%' },
+            { done: false, w: '54%' },
+        ];
         return (
             <div
                 className="flex h-28 w-full items-center justify-center bg-[#e9e2d6]"
                 aria-hidden="true"
             >
-                <div className="flex h-[76%] w-[68%] flex-col justify-center rounded-[3px] bg-[#f5f1e8] px-4 shadow-[0_1px_2px_rgba(60,45,30,0.10)]">
-                    <span className="font-mono text-[6px] uppercase tracking-[0.18em] text-[#a3937c]">
-                        Good evening
-                    </span>
-                    <span className="font-display text-[22px] leading-none tracking-[-0.02em] text-[#2b2118]">
+                <div className="flex h-[84%] w-[78%] flex-col rounded-[3px] bg-[#f5f1e8] px-3 py-2 shadow-[0_1px_2px_rgba(60,45,30,0.10)]">
+                    <span className="font-display text-[17px] leading-none tracking-[-0.02em] text-[#241b12]">
                         Today<span className="text-[#c0492e]">.</span>
                     </span>
-                    <span className="mt-[3px] h-[3px] w-[52%] rounded-full bg-[#ddd2c0]" />
-                    <span className="mt-[4px] h-[3px] w-[38%] rounded-full bg-[#ddd2c0]" />
+                    <span className="mt-[4px] h-[1.5px] w-full bg-[#ddd2c0]">
+                        <span className="block h-full w-[55%] bg-[#c0492e]" />
+                    </span>
+                    <div className="mt-[6px] flex flex-col gap-[5px]">
+                        {rows.map((r, i) => (
+                            <span key={i} className="flex items-center gap-[5px]">
+                                <span
+                                    className={`h-[6px] w-[6px] shrink-0 rounded-full ${
+                                        r.done ? 'bg-[#c0492e]' : 'border border-[#b3a289]'
+                                    }`}
+                                />
+                                <span
+                                    className={`h-[3.5px] rounded-full ${
+                                        r.done ? 'bg-[#cdc0a8]' : 'bg-[#8d7b5f]'
+                                    }`}
+                                    style={{ width: r.w }}
+                                />
+                            </span>
+                        ))}
+                    </div>
                 </div>
             </div>
         );
