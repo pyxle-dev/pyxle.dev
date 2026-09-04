@@ -1,22 +1,44 @@
-import React from 'react';
-import { useTheme } from '../layout.jsx';
+/* ═══ THEME TOGGLE — the light/dark instrument control ═══════════════
+ *
+ * The pre-redesign app's control, redrawn in E's voice: one chromeless
+ * mono button (`.tgl`, styles/tailwind.css §2), one currentColor glyph.
+ * Half-moon fills in dark, a small solid dot in light — the two halves
+ * are CSS-gated on the html theme class (`html.dark .tgl .moon` etc.),
+ * NEVER a JS branch: SSR is theme-blind, so any markup that branched on
+ * the theme would be a hydration mismatch. The button's markup — glyph,
+ * aria-label, title — is byte-identical in both themes and on the
+ * server. `html:not(.js) .tgl` hides the control when it cannot work.
+ *
+ * Mounted by e-chrome.jsx: desktop header (.hd-extra, last item on the
+ * right — where the original app kept it) and the mobile bar.
+ */
 
-export function ThemeToggle() {
+import React from 'react';
+import { useTheme } from './e-theme.jsx';
+
+function ThemeGlyph() {
+    return (
+        <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <circle cx="10" cy="10" r="7.25" stroke="currentColor" strokeWidth="1.5" />
+            <path className="moon" d="M10 2.75 a7.25 7.25 0 0 0 0 14.5 Z" fill="currentColor" />
+            <circle className="dot" cx="10" cy="10" r="3" fill="currentColor" />
+        </svg>
+    );
+}
+
+export function ThemeToggle({ className = '' }) {
     const { toggle } = useTheme();
     return (
         <button
             type="button"
             onClick={toggle}
-            className="rounded-lg border p-2 transition border-zinc-200 bg-zinc-100 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900 dark:border-white/10 dark:bg-white/5 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
+            className={`tgl${className ? ` ${className}` : ''}`}
             aria-label="Toggle light and dark theme"
             title="Toggle theme"
         >
-            <svg className="h-4 w-4 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
-            </svg>
-            <svg className="h-4 w-4 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
-            </svg>
+            <ThemeGlyph />
         </button>
     );
 }
+
+export default ThemeToggle;
