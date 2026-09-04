@@ -8,23 +8,35 @@ module.exports = {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['"Schibsted Grotesk Variable"', 'SchibstedFallback', '-apple-system', '"Helvetica Neue"', 'Arial', 'sans-serif'],
-                display: ['"Fraunces Variable"', 'FrauncesFallback', 'Georgia', '"Times New Roman"', 'serif'],
-                mono: ['ui-monospace', 'SFMono-Regular', '"SF Mono"', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
+                // F "Working Copy" pairing. IBM Plex Sans carries the claims
+                // (H1/H2, notes); IBM Plex Mono carries the evidence — code,
+                // numerals, captions, logs, commands, tabs. Both are cuts of
+                // one Plex family: the claim and the receipt share bones.
+                sans: ['"IBM Plex Sans Variable"', '"IBM Plex Sans"', 'PlexSansFallback', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+                mono: ['"IBM Plex Mono"', 'PlexMonoFallback', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
             },
-            // Galley Proof palette — every value lives as a CSS variable in
-            // tailwind.css so light ("Paper") and dark ("Ink") themes swap
-            // without per-utility dark: variants.
+            // ── F "Working Copy" palette ─────────────────────────────
+            // Every value lives as a CSS variable in styles/tailwind.css
+            // (light on :root, the lamp copy under html.dark). ONE accent:
+            // Run Green, and its every appearance means "code that runs"
+            // (seam · prompts/copied · LIVE/200s · Install · decorator
+            // tokens · execution). Links and headings are never green.
             colors: {
-                paper:  'var(--c-paper)',        // page background
-                ink:    'var(--c-ink)',          // primary text
-                ink2:   'var(--c-ink2)',         // secondary text
-                rule:   'var(--c-rule)',         // hairlines / borders
-                accent: 'var(--c-accent)',       // emerald stroke accent
-                acct:   'var(--c-accent-text)',  // emerald at text sizes (AA)
-                press:  'var(--c-press)',        // ochre "press ink" (numerals, marginalia)
-                plate:  'var(--c-plate)',        // dark code-plate surface
-                plateb: 'var(--c-plate-border)', // plate frame border
+                bond:      'var(--bond)',       // the page
+                sheet:     'var(--sheet)',      // paper-on-paper panes
+                deck:      'var(--deck)',       // quiet beds
+                deck2:     'var(--deck2)',      // plate bed, one step deeper
+                rule:      'var(--rule)',       // default hairline
+                rule2:     'var(--rule2)',      // section-divider rules
+                ink:       'var(--ink)',        // text
+                graphite:  'var(--graphite)',   // secondary text
+                faint:     'var(--faint)',      // line numbers, disabled
+                green:     'var(--green)',      // Run Green — code that runs
+                tint:      'var(--tint)',       // the green wash
+                term:      'var(--term)',       // quoted terminals only
+                termtext:  'var(--term-text)',
+                termdim:   'var(--term-dim)',
+                termgreen: 'var(--term-green)',
             },
         },
     },

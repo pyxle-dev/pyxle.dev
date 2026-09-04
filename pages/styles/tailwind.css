@@ -2,752 +2,635 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════════
+   F — THE WORKING COPY · pyxle.dev design system
+   Ported from the approved design prototype (the pixel
+   truth). Physics: an annotated printed file — light, ruled,
+   line-numbered, dense at rest; it animates only when the visitor
+   acts. One radius (6px). Zero blur shadows. One accent — Run Green —
+   whose every appearance means "code that runs":
+     1 the seam (+ FIG seam)      4 the nav Install button
+     2 $ prompts + copied flash   5 @server/@action/useAction tokens
+     3 LIVE dots + 200s           6 execution (flash, race pip, the
+                                    measured green bar)
+   Links are never green. Headings are never green.
+
+   THEME: light is the DEFAULT and the identity (the document is
+   printed); dark is "the lamp copy" — the same document read at night:
+   paper dims to a warm green-black, ink lifts to bone, hairlines stay
+   hairlines, quoted terminals keep their own still-darker bed. Light
+   values live on :root, dark under html.dark (stamped pre-paint by
+   the layout boot script — localStorage `pyxle-theme`, default light,
+   prefers-color-scheme deliberately never consulted). All dark values
+   are WCAG-checked (every text/ground pair at or above AA).
+
+   Tokens are mirrored into Tailwind utilities by tailwind.config.cjs
+   (bg-bond, text-ink, text-graphite, border-rule, …). House classes
+   below live OUTSIDE Tailwind's layers on purpose: always emitted,
+   never content-purged. Page-specific CSS is BANNED here — it goes in
+   the page's own f-<page>.css.
+   ═══════════════════════════════════════════════════════════════════ */
+
 @layer base {
     html {
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         text-rendering: optimizeLegibility;
+        -webkit-text-size-adjust: 100%;
+        background: var(--bond);
+        /* Sticky 64px header — keep in-page anchor targets clear of it. */
+        scroll-padding-top: 80px;
+        scroll-behavior: smooth;
     }
 
-    /* Metric-compatible local fallbacks so the webfont swap causes no CLS. */
+    /* Metric-compatible local fallbacks so the webfont swap causes no
+       CLS. Fonts are self-hosted via @fontsource (imported in
+       layout.pyxl), font-display: swap — the strategy that holds the
+       Lighthouse 100. Plex Sans runs narrower than Arial, hence the
+       size-adjust. */
     @font-face {
-        font-family: 'FrauncesFallback';
-        src: local('Georgia');
-        size-adjust: 102%;
-        ascent-override: 96%;
+        font-family: 'PlexSansFallback';
+        src: local('Arial'), local('Helvetica Neue');
+        size-adjust: 96.5%;
     }
     @font-face {
-        font-family: 'SchibstedFallback';
-        src: local('Helvetica Neue'), local('Arial');
-        size-adjust: 100.5%;
+        font-family: 'PlexMonoFallback';
+        src: local('Menlo'), local('Consolas'), local('Liberation Mono');
+        size-adjust: 100%;
     }
 
-    /* ── Galley Proof theme tokens ─────────────────────────────────
-       Light = "Paper" (warm paper + ink), dark = "Ink" (the same page
-       printed on green-cast near-black stock). Emerald is punctuation,
-       never wallpaper; ochre is the proofreader's second ink. */
+    /* ── 0 · tokens — F light (f.css :root, verbatim values) ────── */
     :root {
-        --c-paper:        #FAF9F4;
-        --c-ink:          #151915;
-        --c-ink2:         #565D54;
-        --c-rule:         #E3E1D6;
-        --c-accent:       #059669;  /* drawn strokes, marks            */
-        --c-accent-text:  #047857;  /* emerald at text sizes (AA)      */
-        --c-press:        #8A5A24;  /* ochre press ink                 */
-        --c-plate:        #101411;  /* code plates stay dark on paper  */
-        --c-plate-border: #E3E1D6;
-        --c-wash:         #D9F0E3;  /* selection                       */
-        --c-wash-text:    #14532D;
+        --bond: #FBFBF9;      /* the page */
+        --sheet: #FFFFFF;     /* paper-on-paper (panes) */
+        --deck: #F3F4F1;      /* quiet beds */
+        --deck2: #EDEEEA;     /* plate bed, one step deeper */
+        --rule: #E4E6E1;      /* default hairline */
+        --rule2: #C9CCC5;     /* section-divider rules */
+        --ink: #151713;       /* text — 17.42:1 on bond */
+        --graphite: #5D625A;  /* secondary text — 6.03:1 */
+        --faint: #9AA096;     /* line numbers, disabled — never body text */
+        --green: #087443;     /* Run Green — code that runs. 5.65:1 */
+        --green-down: #066037;   /* Install hover */
+        --green-press: #054D2C;  /* Install active */
+        --on-green: #FFFFFF;     /* text on the Install button */
+        --tint: #E7F2EB;      /* the green wash (seam halo, copied flash) */
+        --folio: #D7DAD4;     /* the big printed numerals */
+        --term: #141915;      /* quoted terminals only */
+        --term-text: #D9E2DB;
+        --term-dim: #8B958C;
+        --term-green: #3FA871;
+
+        /* ── syntax inks (docs code frames only, .fdocs .dcode) ─────
+           Six printer's inks for full tokenization — Run Green stays
+           reserved for decorators (code that runs on the server).
+           All ratios ≥ 4.5:1 on Sheet, script-checked. */
+        --syn-kw: #A93226;    /* keywords — carmine, 6.62:1 */
+        --syn-str: #14456E;   /* strings — dark prussian, 9.97:1 */
+        --syn-num: #0F5CA8;   /* numbers + constants — bright prussian, 6.74:1 */
+        --syn-fn: #6B40C0;    /* def/class/calls + components — violet, 6.73:1 */
+        --syn-bi: #0B6470;    /* builtins + JSX elements — teal, 6.84:1 */
+        --syn-at: #7A4B00;    /* attributes + expression braces — ochre, 7.41:1 */
+
+        --mono: 'IBM Plex Mono', 'PlexMonoFallback', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: 'IBM Plex Sans Variable', 'IBM Plex Sans', 'PlexSansFallback', 'Helvetica Neue', Arial, sans-serif;
+        --ease: cubic-bezier(.2, .6, .2, 1); /* the F house ease */
+        color-scheme: light;
     }
+
+    /* ── 0b · F dark — "the lamp copy" ─────────────────────────────
+       The same document under a low desk lamp: warm green-black paper,
+       bone ink, Run Green lifted one step. Quoted terminals keep a
+       still-darker bed, separated from the page by border + their mono
+       head (apparatus, not luminance alone). Ratios script-checked:
+       ink 13.96:1 · graphite 7.68:1 · green 7.27:1 on bond. */
     html.dark {
-        --c-paper:        #101411;
-        --c-ink:          #F1EFE6;
-        --c-ink2:         #A3A99D;
-        --c-rule:         #2B302B;
-        --c-accent:       #34D399;
-        --c-accent-text:  #34D399;
-        --c-press:        #C98C49;
-        --c-plate:        #171C18;
-        --c-plate-border: #2B302B;
-        --c-wash:         #064E3B;
-        --c-wash-text:    #D1FAE5;
+        color-scheme: dark;
+        --bond: #1B1D18;
+        --sheet: #22251E;
+        --deck: #282B23;
+        --deck2: #2C2F26;
+        --rule: #353A31;
+        --rule2: #4C5246;
+        --ink: #E7EAE0;
+        --graphite: #A9B1A0;
+        --faint: #798171;
+        --green: #55BD82;
+        --green-down: #63C78F;
+        --green-press: #4FAF78;
+        --on-green: #1B1D18;    /* bond text on green — a lit key, 7.27:1 */
+        --tint: #22382C;
+        --folio: #454B40;
+        --term: #111510;
+        --term-text: #D9E2DB;
+        --term-dim: #8B958C;
+        --term-green: #4FB57C;
+
+        /* syntax inks under the lamp — same six roles, lifted for the
+           dark Sheet; all ≥ 4.5:1 there, script-checked */
+        --syn-kw: #F0907E;
+        --syn-str: #A9CCEF;
+        --syn-num: #7FB1E8;
+        --syn-fn: #C9A8F5;
+        --syn-bi: #7CC9D4;
+        --syn-at: #D9B36A;
     }
 
     body {
-        font-family: 'Schibsted Grotesk Variable', 'SchibstedFallback', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+        margin: 0;
+        background: var(--bond);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 17px;
+        line-height: 1.55;
+        font-weight: 400;
+        overflow-x: hidden;
     }
 
-    code, pre, kbd, samp {
-        font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-    }
+    a { color: inherit; text-decoration: none; }
 
-    ::selection {
-        background: var(--c-wash);
-        color: var(--c-wash-text);
-    }
-}
+    ::selection { background: var(--tint); }
 
-@layer utilities {
-    .text-balance { text-wrap: balance; }
-    .text-pretty  { text-wrap: pretty; }
+    code, pre, kbd, samp { font-family: var(--mono); }
 
-    .gradient-text {
-        background-image: linear-gradient(135deg, #34d399 0%, #22d3ee 50%, #60a5fa 100%);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-    }
+    img { max-width: 100%; height: auto; }
 
-    /* Single CSS entrance animation, gated by prefers-reduced-motion.
-       Used via the `.reveal` utility — elements fade+rise on first paint,
-       no IntersectionObserver required. */
-    @keyframes reveal-up {
-        from { opacity: 0; transform: translate3d(0, 16px, 0); }
-        to   { opacity: 1; transform: translate3d(0, 0, 0); }
-    }
-    .reveal {
-        animation: reveal-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-    }
-    @media (prefers-reduced-motion: reduce) {
-        .reveal { animation: none; }
-    }
-
-    /* Subtle dotted grid background used behind the hero and in code chrome.
-       Pure CSS — no image, no request. Encoded once, tiled by the GPU. */
-    .grid-bg {
-        background-image:
-            radial-gradient(circle at 1px 1px, rgba(255,255,255,0.06) 1px, transparent 0);
-        background-size: 24px 24px;
-    }
-    html.light .grid-bg {
-        background-image:
-            radial-gradient(circle at 1px 1px, rgba(15,23,42,0.08) 1px, transparent 0);
-    }
-
-    /* Focus ring — visible on keyboard nav, hidden on mouse click.
-       Token-driven: #059669 on paper (3.6:1), #34D399 on ink (9.7:1). */
-    .focus-ring:focus-visible {
-        outline: 2px solid var(--c-accent, #34d399);
+    /* Keyboard focus is ink — visible on every surface, never shown
+       for mouse clicks, never green (green means "code that runs"). */
+    :focus-visible {
+        outline: 2px solid var(--ink);
         outline-offset: 2px;
     }
+
 }
 
-/* ════════════════════════════════════════════════════════════════
-   Apple-style scroll motion layer (added on top of the existing
-   design — no visual restyle). Below-the-fold content eases in as it
-   enters the viewport: fade + rise + a whisper of scale, refined
-   easing, gentle stagger. Plus off-main-thread scroll parallax for
-   depth on the hero glow.
+/* ── 1 · base helpers ──────────────────────────────────────────── */
+.mono { font-family: var(--mono); }
+.hr { height: 1px; background: var(--rule); border: 0; margin: 0; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.cv { content-visibility: auto; contain-intrinsic-size: 900px; }
+.mono-inline { font-family: var(--mono); font-size: .88em; }
 
-   Lighthouse-100 invariants:
-     • Animates only opacity / transform — never layout (no CLS).
-     • No-JS users see everything (reveals gated on `html.js`, which the
-       boot script sets before first paint).
-     • LCP-safe: the hero keeps its on-paint `.reveal`; only below-fold
-       sections use the JS-gated scroll reveals.
-     • Parallax uses CSS scroll-driven timelines (no JS, off main
-       thread) and only where supported + motion is allowed.
-     • Fully disabled under prefers-reduced-motion.
-   ════════════════════════════════════════════════════════════════ */
-@layer utilities {
-    html.js [data-reveal] {
-        opacity: 0;
-        transform: translate3d(0, 26px, 0) scale(0.985);
-        transition:
-            opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
-            transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-        transition-delay: var(--reveal-delay, 0ms);
-    }
-    html.js [data-reveal="left"]  { transform: translate3d(-28px, 0, 0); }
-    html.js [data-reveal="right"] { transform: translate3d(28px, 0, 0); }
-    html.js [data-reveal="fade"]  { transform: translate3d(0, 20px, 0); }
-    html.js [data-reveal].is-visible {
-        opacity: 1;
-        transform: none;
-    }
+/* the measure: F sets at 1140px */
+.frame { max-width: 1140px; margin-inline: auto; padding-inline: 24px; }
 
-    /* Scroll-driven parallax — progressive enhancement, no JS. Desktop only:
-       scroll-linked animations on the root timeline can destabilize mobile
-       compositing (content blanking until a repaint), so gate to ≥768px
-       where they're reliable. Mobile keeps the time-based aurora drift. */
-    @supports (animation-timeline: scroll()) {
-        @media (prefers-reduced-motion: no-preference) and (min-width: 768px) {
-            .parallax-slow,
-            .parallax-fast {
-                animation: parallax-drift linear both;
-                animation-timeline: scroll(root);
-                animation-range: 0 100vh;
-            }
-            .parallax-fast { --parallax-y: 120px; }
-            .parallax-slow { --parallax-y: 60px; }
-            @keyframes parallax-drift {
-                to { transform: translate3d(0, var(--parallax-y, 60px), 0); }
-            }
-        }
-    }
+/* links: Ink with underlines; hover = the underline thickens. NEVER
+   green — green means "code that runs", and links merely take you
+   somewhere. */
+.link {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    text-decoration-color: var(--rule2);
+    transition: text-decoration-color .15s ease;
+}
+.link:hover { text-decoration-thickness: 2px; text-decoration-color: var(--ink); }
 
-    @media (prefers-reduced-motion: reduce) {
-        html.js [data-reveal] { opacity: 1 !important; transform: none !important; transition: none; }
-    }
+/* arrows nudge — every → is an .a span */
+.a { display: inline-block; transition: transform .18s var(--ease); }
+a:hover .a, button:hover .a { transform: translateX(3px); }
+
+/* ── 1b · the couplet law: claim in sans, receipt in mono ──────── */
+h1 {
+    font: 700 clamp(46px, 5.4vw, 76px)/1.03 var(--sans);
+    letter-spacing: -0.028em;
+    color: var(--ink);
+    margin: 0;
+}
+h2 {
+    font: 600 clamp(31px, 3.4vw, 46px)/1.07 var(--sans);
+    letter-spacing: -0.018em;
+    color: var(--ink);
+    margin: 0;
+}
+.receipt {
+    font: 400 13px/1.6 var(--mono);
+    color: var(--graphite);
+    margin: 12px 0 0;
+}
+.sec-head { margin-bottom: 44px; }
+.sec-head h2 + .receipt { margin-top: 12px; }
+
+/* the ledger emphasis: a double rule drawn under the claim */
+.emph { position: relative; display: inline-block; }
+.emph-rule {
+    position: absolute;
+    left: 0.04em; right: 0.08em; bottom: 0.02em;
+    height: 9px;
+    pointer-events: none;
+    border-top: 4px solid var(--ink);
+}
+.emph-rule::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 3px;
+    border-top: 1px solid var(--ink);
+}
+/* ledger emphasis that survives line wraps (stance blocks) */
+.emph-i {
+    text-decoration: underline;
+    text-decoration-thickness: 3px;
+    text-decoration-color: var(--ink);
+    text-underline-offset: 6px;
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 8px;
 }
 
-/* ════════════════════════════════════════════════════════════════
-   Premium surface treatments — same emerald→cyan→blue brand, fresher
-   composition: an aurora mesh backdrop and an animated gradient
-   hairline border for elevated artifacts/cards.
-   ════════════════════════════════════════════════════════════════ */
-@layer utilities {
-    /* Aurora mesh — layered brand-gradient glows, drifting slowly. */
-    .aurora {
-        background-image:
-            radial-gradient(55% 48% at 50% -8%, rgba(52,211,153,0.22), transparent 72%),
-            radial-gradient(42% 46% at 84% 4%, rgba(96,165,250,0.18), transparent 72%),
-            radial-gradient(46% 46% at 12% 16%, rgba(34,211,238,0.16), transparent 72%);
-    }
-    html.light .aurora {
-        background-image:
-            radial-gradient(55% 48% at 50% -8%, rgba(16,185,129,0.16), transparent 72%),
-            radial-gradient(42% 46% at 84% 4%, rgba(59,130,246,0.12), transparent 72%),
-            radial-gradient(46% 46% at 12% 16%, rgba(34,211,238,0.10), transparent 72%);
-    }
-    @keyframes aurora-drift {
-        0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-        50%      { transform: translate3d(0, -2%, 0) scale(1.06); }
-    }
-    .aurora-anim { animation: aurora-drift 16s ease-in-out infinite; }
+/* ── 2 · section apparatus — running heads ─────────────────────────
+   Tab left ON the rule, folio numeral right ON the rule. The tabs are
+   the document's running heads: you always know which part of the
+   file you're in. */
+.rulebar { position: relative; border-top: 1px solid var(--rule2); }
+.rulebar .tab {
+    position: absolute;
+    left: 0;
+    top: -17px;
+    background: var(--bond);
+    padding-right: 14px;
+    font: 500 11px/16px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--graphite);
+    text-decoration: none;
+    transition: color .15s ease;
+}
+a.tab:hover { color: var(--ink); }
+.folio {
+    position: absolute;
+    right: 0;
+    top: -27px;
+    background: var(--bond);
+    padding-left: 18px;
+    font: 500 54px/1 var(--mono);
+    letter-spacing: -0.02em;
+    color: var(--folio);
+    user-select: none;
+}
+.sec { scroll-margin-top: 80px; }
 
-    /* Animated gradient hairline — use as a `p-px` wrapper background. */
-    @keyframes edge-flow { to { background-position: 200% 50%; } }
-    .gradient-edge {
-        background-image: linear-gradient(110deg, #34d399, #22d3ee, #60a5fa, #34d399);
-        background-size: 200% 100%;
-        animation: edge-flow 9s linear infinite;
-    }
-    /* Static gradient hairline for cards (cheaper; no animation). */
-    .gradient-edge-static {
-        background-image: linear-gradient(135deg, rgba(52,211,153,0.5), rgba(34,211,238,0.32) 45%, rgba(96,165,250,0.5));
-    }
-
-    @keyframes float-y {
-        0%, 100% { transform: translate3d(0, 0, 0); }
-        50%      { transform: translate3d(0, -8px, 0); }
-    }
-    .float-y { animation: float-y 7s ease-in-out infinite; }
-
-    @media (prefers-reduced-motion: reduce) {
-        .aurora-anim, .gradient-edge, .float-y { animation: none; }
-    }
+/* ── 3 · panes: 1px rule border, 6px radius, no shadows ─────────── */
+.pane {
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.pane-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    height: 36px;
+    padding: 0 14px;
+    background: var(--deck);
+    border-bottom: 1px solid var(--rule);
+    font: 400 12.5px/1 var(--mono);
+    color: var(--graphite);
 }
 
-/* ════════════════════════════════════════════════════════════════
-   Mobile compositing safety (below the desktop breakpoint).
-
-   On some real mobile devices (notably Samsung Chrome on recent
-   Galaxy hardware) a page that stacks many permanent or perpetually
-   animating composited layers — entrance reveals that settle on a 3D
-   transform, the infinitely-drifting aurora/float/edge layers — can
-   exhaust the compositor's layer budget. Sections then blank out when
-   scrolled out and back into view and only repaint on a tap. It does
-   NOT reproduce in desktop devtools' mobile emulation (different
-   compositor), which is why it slipped through.
-
-   The fix mirrors the parallax gate above: below 768px we drop the
-   decorative motion entirely and show every reveal immediately. No
-   layout or final-state change (reveals already end at opacity:1 /
-   transform:none) — only the transient, layer-promoting motion is
-   removed, so the mobile compositor stays calm. Desktop is untouched.
-   Unlayered + !important so it wins over the @layer rules above.
-   ════════════════════════════════════════════════════════════════ */
-@media (max-width: 767px) {
-    html.js [data-reveal] {
-        opacity: 1 !important;
-        transform: none !important;
-        transition: none !important;
-    }
-    .reveal { animation: none !important; }
-    .aurora-anim,
-    .float-y,
-    .gradient-edge { animation: none !important; }
-}
-
-/* ════════════════════════════════════════════════════════════════
-   Live-playground preview scope — styles the *output* the user's
-   snippet renders (raw tags + a few helper classes), so whatever
-   they type looks good without relying on Tailwind's purge (which
-   can't see runtime-typed class names). Both themes.
-   ════════════════════════════════════════════════════════════════ */
-.preview-scope { color: #18181b; }
-html.dark .preview-scope { color: #fafafa; }
-.preview-scope h1, .preview-scope .preview-h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; }
-.preview-scope h2 { font-size: 1.25rem; font-weight: 650; letter-spacing: -0.01em; }
-.preview-scope h3 { font-size: 1.05rem; font-weight: 650; }
-.preview-scope p  { margin-top: 0.5rem; color: #52525b; line-height: 1.6; }
-html.dark .preview-scope p { color: #a1a1aa; }
-.preview-scope a  { color: #059669; text-decoration: underline; text-underline-offset: 2px; }
-html.dark .preview-scope a { color: #34d399; }
-.preview-scope ul { margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.4rem; }
-.preview-scope li { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.75rem; border-radius: 0.55rem; background: rgba(9,9,11,0.04); font-size: 0.9rem; }
-html.dark .preview-scope li { background: rgba(255,255,255,0.05); }
-.preview-scope li::before { content: ""; width: 6px; height: 6px; border-radius: 9999px; background: linear-gradient(135deg, #34d399, #22d3ee); flex: 0 0 auto; }
-.preview-scope .card {
-    border: 1px solid rgba(9,9,11,0.08);
-    border-radius: 1rem;
-    padding: 1.5rem;
-    background: rgba(9,9,11,0.015);
-}
-html.dark .preview-scope .card { border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); }
-.preview-scope .tag {
-    display: inline-block;
-    margin-bottom: 0.75rem;
-    padding: 0.15rem 0.6rem;
-    border-radius: 9999px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.7rem;
-    color: #047857;
-    background: rgba(16,185,129,0.1);
-    border: 1px solid rgba(16,185,129,0.2);
-}
-html.dark .preview-scope .tag { color: #6ee7b7; }
-.preview-scope button {
-    margin-top: 1rem;
-    padding: 0.5rem 1rem;
-    border-radius: 0.6rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #052e1a;
-    background: #34d399;
-    cursor: pointer;
-    transition: background-color 0.15s;
-}
-.preview-scope button:hover { background: #6ee7b7; }
-.preview-scope input {
-    margin-top: 0.5rem;
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.6rem;
-    border: 1px solid rgba(9,9,11,0.12);
-    background: transparent;
-    font-size: 0.9rem;
-    color: inherit;
-    outline: none;
-}
-html.dark .preview-scope input { border-color: rgba(255,255,255,0.12); }
-.preview-scope input:focus { border-color: rgba(16,185,129,0.5); }
-
-/* ── Syntax highlighting token colors ────────────────────────
-   Referenced by the pre-tokenized code blocks in index.pyxl and
-   the shared highlighter in pages/components/code-highlighter.jsx.
-   Kept in the global stylesheet so the tokens render correctly
-   during SSR without any inline <style> round-trip. */
-.sh-kw   { color: #c084fc; }
-.sh-str  { color: #6ee7b7; }
-.sh-cmt  { color: #a1a1aa; font-style: italic; }
-.sh-dec  { color: #facc15; }
-.sh-fn   { color: #60a5fa; }
-.sh-tag  { color: #71717a; }
-.sh-comp { color: #22d3ee; }
-.sh-elem { color: #f87171; }
-.sh-attr { color: #fde047; }
-.sh-brc  { color: #facc15; }
-.sh-prop { color: #22d3ee; }
-.sh-num  { color: #fb923c; }
-.sh-cmd  { color: #4ade80; }
-.sh-flg  { color: #22d3ee; }
-.sh-pl   { color: #d4d4d8; }
-
-/* ════════════════════════════════════════════════════════════════
-   GALLEY PROOF — homepage redesign 4.
-   The page is typeset like a printed argument: flat paper/ink
-   surfaces, hairline rules, hanging numerals, and a motion language
-   made entirely of the logo's own gesture — a 6px round-cap stroke
-   that draws itself, and a dot that lands like a period.
-
-   Invariants (same contract as the layers above):
-     • Every animation is ONE-SHOT opacity/transform/stroke-dashoffset.
-       There are zero infinite decorative loops on the page.
-     • Hidden-until-animated states are gated on html.js, so no-JS
-       visitors (and crawlers) see the finished page.
-     • Below 768px and under prefers-reduced-motion, marks render in
-       their final state instantly (the known mobile-compositor gate).
-   ════════════════════════════════════════════════════════════════ */
-
-/* ── Self-drawing stroke (logo P, ticks, rules, circled zero) ─────
-   Any <path pathLength="1"> with .gp-draw inside a [data-reveal]
-   container draws itself when the container becomes .is-visible.
-   .gp-draw-load variants play on page load instead (hero logo). */
-@layer utilities {
-    html.js .gp-draw {
-        stroke-dasharray: 1;
-        stroke-dashoffset: 1;
-        transition: stroke-dashoffset var(--draw-dur, 0.9s) cubic-bezier(0.65, 0, 0.35, 1);
-        transition-delay: var(--draw-delay, 0ms);
-    }
-    html.js [data-reveal].is-visible .gp-draw { stroke-dashoffset: 0; }
-
-    @keyframes gp-draw-in { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
-    html.js .gp-draw-load {
-        stroke-dasharray: 1;
-        animation: gp-draw-in var(--draw-dur, 0.9s) cubic-bezier(0.65, 0, 0.35, 1) var(--draw-delay, 0ms) both;
-    }
-
-    /* Pure trigger — an IO target whose children draw/slide, while the
-       element itself never fades or moves. Declared after the base
-       [data-reveal] rules so it wins at equal specificity. */
-    html.js [data-reveal="none"] {
-        opacity: 1;
-        transform: none;
-        transition: none;
-    }
-
-    /* The period lands: a dot pops in with slight overshoot. */
-    @keyframes gp-dot-pop {
-        from { transform: scale(0); }
-        60%  { transform: scale(1.25); }
-        to   { transform: scale(1); }
-    }
-    /* SVG dots scale from their own center, not the viewport origin. */
-    svg .gp-dot, svg .gp-dot-load {
-        transform-box: fill-box;
-        transform-origin: center;
-    }
-    html.js .gp-dot {
-        transform: scale(0);
-        transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-        transition-delay: var(--dot-delay, 0ms);
-    }
-    html.js [data-reveal].is-visible .gp-dot { transform: scale(1); }
-    html.js .gp-dot-load {
-        animation: gp-dot-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) var(--dot-delay, 0ms) both;
-    }
-}
-
-/* ── The Deletion ─────────────────────────────────────────────────
-   Eight filenames struck out by a hand-drawn pen stroke, top to
-   bottom, then the ninth row underlined with a period that pops.
-   Rows carry --i (index); the container carries data-reveal. */
-@layer utilities {
-    html.js .gp-strike path {
-        stroke-dasharray: 1;
-        stroke-dashoffset: 1;
-        transition: stroke-dashoffset 0.24s ease-out;
-        transition-delay: calc(var(--i, 0) * 110ms);
-    }
-    html.js [data-reveal].is-visible .gp-strike path { stroke-dashoffset: 0; }
-
-    html.js .gp-struck-text {
-        transition: opacity 0.2s ease-out;
-        transition-delay: calc(var(--i, 0) * 110ms);
-    }
-    html.js [data-reveal].is-visible .gp-struck-text { opacity: 0.85; }
-}
-
-/* ── Line-mask headline reveal (section h2s only — never the h1) ──
-   Fraunces' font box is taller than the tight display leading, so the
-   last line's descenders paint below the line box; the mask needs a
-   bottom bleed or it crops them (g, p, y). The negative margin gives
-   the bleed back to layout, and the hidden offset clears the enlarged
-   window so pre-reveal text can't peek through it. */
-@layer utilities {
-    .gp-lm {
-        display: block;
-        overflow: hidden;
-        padding-bottom: 0.25em;
-        margin-bottom: -0.25em;
-    }
-    html.js .gp-lm > span {
-        display: block;
-        transform: translateY(calc(110% + 0.3em));
-        transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-        transition-delay: var(--lm-delay, 0ms);
-    }
-    html.js [data-reveal].is-visible .gp-lm > span { transform: translateY(0); }
-}
-
-/* ── Hairline rules that draw themselves (pull-quote, running head) ── */
-@layer utilities {
-    html.js .gp-rule-x {
-        transform: scaleX(0);
-        transform-origin: center;
-        transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-        transition-delay: var(--rule-delay, 0ms);
-    }
-    html.js .gp-rule-x.gp-from-left { transform-origin: left; }
-    html.js [data-reveal].is-visible .gp-rule-x { transform: scaleX(1); }
-}
-
-/* ── Typesetting furniture ────────────────────────────────────────
-   Dot leaders for the index section; a baseline-rule input for the
-   newsletter coda; masthead hide/reveal-on-scroll-up. */
-@layer utilities {
-    .gp-leader {
-        flex: 1 1 auto;
-        min-width: 2rem;
-        border-bottom: 2px dotted var(--c-rule);
-        margin-bottom: 0.45em;
-        transition: border-color 0.15s ease;
-    }
-
-    .gp-baseline-input {
-        background: transparent;
-        border: 0;
-        border-bottom: 1px solid var(--c-ink2);
-        border-radius: 0;
-        padding: 0.5rem 0;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-    .gp-baseline-input:focus {
-        outline: none;
-        border-color: var(--c-accent);
-        box-shadow: 0 1px 0 0 var(--c-accent);
-    }
-
-    .gp-masthead {
-        transition: transform 0.22s ease, background-color 0.2s ease, visibility 0s linear 0s;
-    }
-    /* visibility removes the off-screen controls from the tab order; the
-       0.22s delay lets the slide-out finish before they vanish. */
-    .gp-masthead.gp-hidden {
-        transform: translateY(-100%);
-        visibility: hidden;
-        transition: transform 0.22s ease, background-color 0.2s ease, visibility 0s linear 0.22s;
-    }
-    /* If focus does land inside (e.g. via a skip link), slide back in. */
-    .gp-masthead.gp-hidden:focus-within {
-        transform: none;
-        visibility: visible;
-    }
-
-    /* "Just shipped" announcement — hidden flash-free once dismissed. A boot
-       script sets the class on <html> before paint, so a returning visitor who
-       dismissed it never sees a flash of the banner. */
-    html.pyxle-ann-dismissed .just-shipped { display: none !important; }
-}
-
-/* ── Duotone-plus code plates ─────────────────────────────────────
-   Two inks on dark stock, like a letterpress duotone: emerald for
-   structure (decorators brightest — they are the anatomy of a
-   .pyxl), ochre press-ink for literals, bright ink for names, and
-   punctuation recedes. Four voices, no rainbow. Plates are dark in
-   BOTH themes — code is a photographic plate on the page. */
-.duotone code, .duotone .sh-pl,
-.duotone .sh-attr, .duotone .sh-prop { color: #C6CCC2; }
-.duotone .sh-kw, .duotone .sh-cmd { color: #34D399; }
-.duotone .sh-dec  { color: #6EE7B7; }
-.duotone .sh-cmt  { color: #8A9086; font-style: italic; }
-.duotone .sh-str, .duotone .sh-num, .duotone .sh-flg { color: #CFA265; }
-.duotone .sh-fn, .duotone .sh-comp, .duotone .sh-elem { color: #F1EFE6; }
-.duotone .sh-brc, .duotone .sh-tag { color: #878D83; }
-
-/* ── Performance: skip offscreen rendering for below-fold sections ── */
-.gp-cv {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 720px;
-}
-
-/* ── Gates: reduced motion + mobile compositors ───────────────────
-   All Galley Proof motion collapses to final-state-instantly. The
-   .is-visible class still arrives via IntersectionObserver, so
-   nothing is ever lost — it just doesn't perform. */
-@media (prefers-reduced-motion: reduce), (max-width: 767px) {
-    html.js .gp-draw,
-    html.js .gp-strike path { stroke-dashoffset: 0 !important; transition: none !important; }
-    html.js .gp-draw-load   { animation: none !important; stroke-dasharray: none !important; }
-    html.js .gp-dot         { transform: scale(1) !important; transition: none !important; }
-    html.js .gp-dot-load    { animation: none !important; }
-    html.js .gp-lm > span   { transform: none !important; transition: none !important; }
-    html.js .gp-rule-x      { transform: none !important; transition: none !important; }
-    html.js .gp-struck-text { transition: none !important; }
-    .gp-masthead            { transition: background-color 0.2s ease; }
-}
-
-/* ── /roadmap — the print-run timeline ────────────────────────────
-   A base rule runs the full timeline; an accent "ink" line scales
-   over it, driven by a rAF'd scroll handler (transform-only, GPU).
-   Dots ignite via the existing data-reveal .is-visible state — no
-   extra JS. Everything stills under prefers-reduced-motion. */
-.rm-ink {
-    transform-origin: top;
-    transform: scaleY(0);
-    will-change: transform;
-}
-.rm-dot {
-    box-shadow: 0 0 0 0 transparent;
-    transition: background-color 600ms cubic-bezier(0.22, 1, 0.36, 1),
-                border-color 600ms cubic-bezier(0.22, 1, 0.36, 1),
-                box-shadow 900ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-html.js [data-reveal].is-visible .rm-dot--shipped {
-    background-color: var(--c-accent);
-    border-color: var(--c-accent);
-    box-shadow: 0 0 0 5px color-mix(in srgb, var(--c-accent) 14%, transparent);
-}
-html.js [data-reveal].is-visible .rm-dot--now {
-    border-color: var(--c-accent);
-    animation: rm-pulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) 600ms infinite;
-}
-@keyframes rm-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-accent) 35%, transparent); }
-    50%      { box-shadow: 0 0 0 8px transparent; }
-}
-html.no-js .rm-dot--shipped { background-color: var(--c-accent); border-color: var(--c-accent); }
-@media (prefers-reduced-motion: reduce) {
-    .rm-ink { transform: scaleY(1) !important; }
-    .rm-dot { transition: none; }
-    html.js [data-reveal] .rm-dot--shipped,
-    html.js [data-reveal].is-visible .rm-dot--shipped {
-        background-color: var(--c-accent); border-color: var(--c-accent); box-shadow: none;
-    }
-    html.js [data-reveal].is-visible .rm-dot--now { animation: none; }
-}
-
-/* ════════════════════════════════════════════════════════════════
-   /compare — the custody ledger.
-   Four ledger lines trace one field across four stacks. Line width
-   is proportional to station count, so Pyxle's line is physically
-   short and the two-stack line is long. All rows animate at ONE
-   speed — one station per beat (300ms) — released by the shared
-   scroll-reveal observer (.is-visible on the .seam-fig ancestor).
-   No JS off / reduced-motion / print → the finished ledger.
-   Per-row --last = stations-1; per-station --i = index.
-   ════════════════════════════════════════════════════════════════ */
-
-.seam-fig { display: flex; flex-direction: column; gap: 0; }
-
-.seam-row {
+/* ── 4 · the copy chip ($ command · copy) — green jobs 2 ─────────── */
+.chip {
     display: flex;
     align-items: center;
-    gap: 1.75rem;
-    padding: 1.9rem 0;
-    border-top: 1px solid var(--c-rule);
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    font: 400 14px/1 var(--mono);
+    color: var(--ink);
+    background: var(--sheet);
+    border: 1px solid var(--rule2);
+    border-radius: 6px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: background-color .15s ease, border-color .15s ease;
 }
-.seam-row:first-child { border-top: 0; }
-.seam-head { width: 13.5rem; flex: none; }
+.chip:hover { border-color: var(--graphite); }
+.chip:active { background: var(--deck); }
+.chip-d { color: var(--green); }               /* $ — green job 2 */
+.chip-cmd { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip-copy { font-size: 12px; color: var(--faint); transition: color .15s ease; }
+.chip:hover .chip-copy { color: var(--ink); }
+.chip.copied { background: var(--tint); border-color: var(--green); }
+.chip.copied .chip-copy { color: var(--green); }
 
-.seam-track {
-    position: relative;
-    flex: none;
-    width: calc((var(--last) + 0.55) * 6.6rem);
-    max-width: 100%;
-    padding-bottom: 1.6rem;   /* room for labels below the line */
-}
-.seam-line {
+/* the copy → quickstart funnel: the wrapper — not the chip — is the
+   flex item wherever chips flex, and it anchors the transient
+   `quickstart →` link a real copy reveals. The link is absolutely
+   positioned above the chip, so revealing it moves NOTHING. */
+.chip-wrap { position: relative; display: flex; min-width: 0; }
+.chip-wrap > .chip { flex: 1; min-width: 0; }
+.chip-q {
     position: absolute;
-    left: 0; top: 4px;
-    height: 2px; width: 100%;
-    background: color-mix(in srgb, var(--c-ink2) 42%, transparent);
-    transform-origin: left center;
+    left: 2px;
+    bottom: calc(100% + 7px);
+    font: 400 11.5px/1 var(--mono);
+    white-space: nowrap;
+    animation: chip-q-in .15s ease-out;
 }
-.seam-row--pyxle .seam-line { background: var(--c-accent); height: 2.5px; top: 3.75px; }
+@keyframes chip-q-in { from { opacity: 0; } to { opacity: 1; } }
+/* the mobile bar's own idiom: the cell label becomes the link — same
+   cell box (`.m-bar a` geometry), underlined because it now navigates */
+.m-bar .m-quick { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
 
-.seam-stations {
-    position: relative;
-    margin: 0; padding: 0; list-style: none;
-    display: flex; justify-content: space-between; align-items: center;
-    height: 10px;
+/* ── 5 · the ONE solid button (green job 4) ─────────────────────── */
+.btn-install {
+    font: 500 15px/1 var(--sans);
+    color: var(--on-green);
+    background: var(--green);
+    border-radius: 6px;
+    padding: 10px 18px;
+    text-decoration: none;
+    transition: background-color .15s ease;
+    white-space: nowrap;
 }
-.seam-station { position: relative; flex: none; }
-.seam-dot {
-    display: block;
-    width: 9px; height: 9px; border-radius: 9999px;
-    border: 2px solid var(--c-ink2); background: var(--c-paper);
-}
-.seam-row--pyxle .seam-dot { border-color: var(--c-accent); background: var(--c-accent); }
-.seam-label {
-    position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-    font-size: 10.5px; line-height: 1.15; letter-spacing: -0.01em;
-    color: var(--c-ink2); white-space: nowrap;
-}
-.seam-station:first-child .seam-label { left: 0; transform: none; }
-.seam-station:last-child  .seam-label { left: auto; right: 0; transform: none; }
-.seam-row--pyxle .seam-label { color: color-mix(in srgb, var(--c-accent) 78%, var(--c-ink)); }
+.btn-install:hover { background: var(--green-down); }
+.btn-install:active { background: var(--green-press); }
 
-.seam-count { flex: none; padding-left: 0.75rem; }
-
-/* ── the choreography (JS on; released by .is-visible) ───────────── */
-html.js [data-reveal] .seam-line    { transform: scaleX(0); }
-html.js [data-reveal] .seam-station { opacity: 0; transform: scale(0.4); }
-html.js [data-reveal] .seam-count   { opacity: 0; }
-
-html.js [data-reveal].is-visible .seam-line {
-    transform: scaleX(1);
-    transition: transform calc(var(--last) * 300ms) cubic-bezier(0.22, 1, 0.36, 1);
+/* ── 6 · header — the running head of the whole site ──────────────
+   64px, Bond, one rule2 hairline. It does not hide on scroll:
+   running heads don't dodge. Active page = 2px ink underline (never
+   green — the current page is a fact, not code that runs). */
+.hd {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    border-bottom: 1px solid var(--rule2);
+    background: var(--bond);
 }
-html.js [data-reveal].is-visible .seam-station {
-    opacity: 1; transform: scale(1);
-    transition: opacity 260ms ease, transform 380ms cubic-bezier(0.34, 1.4, 0.6, 1);
-    transition-delay: calc(var(--i) * 300ms);
+.hd-row {
+    height: 64px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
 }
-html.js [data-reveal].is-visible .seam-count {
-    opacity: 1;
-    transition: opacity 420ms ease;
-    transition-delay: calc(var(--i) * 300ms);
+.hd .wordmark { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.hd .wordmark img { display: block; }
+.hd .wm { font: 600 17px/1 var(--sans); color: var(--ink); letter-spacing: -0.01em; }
+.hd nav { display: flex; align-items: center; gap: 22px; margin-left: auto; min-width: 0; }
+.hd nav a {
+    font: 400 14.5px/1 var(--sans);
+    color: var(--graphite);
+    text-decoration: none;
+    background: linear-gradient(currentColor, currentColor) no-repeat left calc(100% + 4px) / 0 1px;
+    transition: color .15s ease, background-size .22s var(--ease);
+    padding-bottom: 2px;
+    white-space: nowrap;
+}
+.hd nav a:hover { color: var(--ink); background-size: 100% 1px; }
+.hd nav a.on {
+    color: var(--ink);
+    background: linear-gradient(var(--ink), var(--ink)) no-repeat left calc(100% + 4px) / 100% 2px;
+}
+.hd .hd-extra { display: flex; align-items: center; gap: 14px; }
+/* the homepage's live star count (nav-extra slot) */
+.hd-stars {
+    display: inline-flex; align-items: center; gap: 6px;
+    font: 400 12.5px/1 var(--mono); color: var(--graphite);
+    text-decoration: none; transition: color .15s ease;
+}
+.hd-stars:hover { color: var(--ink); }
+.star-i { display: block; flex: none; }
+.starrable:hover .star-i path { fill: currentColor; }
+
+/* theme toggle — the reading lamp. Chromeless mono control; the
+   moon/dot halves are CSS-gated on the html theme class (never a JS
+   branch — hydration law); a control that cannot work without JS does
+   not render. */
+.tgl { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
+    padding: 0; background: transparent; border: 0; color: var(--graphite); cursor: pointer;
+    transition: color .15s ease; }
+.tgl:hover { color: var(--ink); }
+.tgl .moon { display: none; }
+html.dark .tgl .moon { display: block; }
+html.dark .tgl .dot { display: none; }
+html:not(.js) .tgl { display: none; }
+.m-bar .m-tgl { flex: 0 0 56px; width: auto; height: 100%; border-left: 1px solid var(--rule); }
+@media (max-width: 768px) { .hd .hd-extra .tgl { display: none; } }
+
+/* mobile quick-action bar (≤768px, all pages) — Bond, top hairline */
+.m-bar { position: fixed; left: 0; right: 0; bottom: 0; height: 56px; background: var(--bond); border-top: 1px solid var(--rule2);
+    display: none; align-items: stretch; z-index: 50; }
+.m-bar a, .m-bar button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 9px;
+    font-family: var(--mono); font-size: 12.5px; color: var(--ink); background: transparent; border: 0; border-right: 1px solid var(--rule); cursor: pointer; }
+.m-bar a:last-child, .m-bar button:last-child { border-right: 0; }
+@media (max-width: 768px) {
+    .m-bar { display: flex; }
+    body { padding-bottom: 56px; }
 }
 
+/* ── 7 · footer — EOF ───────────────────────────────────────────── */
+.ft { padding-bottom: 40px; }
+.ft .rulebar { margin-bottom: 56px; }
+.ft-nl {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 36px;
+}
+.ft-nl-label { font: 400 15px/1.5 var(--sans); color: var(--graphite); flex: none; }
+.nl-row { display: flex; gap: 8px; flex: 1 1 300px; max-width: 420px; }
+.nl-row input {
+    flex: 1;
+    min-width: 0;
+    font: 400 14px/1 var(--sans);
+    color: var(--ink);
+    background: var(--sheet);
+    border: 1px solid var(--rule2);
+    border-radius: 6px;
+    padding: 10px 12px;
+    transition: border-color .15s ease;
+}
+.nl-row input::placeholder { color: var(--faint); }
+.nl-row input:hover { border-color: var(--graphite); }
+.nl-row input:focus { outline: none; border-color: var(--ink); }
+.nl-row button {
+    font: 500 14px/1 var(--sans);
+    color: var(--ink);
+    background: var(--sheet);
+    border: 1px solid var(--rule2);
+    border-radius: 6px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: border-color .15s ease, background-color .15s ease;
+}
+.nl-row button:hover { border-color: var(--ink); }
+.nl-row button:active { background: var(--deck); }
+.nl-row button:disabled { cursor: default; color: var(--graphite); border-color: var(--rule2); }
+.nl-note { font: 400 12.5px/1.5 var(--mono); color: var(--graphite); min-height: 19px; margin: 0; flex-basis: 100%; }
+.nl-note .nl-ok { color: var(--green); }   /* a 200 — green job 3 */
+.nl-ts { flex-basis: 100%; }
+.nl-ts:empty { display: none; }
+.foot-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 20px;
+    flex-wrap: wrap;
+    font: 400 12.5px/1.6 var(--mono);
+    color: var(--graphite);
+    margin: 0;
+}
+.foot-links { display: flex; gap: 18px; flex-wrap: wrap; }
+.foot-links .link, .foot-dogfood .link { color: var(--graphite); }
+.foot-links .link:hover, .foot-dogfood .link:hover { color: var(--ink); }
+.foot-dogfood {
+    margin: 18px 0 0;
+    font: 400 12.5px/1.6 var(--mono);
+    color: var(--graphite);
+}
+@media (max-width: 760px) { .foot-row { flex-direction: column; gap: 10px; } }
+
+/* ── 8 · BOOT — the document prints itself ─────────────────────────
+   Gated on html.js (stamped pre-paint by the layout boot script);
+   pure opacity/transform, zero layout shift. No-JS: everything is
+   simply there. Delays ride --bd (set inline, deterministically, so
+   SSR == first client render). */
+.js .b {
+    opacity: 0;
+    animation: bootup .5s var(--ease) forwards;
+    animation-delay: var(--bd, 0s);
+}
+@keyframes bootup { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.js .b-flat { animation-name: bootflat; }
+@keyframes bootflat { from { opacity: 0; } to { opacity: 1; } }
+.js .b-stamp { animation-name: stampin; animation-duration: .4s; animation-timing-function: cubic-bezier(.2, .9, .3, 1.15); }
+@keyframes stampin {
+    from { opacity: 0; transform: rotate(-6deg) scale(1.22); }
+    to   { opacity: 1; transform: rotate(-2.5deg) scale(1); }
+}
+/* the ledger rule draws itself after the claim lands */
+.js .emph-rule { transform: scaleX(0); transform-origin: left center; animation: drawx .45s var(--ease) .62s forwards; }
+.js .stance .emph-rule { transform: none; animation: none; }
+@keyframes drawx { to { transform: scaleX(1); } }
+/* the file prints, line by line (delays set per-row, inline) */
+.js .pane-specimen .row { opacity: 0; animation: rowin .18s ease-out forwards; animation-delay: var(--rd, .35s); }
+@keyframes rowin { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: none; } }
+
+/* ── 9 · REVEAL — apparatus stamps in on scroll ────────────────────
+   One quick pass per section; rules draw, tabs and folios stamp,
+   content rises 14px. All gated on .js + .seen (useSeen, f-kit). */
+.js .rv { opacity: 0; transform: translateY(14px); transition: opacity .5s ease var(--rvd, 0s), transform .5s var(--ease) var(--rvd, 0s); }
+.js .seen .rv { opacity: 1; transform: none; }
+.js .rulebar .shade {
+    position: absolute;
+    left: 0; right: 0; top: -1px;
+    height: 1px;
+    background: var(--bond);
+    transform-origin: right center;
+    transition: transform .7s var(--ease);
+    pointer-events: none;
+}
+.js .seen .rulebar .shade { transform: scaleX(0); }
+.js .rulebar .tab, .js .rulebar .folio { opacity: 0; transition: opacity .4s ease .25s; }
+.js .seen .rulebar .tab, .js .seen .rulebar .folio { opacity: 1; }
+html:not(.js) .shade { display: none; }
+
+/* ── 10 · code-highlighter tokens (components/code-highlighter.jsx)
+   The three-ink law: code is Ink, comments/punctuation/strings recede
+   to Graphite, and the ONLY coloured scope is the decorators — the
+   anatomy that runs on the server (green job 5). No client colour: F
+   prints one document, not two stacks. */
+.sh-kw   { color: var(--ink); font-weight: 500; }
+.sh-str  { color: var(--graphite); }
+.sh-cmt  { color: var(--graphite); font-style: italic; }
+.sh-dec  { color: var(--green); font-weight: 500; }
+.sh-fn   { color: var(--ink); }
+.sh-tag  { color: var(--graphite); }
+.sh-comp { color: var(--ink); }
+.sh-elem { color: var(--ink); }
+.sh-attr { color: var(--graphite); }
+.sh-brc  { color: var(--graphite); }
+.sh-prop { color: var(--graphite); }
+.sh-num  { color: var(--ink); }
+.sh-cmd  { color: var(--ink); }
+.sh-flg  { color: var(--graphite); }
+.sh-pl   { color: var(--graphite); }
+
+/* ── 11 · INTERIM docs code-frame readability ─────────────────────
+   The docs surface server-emits .dcode.frame / .fhd / .cm / .dec /
+   .tg — Lane B owns the full F restyle (docs-chrome.jsx). Until it
+   lands, these keep all 64 articles reading in F law. DELETE at
+   Phase 2 if Lane B has replaced them. */
+.dcode.frame { max-width: none; margin-inline: 0; padding-inline: 0;
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; }
+.dcode .fhd { background: var(--deck); border-bottom: 1px solid var(--rule);
+    color: var(--graphite); font-family: var(--mono); }
+.cm { color: var(--graphite); font-style: italic; }
+.pu { color: var(--graphite); }
+.dec { color: var(--green); font-weight: 500; }
+.tg { color: var(--ink); }
+
+/* ── 12 · playground preview scope (Lane E retunes) ──────────────
+   The sandbox's rendered-output pane in F law: quiet ruled lists, a
+   green tag chip only where the loader ran. */
+.preview-scope { color: var(--ink); }
+.preview-scope h1, .preview-scope .preview-h1 { font-family: var(--mono); font-size: 1.7rem; font-weight: 500; letter-spacing: -0.01em; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--ink); }
+.preview-scope h2 { font-family: var(--mono); font-size: 1.2rem; font-weight: 500; }
+.preview-scope h3 { font-family: var(--mono); font-size: 1rem; font-weight: 500; }
+.preview-scope p  { margin-top: 0.6rem; color: var(--graphite); line-height: 1.6; font-size: 0.9rem; }
+.preview-scope a  { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.preview-scope ul { margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.preview-scope li { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.75rem; background: var(--sheet); font-family: var(--mono); font-size: 0.8rem; color: var(--graphite); }
+.preview-scope li + li { border-top: 1px solid var(--rule); }
+.preview-scope li::before { content: ""; width: 5px; height: 5px; border-radius: 6px; background: var(--green); flex: 0 0 auto; }
+.preview-scope .card { margin-top: 1rem; padding: 1rem 1.1rem; border-radius: 6px; border: 1px solid var(--rule); background: var(--sheet); }
+.preview-scope .tag {
+    display: inline-flex; align-items: center; padding: 0.25rem 0.55rem;
+    margin-top: 0.75rem; border-radius: 6px; font-family: var(--mono);
+    font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--green);
+    background: var(--tint); border: 0;
+}
+.preview-scope button {
+    margin-top: 0.9rem; padding: 0.6rem 1.1rem; border-radius: 6px;
+    border: 1px solid var(--rule2); background: var(--sheet);
+    color: var(--ink); font-family: var(--mono); font-weight: 400;
+    font-size: 0.8rem; cursor: pointer;
+    transition: border-color .15s ease;
+}
+.preview-scope button:hover { border-color: var(--graphite); }
+.preview-scope button:disabled { cursor: default; color: var(--graphite); border-color: var(--rule); }
+.preview-scope input {
+    margin-top: 0.9rem; padding: 0.55rem 0.8rem; border-radius: 6px;
+    border: 1px solid var(--rule2); background: var(--sheet);
+    font-family: var(--mono); font-size: 0.8rem; color: var(--ink);
+    width: 100%; max-width: 20rem; outline: none;
+    transition: border-color .15s ease;
+}
+.preview-scope input::placeholder { color: var(--faint); }
+.preview-scope input:focus { border-color: var(--ink); }
+
+/* ── 13 · responsive chrome ──────────────────────────────────────── */
+@media (max-width: 1000px) {
+    .hd nav { gap: 16px; }
+    .hd-row { gap: 16px; }
+}
+@media (max-width: 860px) {
+    .hd nav a.hide-s { display: none; }
+}
+@media (max-width: 768px) {
+    body { font-size: 16px; }
+    .frame { padding-inline: 16px; }
+    .hd-row { gap: 14px; }
+    .hd nav { gap: 14px; }
+    .hd nav a { padding-block: 15px 13px; }
+    .btn-install { padding: 12px 16px; }
+    .chip { padding: 14px; }
+    .nl-row input, .nl-row button { padding: 13px 14px; }
+}
+@media (max-width: 480px) {
+    .hd nav a:not(.hd-gh) { display: none; }
+}
+
+/* ── 14 · MOTION DISCIPLINE — everything dies under reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
-    html.js [data-reveal] .seam-line,
-    html.js [data-reveal].is-visible .seam-line { transform: scaleX(1); transition: none; }
-    html.js [data-reveal] .seam-station,
-    html.js [data-reveal].is-visible .seam-station { opacity: 1; transform: none; transition: none; }
-    html.js [data-reveal] .seam-count,
-    html.js [data-reveal].is-visible .seam-count { opacity: 1; transition: none; }
-}
-
-/* ── mobile (≤900px): four vertical timelines ────────────────────── */
-@media (max-width: 900px) {
-    .seam-row { flex-direction: column; align-items: stretch; gap: 0.9rem; padding: 1.6rem 0; }
-    .seam-head { width: auto; }
-    .seam-track {
-        width: auto; max-width: none;
-        padding: 0 0 0 1.25rem;   /* left rail gutter */
-    }
-    .seam-line {
-        left: 3px; top: 2px;
-        width: 2px; height: 100%;
-        transform-origin: top center;
-    }
-    .seam-row--pyxle .seam-line { width: 2.5px; left: 2.75px; }
-    .seam-stations { flex-direction: column; align-items: stretch; height: auto; gap: 0.85rem; }
-    .seam-station { padding-left: 1rem; }
-    .seam-dot { position: absolute; left: -1.25rem; margin-top: 1px; }
-    .seam-station:first-child .seam-dot { left: -1.25rem; }
-    .seam-label {
-        position: static; transform: none; left: auto; right: auto;
-        font-size: 12px; white-space: normal;
-    }
-    .seam-station:first-child .seam-label,
-    .seam-station:last-child .seam-label { left: auto; right: auto; }
-    .seam-count { padding-left: 1.25rem; margin-top: 0.35rem; }
-    /* vertical growth on mobile */
-    html.js [data-reveal] .seam-line { transform: scaleY(0); }
-    html.js [data-reveal].is-visible .seam-line { transform: scaleY(1); }
-    @media (prefers-reduced-motion: reduce) {
-        html.js [data-reveal] .seam-line,
-        html.js [data-reveal].is-visible .seam-line { transform: scaleY(1); }
-    }
-}
-
-/* ════════════════════════════════════════════════════════════════
-   /compare — the capability matrix.
-   Pyxle's column is tinted and capped in accent so the eye reads it
-   as the only complete column. Marks: full (dot), partial (ring),
-   none (dash). No transforms on table rows; the whole figure reveals
-   as one via .mx-wrap[data-reveal].
-   ════════════════════════════════════════════════════════════════ */
-
-.mx-table { border-collapse: separate; border-spacing: 0; }
-.mx-table th, .mx-table td { padding: 0.95rem 0.6rem; }
-.mx-cap-h, .mx-cap { text-align: left; width: 42%; padding-left: 0; }
-.mx-col-h, .mx-cell { text-align: center; vertical-align: middle; width: 14.5%; }
-.mx-table thead th { vertical-align: bottom; padding-bottom: 1rem; border-bottom: 1px solid var(--c-rule); }
-.mx-table tbody tr { border-top: 1px solid var(--c-rule); }
-.mx-table tbody tr:first-child > * { border-top: 0; }
-.mx-cap { vertical-align: baseline; }
-
-/* the highlighted winning column */
-.mx-col-pyxle { background: color-mix(in srgb, var(--c-accent) 7%, transparent); }
-.mx-table thead th.mx-col-pyxle {
-    border-top: 2px solid var(--c-accent);
-    border-top-left-radius: 7px; border-top-right-radius: 7px;
-}
-.mx-tally .mx-col-pyxle {
-    border-bottom: 2px solid var(--c-accent);
-    border-bottom-left-radius: 7px; border-bottom-right-radius: 7px;
-}
-.mx-tally th, .mx-tally td { padding-top: 1.15rem; border-top: 1px solid var(--c-rule); }
-
-/* marks */
-.mx-mark { display: inline-block; vertical-align: middle; }
-.mx-full { width: 10px; height: 10px; border-radius: 9999px; background: var(--c-ink2); }
-.mx-full.mx-acct {
-    background: var(--c-accent);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-accent) 16%, transparent);
-    width: 11px; height: 11px;
-}
-.mx-part { width: 10px; height: 10px; border-radius: 9999px; border: 1.5px solid var(--c-ink2); background: transparent; }
-.mx-none { width: 12px; height: 2px; border-radius: 2px; background: var(--c-ink2); opacity: 0.38; }
-
-@media (max-width: 640px) {
-    .mx-table th, .mx-table td { padding: 0.8rem 0.4rem; }
-    .mx-cap { width: 38%; }
-    .mx-col-h .font-display { font-size: 0.95rem; }
+    html { scroll-behavior: auto; }
+    .js .b, .js .pane-specimen .row, .js .rv,
+    .js .rulebar .tab, .js .rulebar .folio { opacity: 1 !important; transform: none !important; animation: none !important; transition: none !important; }
+    .js .emph-rule { transform: none !important; animation: none !important; }
+    .js .rulebar .shade { display: none; }
+    .a, .hd nav a, .link, .chip, .tgl { transition: none !important; }
+    .chip-q { animation: none !important; }   /* the quickstart link appears/expires instantly */
 }
