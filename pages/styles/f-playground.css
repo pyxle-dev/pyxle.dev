@@ -1,0 +1,331 @@
+/* ═══ F — THE WORKING COPY · /playground ═════════════════════════════
+   The working copy, powered on: the editor pane IS the specimen
+   (Sheet, the page's one Ink border — the most-important-object law —
+   line numbers, three-ink colour), the result pane beside it, and a
+   quoted sandbox log beneath in the Terminal bed. Section 02 is the
+   real server: a ruled reaction table wired to this page's actual
+   @action, its log printing real HTTP 200s (green job 3).
+
+   House tokens/idioms come from styles/tailwind.css. Log-line column
+   classes (.log-line/.lg-*) are the ones f-kit's <LogLine> emits —
+   mirrored from f-index.css and scoped under .pg-log so the two pages
+   can never restyle each other. Motion here is diegetic only: rows
+   land when real events fire, the result pane flashes when a run
+   actually completes, the LIVE dot breathes only while the sandbox is
+   genuinely rendering. Everything dies under prefers-reduced-motion. */
+
+/* ── section cadence (dense bench → server proof → quiet start) ─── */
+.sec-sandbox { padding-top: 40px; padding-bottom: 88px; }
+.sec-server .rulebar { margin-bottom: 92px; }
+.sec-server { padding-bottom: 96px; }
+.sec-getreal .rulebar { margin-bottom: 64px; }
+.sec-getreal { padding-bottom: 96px; }
+
+/* ── 01 · head ───────────────────────────────────────────────────── */
+.pg-head h1 { max-width: 21ch; }
+.pg-head .receipt { max-width: 72ch; }
+/* the gate: the run facts, one mono strip */
+.pg-gate {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 26px;
+    margin: 26px 0 0;
+    font: 400 12.5px/1.6 var(--mono);
+    color: var(--graphite);
+}
+.pg-gate .k { color: var(--ink); }
+
+/* ── example tabs — the files, filed under a rule ─────────────────
+   The active file wears the header's active-page mark: a 2px ink
+   segment ON the rule (the current file is a fact — never green). */
+.extab-bar {
+    border-top: 1px solid var(--rule2);
+    margin-top: 40px;
+    display: flex;
+    gap: 26px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.extab-bar::-webkit-scrollbar { display: none; }
+.extab {
+    position: relative;
+    background: transparent;
+    border: 0;
+    padding: 9px 10px 12px 0;
+    font: 500 11.5px/16px var(--mono);
+    letter-spacing: 0.02em;       /* filenames print lowercase — files, not running heads */
+    color: var(--graphite);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color .15s ease;
+}
+.extab::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 10px;
+    top: 0;
+    height: 2px;
+    background: var(--ink);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform .22s var(--ease);
+}
+.extab:hover { color: var(--ink); }
+.extab .xn { color: var(--faint); transition: color .15s ease; }
+.extab.on { color: var(--ink); }
+.extab.on .xn { color: var(--ink); }
+.extab.on::before { transform: scaleX(1); }
+.extab-note {
+    margin-left: auto;
+    padding: 9px 0 0 10px;
+    font: 400 11px/16px var(--mono);
+    color: var(--faint);
+    white-space: nowrap;
+}
+
+/* ── the bench: editor 58 / result 42, one pane, Ink border ─────── */
+.pane-bench { margin-top: 18px; border-color: var(--ink); }
+html.dark .pane-bench { border-color: var(--rule2); }
+.pg-bench { display: grid; grid-template-columns: 58fr 42fr; }
+.pg-ed { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--rule); }
+.pg-pv { display: flex; flex-direction: column; min-width: 0; }
+
+.pg-ed-head, .pg-pv-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 36px;
+    flex: none;
+    padding: 0 14px;
+    background: var(--deck);
+    border-bottom: 1px solid var(--rule);
+    font: 400 12.5px/1 var(--mono);
+    color: var(--graphite);
+    min-width: 0;
+}
+.pg-file { color: var(--ink); }
+.pg-ed-note, .pg-pv-note {
+    margin-left: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 11px;
+    color: var(--graphite);
+}
+/* the LIVE dot — green only while the sandbox is genuinely rendering
+   (job 3); grey before; it breathes like a status page's own pulse */
+.pg-dot {
+    width: 6px; height: 6px; flex: none;
+    border-radius: 6px;
+    background: var(--rule2);
+}
+.pg-dot.live { background: var(--green); animation: pgbreathe 2s ease-in-out infinite; }
+@keyframes pgbreathe { 50% { opacity: .45; } }
+.pg-dot.err { background: var(--graphite); }
+
+/* editor interior — gutter + three-ink listing */
+.pg-ed-body { position: relative; min-height: 0; }
+.pg-editor { display: flex; height: 100%; font: 400 13px/1.7 var(--mono); }
+.pg-gutter {
+    flex: none;
+    width: 46px;
+    overflow: hidden;
+    background: var(--sheet);
+    border-right: 1px solid var(--rule);
+    pointer-events: none;
+    user-select: none;
+}
+.pg-gutter-in {
+    padding: 14px 12px 14px 0;
+    text-align: right;
+    white-space: pre;
+    color: var(--faint);
+    will-change: transform;
+}
+.pg-code { position: relative; flex: 1; min-width: 0; }
+.pg-code pre {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    overflow: auto;
+    white-space: pre;
+    padding: 14px 16px;
+    color: var(--ink);
+    scrollbar-width: none;
+}
+.pg-code pre::-webkit-scrollbar { display: none; }
+.pg-code textarea {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 14px 16px;
+    resize: none;
+    overflow: auto;
+    white-space: pre;
+    background: transparent;
+    color: transparent;
+    caret-color: var(--ink);
+    border: 0;
+    outline: none;
+    font: inherit;
+    line-height: inherit;
+}
+.pg-code textarea::selection { background: var(--tint); color: transparent; }
+
+/* preview interior */
+.pg-pv-body { position: relative; overflow: hidden; min-height: 0; background: var(--sheet); }
+.pg-pv-body iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--sheet); }
+/* execution flash — the pane bed washes tint when a run really lands
+   (green job 6), then settles */
+.pg-pv-body.ran { animation: pgran .7s ease-out; }
+@keyframes pgran { 0% { background: var(--tint); } 100% { background: var(--sheet); } }
+.pg-boot {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px 28px;
+}
+.pg-boot p { margin: 0; font: 400 12.5px/1.7 var(--mono); color: var(--graphite); max-width: 40ch; }
+.pg-boot .dim { color: var(--faint); }
+.pg-boot-dot { width: 7px; height: 7px; border-radius: 6px; background: var(--graphite); }
+.pg-boot-dot.pulse { animation: pgbreathe 1.2s ease-in-out infinite; }
+.pg-default { position: absolute; inset: 0; overflow: auto; padding: 24px 28px; }
+
+/* ── the sandbox log — quoted Terminal bed (mirrors f-index idiom) ── */
+.pane.pane-log, .pane .pane-log { background: var(--term); border-color: var(--term); }
+.pane.pane-log { margin-top: 22px; }
+html.dark .pane.pane-log, html.dark .pane .pane-log { border-color: var(--rule2); }  /* the quote reads by apparatus, not luminance */
+.log-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font: 500 10px/1 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--term-dim);
+    padding: 10px 14px 0;
+}
+.log-up { letter-spacing: 0.04em; font-weight: 400; font-variant-numeric: tabular-nums; }
+.log-body { padding: 8px 14px 12px; min-height: 92px; }
+.pg-log .log-line {
+    display: flex;
+    gap: 0;
+    font: 400 12.5px/1.9 var(--mono);
+    color: var(--term-text);
+    white-space: nowrap;
+    margin: 0;
+}
+.pg-log .lg-m { width: 52px; flex: none; color: var(--term-dim); }
+.pg-log .lg-p { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pg-log .lg-s { width: 46px; flex: none; text-align: right; color: var(--term-green); }  /* ok/200 — green job 3 */
+.pg-log .lg-s.lg-4xx { color: var(--term-dim); }   /* an error never ran — no green */
+.pg-log .lg-ms { width: 72px; flex: none; text-align: right; color: var(--term-text); }
+.pg-log .lg-c { margin-left: 14px; flex: 1 1 0; min-width: 0; color: var(--term-dim); overflow: hidden; text-overflow: ellipsis; }
+.pg-log .log-line.fresh-log { animation: freshlog 1s ease-out; }
+@keyframes freshlog { 0% { color: #fff; transform: translateY(2px); opacity: 0; } 20% { opacity: 1; transform: none; } }
+.pg-log .log-idle { font: 400 12.5px/1.9 var(--mono); color: var(--term-dim); margin: 0; }
+
+/* the isolation receipt under the bench */
+.pg-iso { margin: 14px 0 0; font: 400 12.5px/1.6 var(--mono); color: var(--graphite); }
+
+/* ── 02 · the real server ────────────────────────────────────────── */
+.srv-grid { display: grid; grid-template-columns: 42fr 58fr; gap: 24px; align-items: start; }
+.srv-col { min-width: 0; }
+
+/* the reaction board — a ruled table of six cells (shared hairlines) */
+.rx-grid { display: grid; grid-template-columns: repeat(3, 1fr); }
+.rx {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 14px 14px 12px;
+    background: var(--sheet);
+    border: 0;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--mono);
+    cursor: pointer;
+    text-align: left;
+    transition: background-color .15s ease;
+}
+.rx:nth-child(3n) { border-right: 0; }
+.rx:nth-child(n+4) { border-bottom: 0; }
+.rx:hover { background: var(--deck); }
+.rx:active { background: var(--deck2); }
+/* a real 200 landed — the cell washes tint once (green job 6) */
+.rx.hit { animation: rxhit .8s ease-out; }
+@keyframes rxhit { 0% { background: var(--tint); } 100% { background: var(--sheet); } }
+.rx .ic { font-size: 19px; line-height: 1; user-select: none; }
+.rx .lb { font-size: 11px; color: var(--graphite); }
+.rx .ct { font-size: 15px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.rx .lat {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    font-size: 10.5px;
+    color: var(--graphite);
+    font-variant-numeric: tabular-nums;
+}
+.srv-log { margin-top: 0; border-radius: 0 0 6px 6px; border: 0; border-top: 1px solid var(--rule); }
+.pane-board { display: flex; flex-direction: column; }
+.pane-board .pane-head b { color: var(--ink); font-weight: 500; }
+.pane-board .srv-log { margin-top: auto; }
+.srv-log .log-body { min-height: 116px; }
+
+/* the handler, printed */
+.pane-handler .code {
+    margin: 0;
+    overflow-x: auto;
+    padding: 16px 18px;
+    font: 400 12px/1.75 var(--mono);
+    color: var(--ink);
+}
+
+/* ── 03 · run it for real ────────────────────────────────────────── */
+.start-row { display: grid; grid-template-columns: minmax(0, 440px) 1fr; gap: 48px; align-items: start; }
+.start-steps { display: flex; flex-direction: column; gap: 10px; }
+.start-exits {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px 22px;
+    font: 500 15px/1.4 var(--sans);
+}
+.start-facts { margin: 18px 0 0; font: 400 12.5px/1.6 var(--mono); color: var(--graphite); }
+
+/* ── responsive ──────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .pg-bench { grid-template-columns: 1fr; }
+    .pg-ed { border-right: 0; border-bottom: 1px solid var(--rule); }
+    .srv-grid { grid-template-columns: 1fr; }
+    .start-row { grid-template-columns: 1fr; gap: 28px; }
+}
+@media (max-width: 768px) {
+    .sec-sandbox { padding-top: 28px; padding-bottom: 64px; }
+    .sec-server .rulebar { margin-bottom: 72px; }
+    .sec-server { padding-bottom: 72px; }
+    .sec-getreal .rulebar { margin-bottom: 56px; }
+    .pg-gate { gap: 4px 18px; }
+    .pg-ed-note { display: none; }
+    .pg-log .log-body { min-height: 72px; }
+    .pg-log .lg-ms { width: 58px; }
+    .pg-log .lg-c { display: none; }
+}
+
+/* ── motion discipline — this page's own kills ───────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .pg-dot.live, .pg-boot-dot.pulse { animation: none; }
+    .pg-pv-body.ran, .rx.hit, .pg-log .log-line.fresh-log { animation: none; }
+    .extab { transition: none; }
+}
