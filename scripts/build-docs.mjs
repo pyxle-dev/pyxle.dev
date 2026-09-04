@@ -238,6 +238,7 @@ const SITE_PAGES = [
   { path: "/docs", priority: "0.9" },
   { path: "/compare", priority: "0.9" },
   { path: "/playground", priority: "0.8" },
+  { path: "/demos", priority: "0.8" },
   { path: "/plugins", priority: "0.8" },
   { path: "/roadmap", priority: "0.8" },
   { path: "/benchmarks", priority: "0.7" },
@@ -832,6 +833,7 @@ function build() {
     `- [Plugin directory](${SITE_URL}/plugins.md): official and community plugins`,
     `- [Benchmarks & methodology](${SITE_URL}/benchmarks.md): reproducible performance numbers`,
     `- [Interactive playground](${SITE_URL}/playground.md): run Pyxle in the browser`,
+    `- [Live demos](${SITE_URL}/demos.md): six real Pyxle apps, running now`,
     ``
   );
   writeFileSync(join(PUBLIC_DIR, "llms.txt"), llms.join("\n"));

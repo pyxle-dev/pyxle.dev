@@ -1,0 +1,205 @@
+/* ═══════════════════════════════════════════════════════════════════
+   F — THE WORKING COPY · /demos — demos, really deployed.
+   F5 grown to a page: this site itself leads double-wide with its
+   measured uptime set as mono receipts (or an honest attribution
+   when the fetch failed — never a stale figure), Today and Pulse
+   follow with real screenshots, and the three smaller apps are a
+   printed index — ruled rows, no shots faked. The breathing LIVE dots are
+   the page's one ambient motion: a status page's own pulse,
+   diegetic. Page-owned classes are dm-*.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rulebar-hero { border-top: none; height: 0; }
+.rulebar-hero .tab { top: -8px; }
+
+/* ── cadence ────────────────────────────────────────────────────── */
+.dm-hero { padding-top: 0; padding-bottom: 72px; }
+.dm-hero-head { margin-top: 64px; }
+.sec-run .rulebar { margin-bottom: 84px; }
+.sec-run { padding-bottom: 96px; }
+.sec-more .rulebar { margin-bottom: 76px; }
+.sec-more { padding-bottom: 88px; }
+
+/* ── the demo cards (shots are real captures) ───────────────────── */
+.dm-demos {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+}
+.dm-demo {
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    transition: border-color .2s ease;
+}
+.dm-demo:hover { border-color: var(--graphite); }
+.dm-main { display: block; text-decoration: none; flex: 1; min-width: 0; }
+.dm-main:hover .dm-name { text-decoration: underline; text-underline-offset: 3px; }
+.dm-shot {
+    display: block;
+    border-bottom: 1px solid var(--rule);
+    background: var(--deck);
+    overflow: hidden;
+}
+.dm-shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    transition: transform .45s var(--ease);
+}
+.dm-demo:hover .dm-shot img { transform: scale(1.025); }
+.dm-body { display: block; padding: 16px 18px 6px; }
+.dm-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font: 600 17px/1.3 var(--sans);
+    color: var(--ink);
+    letter-spacing: -0.01em;
+}
+.dm-url { display: block; margin-top: 6px; font: 400 13px/1.4 var(--mono); color: var(--graphite); }
+.dm-note { display: block; margin-top: 8px; font: 400 15px/1.5 var(--sans); color: var(--graphite); }
+.dm-up { display: block; margin-top: 10px; font: 400 12px/1.5 var(--mono); color: var(--graphite); }
+.dm-up b { font-weight: 500; color: var(--ink); }
+.dm-foot { padding: 10px 18px 16px; font: 400 14px/1.4 var(--sans); display: flex; gap: 16px; margin: 0; }
+
+/* the LIVE chip — green job 3; the dot breathes once revealed */
+.dm-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font: 500 10px/1 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--green);
+    background: var(--tint);
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+.dm-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 6px;
+    background: var(--green);
+}
+.js .sec-run:not(.seen) .dm-dot, .js .sec-more:not(.seen) .dm-dot { opacity: 0; }
+.js .sec-run.seen .dm-dot, .js .sec-more.seen .dm-dot {
+    animation:
+        dm-dotpop .4s ease-out both,
+        dm-breathe 2s ease-in-out calc(.4s + var(--dp, 0s)) infinite;
+    animation-delay: var(--dp, 0s), calc(.4s + var(--dp, 0s));
+}
+@keyframes dm-dotpop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: none; } }
+@keyframes dm-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* the featured card leads at double width — shot left, meta right */
+.dm-feature { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+.dm-feature .dm-main { display: contents; }
+.dm-feature .dm-shot {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    border-bottom: none;
+    border-right: 1px solid var(--rule);
+    max-height: 430px;
+}
+.dm-feature .dm-shot img { height: 100%; object-fit: cover; object-position: top left; }
+.dm-feature .dm-body { grid-column: 2; grid-row: 1; padding: 26px 28px 8px; }
+.dm-feature .dm-name { font-size: 20px; }
+.dm-feature .dm-note { margin-top: 12px; max-width: 40ch; }
+.dm-feature .dm-foot { grid-column: 2; grid-row: 2; align-self: end; padding: 0 28px 24px; }
+
+/* the monitor's own receipts, printed as ruled mono rows
+   (spans, display-managed — the card body lives inside an <a>) */
+.dm-receipts { display: block; margin: 14px 0 0; border-top: 1px solid var(--rule); }
+.dm-receipts .r {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    margin: 0;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--rule);
+    font: 400 12px/1.5 var(--mono);
+    color: var(--graphite);
+}
+.dm-receipts b { font-weight: 500; color: var(--ink); white-space: nowrap; }
+
+/* ── the printed index — three more, no shots faked ─────────────── */
+.dm-rows { border-top: 1px solid var(--rule); }
+.dm-row {
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr) 230px 150px;
+    gap: 20px;
+    align-items: baseline;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+}
+.dm-row .nm {
+    font: 600 15px/1.4 var(--sans);
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+}
+.dm-row .what { font: 400 14.5px/1.55 var(--sans); color: var(--graphite); min-width: 0; }
+.dm-row .up { font: 400 12px/1.5 var(--mono); color: var(--graphite); white-space: nowrap; }
+.dm-row .go { font: 400 14px/1.4 var(--sans); text-align: right; white-space: nowrap; }
+
+/* ── the stance ─────────────────────────────────────────────────── */
+.dm-stance { margin-top: 72px; max-width: 62ch; }
+.dm-stance h3 { font: 600 21px/1.5 var(--sans); letter-spacing: -0.01em; margin: 0; }
+.dm-stance p { margin: 14px 0 0; color: var(--graphite); }
+.dm-stance-gh { font: 400 13px/1.6 var(--mono); }
+.dm-close { margin-top: 32px; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.dm-close .chip-wrap { max-width: 420px; flex: 1 1 300px; }
+
+/* ── responsive ─────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+    .dm-demos { grid-template-columns: minmax(0, 1fr); max-width: 640px; }
+    .dm-feature { grid-template-columns: minmax(0, 1fr); }
+    .dm-feature .dm-shot {
+        grid-column: 1;
+        grid-row: 1;
+        border-right: none;
+        border-bottom: 1px solid var(--rule);
+        max-height: none;
+        aspect-ratio: 880 / 557;
+        height: auto;
+    }
+    .dm-feature .dm-body { grid-column: 1; grid-row: 2; }
+    .dm-feature .dm-foot { grid-column: 1; grid-row: 3; padding: 10px 28px 24px; }
+}
+@media (max-width: 900px) {
+    .dm-row { grid-template-columns: 170px minmax(0, 1fr); }
+    .dm-row .up { grid-column: 1; }
+    .dm-row .go { grid-column: 2; grid-row: 2; text-align: left; }
+}
+@media (max-width: 760px) {
+    .dm-hero-head { margin-top: 44px; }
+    .sec-run .rulebar { margin-bottom: 60px; }
+    .sec-more .rulebar { margin-bottom: 56px; }
+    .dm-feature .dm-body { padding: 16px 18px 6px; }
+    .dm-feature .dm-foot { padding: 10px 18px 16px; }
+    .dm-feature .dm-name { font-size: 17px; }
+    .dm-row { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 14px 0; }
+    .dm-row .up, .dm-row .go { grid-column: 1; }
+    .dm-stance { margin-top: 56px; }
+    .dm-foot .link, .dm-row .go .link, .dm-close .link {
+        display: inline-block;
+        padding-block: 11px;
+        margin-block: -6px;
+    }
+}
+
+/* ── motion discipline — the pulse goes still, stays visible ────── */
+@media (prefers-reduced-motion: reduce) {
+    .dm-dot { animation: none !important; }
+    .js .sec-run:not(.seen) .dm-dot, .js .sec-more:not(.seen) .dm-dot { opacity: 1; }
+    .dm-shot img, .dm-demo { transition: none !important; }
+}

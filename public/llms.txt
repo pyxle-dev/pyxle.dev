@@ -102,3 +102,4 @@
 - [Plugin directory](https://pyxle.dev/plugins.md): official and community plugins
 - [Benchmarks & methodology](https://pyxle.dev/benchmarks.md): reproducible performance numbers
 - [Interactive playground](https://pyxle.dev/playground.md): run Pyxle in the browser
+- [Live demos](https://pyxle.dev/demos.md): six real Pyxle apps, running now

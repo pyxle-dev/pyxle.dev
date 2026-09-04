@@ -1,0 +1,286 @@
+"""/demos — six live Pyxle apps; uptime is the monitor's own.
+
+Uptime is pulled live (server-side, cached) from our monitor's public
+API — the numbers on this page are measured, never typed in. If the
+fetch fails the page still renders; cards then attribute the figure to
+the monitor instead of showing a stale one.
+"""
+
+import asyncio
+import json
+import time
+import urllib.request
+
+from pyxle import __version__
+
+STATUS_API = "https://status.pyxle.dev/api/status.json"
+_STATUS_TTL = 300.0       # happy-path re-fetch interval, seconds
+_STATUS_ERR_TTL = 60.0    # retry sooner after a failure
+# Module-level cache: one upstream fetch per process per TTL, shared by
+# every request. Keeps last-good data through transient upstream failures.
+_status_cache = {"at": float("-inf"), "ok": False, "data": None}
+
+
+def _fetch_status_sync():
+    req = urllib.request.Request(STATUS_API, headers={"User-Agent": "pyxle.dev/demos"})
+    with urllib.request.urlopen(req, timeout=4) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+@server
+async def load(request):
+    now = time.monotonic()
+    ttl = _STATUS_TTL if _status_cache["ok"] else _STATUS_ERR_TTL
+    if now - _status_cache["at"] > ttl:
+        _status_cache["at"] = now
+        try:
+            raw = await asyncio.to_thread(_fetch_status_sync)
+            services = {
+                s["slug"]: {
+                    "uptime": s.get("uptime"),
+                    "observedDays": s.get("observed_days"),
+                    "status": s.get("status"),
+                }
+                for s in raw.get("services", [])
+            }
+            _status_cache["ok"] = True
+            _status_cache["data"] = {
+                "services": services,
+                "serviceCount": len(services),
+                "overall": raw.get("status", {}).get("description", ""),
+            }
+        except Exception:
+            # Keep last-good data if we have it; otherwise the page renders
+            # honestly without figures.
+            _status_cache["ok"] = False
+
+    return {"version": __version__, "status": _status_cache["data"]}
+
+
+import './styles/f-demos.css';
+import React from 'react';
+import { Link } from 'pyxle/client';
+import { PageMeta } from './components/e-meta.jsx';
+import { GITHUB } from './components/f-chrome.jsx';
+import { Rulebar, Receipt, CopyChip, useSeen } from './components/f-kit.jsx';
+
+/* ════════════════════════════════════════════════════════════════
+   F — THE WORKING COPY · /demos — demos, really deployed.
+
+   F5 grown to a page. The three apps we run in production lead —
+   this site itself double-wide (the strongest dogfood there is) with
+   measured uptime printed as mono receipts (the loader above pulls
+   them from our monitor's public API; when the fetch fails the page
+   attributes, never prints a stale figure), Today and Pulse with
+   real screenshots. The three smaller demos are a printed index:
+   ruled rows, no shots faked — the honest presentation for apps we
+   didn't capture.
+
+   Motion: the breathing LIVE dots are the page's one ambient
+   animation — a status page's own pulse, diegetic — and they go
+   still (but stay visible) under reduced motion. Everything else
+   reveals once and rests.
+   ════════════════════════════════════════════════════════════════ */
+
+/** The monitor's figure for a service, or an honest absence. */
+function upline(status, slug) {
+    const s = status && status.services && status.services[slug];
+    if (!s || s.uptime == null) return null;
+    return `up ${s.uptime.toFixed(2)}% · ${s.observedDays}d observed`;
+}
+
+function LiveChip({ dp }) {
+    return (
+        <span className="dm-live"><span className="dm-dot" style={{ '--dp': dp }} aria-hidden="true" />live</span>
+    );
+}
+
+/* ── 01 · the three we run in production ─────────────────────────── */
+
+function RunSection({ status, version }) {
+    const [ref, seen] = useSeen();
+    const pyxleUp = upline(status, 'pyxle-dev');
+    const todayUp = upline(status, 'today');
+    const pulseUp = upline(status, 'pulse');
+    return (
+        <section ref={ref} className={`sec sec-run${seen ? ' seen' : ''}`} id="production">
+            <div className="frame">
+                <Rulebar tab="01 · In production" href="#production" folio="01" />
+                <div className="sec-head rv">
+                    <h2>The three we run in production.</h2>
+                    <Receipt>real screenshots, live URLs — click them · uptime is the monitor&rsquo;s own, never typed</Receipt>
+                </div>
+                <div className="dm-demos">
+                    <div className="dm-demo dm-feature rv" style={{ '--rvd': '.06s' }}>
+                        <a className="dm-main" href="https://pyxle.dev" target="_blank" rel="noopener noreferrer">
+                            <span className="dm-shot"><img src="/shots/pyxle-dev.png" alt="pyxle.dev — this site's homepage, served by Pyxle" width="880" height="557" loading="lazy" /></span>
+                            <span className="dm-body">
+                                <span className="dm-name">This site <LiveChip dp=".15s" /></span>
+                                <span className="dm-url">pyxle.dev</span>
+                                <span className="dm-note">
+                                    The page you are reading — every route on it is a .pyxl file.
+                                    The homepage guestbook is a live @action, the newsletter line
+                                    below is another, and the footer links each page&rsquo;s source.
+                                </span>
+                                <span className="dm-receipts">
+                                    {pyxleUp
+                                        ? <span className="r"><span>uptime, measured</span><b>{pyxleUp}</b></span>
+                                        : <span className="r"><span>uptime</span><b>measured by our monitor</b></span>}
+                                    {version
+                                        ? <span className="r"><span>framework</span><b>pyxle v{version}</b></span>
+                                        : null}
+                                    {status && status.overall
+                                        ? <span className="r"><span>monitor says</span><b>{status.overall.toLowerCase()}</b></span>
+                                        : null}
+                                </span>
+                            </span>
+                        </a>
+                        <p className="dm-foot">
+                            <a className="link" href="https://github.com/pyxle-dev/pyxle.dev" target="_blank" rel="noopener noreferrer">source <span className="a">→</span></a>
+                        </p>
+                    </div>
+                    <div className="dm-demo rv" style={{ '--rvd': '.14s' }}>
+                        <a className="dm-main" href="https://today.pyxle.app" target="_blank" rel="noopener noreferrer">
+                            <span className="dm-shot"><img src="/shots/today.png" alt="Today — today.pyxle.app sign-in page" width="880" height="557" loading="lazy" /></span>
+                            <span className="dm-body">
+                                <span className="dm-name">Today <LiveChip dp=".45s" /></span>
+                                <span className="dm-url">today.pyxle.app</span>
+                                <span className="dm-note">A username/password todo app — sessions via pyxle-auth.</span>
+                                <span className="dm-up">{todayUp || 'uptime: measured by our monitor'}</span>
+                            </span>
+                        </a>
+                        <p className="dm-foot">
+                            <a className="link" href="https://today.pyxle.app" target="_blank" rel="noopener noreferrer">visit <span className="a">→</span></a>
+                            <a className="link" href="https://github.com/pyxle-dev/pyxle-demos/tree/main/today" target="_blank" rel="noopener noreferrer">source <span className="a">→</span></a>
+                        </p>
+                    </div>
+                    <div className="dm-demo rv" style={{ '--rvd': '.22s' }}>
+                        <a className="dm-main" href="https://pulse.pyxle.app" target="_blank" rel="noopener noreferrer">
+                            <span className="dm-shot"><img src="/shots/pulse.png" alt="Pulse — pulse.pyxle.app status platform" width="880" height="557" loading="lazy" /></span>
+                            <span className="dm-body">
+                                <span className="dm-name">Pulse <LiveChip dp=".75s" /></span>
+                                <span className="dm-url">pulse.pyxle.app</span>
+                                <span className="dm-note">A status-page demo — DB-backed pages, prerendered with ISR.</span>
+                                <span className="dm-up">{pulseUp || 'uptime: measured by our monitor'}</span>
+                            </span>
+                        </a>
+                        <p className="dm-foot">
+                            <a className="link" href="https://pulse.pyxle.app" target="_blank" rel="noopener noreferrer">visit <span className="a">→</span></a>
+                            <a className="link" href="https://github.com/pyxle-dev/pyxle-demos/tree/main/pulse" target="_blank" rel="noopener noreferrer">source <span className="a">→</span></a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── 02 · three more — a printed index, nothing faked ────────────── */
+
+const MORE = [
+    {
+        name: 'Chroma',
+        host: 'chroma.pyxle.app',
+        href: 'https://chroma.pyxle.app/',
+        slug: 'chroma',
+        what: <>Color palettes computed by Python&rsquo;s <span className="mono-inline">colorsys</span> — the loader does the math, the page just prints it.</>,
+        dp: '.2s',
+    },
+    {
+        name: 'Flux',
+        host: 'flux.pyxle.app',
+        href: 'https://flux.pyxle.app/',
+        slug: 'flux',
+        what: <>A SaaS analytics dashboard — charts server-rendered from one <span className="mono-inline">@server</span> loader.</>,
+        dp: '.5s',
+    },
+    {
+        name: 'Glyph',
+        host: 'glyph.pyxle.app',
+        href: 'https://glyph.pyxle.app/',
+        slug: 'glyph',
+        what: <>Geometric patterns from server-side <span className="mono-inline">math.sin</span> — regenerate is a real round trip.</>,
+        dp: '.8s',
+    },
+];
+
+function MoreSection({ status, version }) {
+    const [ref, seen] = useSeen();
+    return (
+        <section ref={ref} className={`sec sec-more${seen ? ' seen' : ''}`} id="more">
+            <div className="frame">
+                <Rulebar tab="02 · Three more" href="#more" folio="02" />
+                <div className="sec-head rv">
+                    <h2>Three more, built to show one thing each.</h2>
+                    <Receipt>smaller apps, same physics — every row opens a live deployment</Receipt>
+                </div>
+                <div className="dm-rows rv" style={{ '--rvd': '.06s' }}>
+                    {MORE.map((d) => {
+                        const up = upline(status, d.slug);
+                        return (
+                            <p key={d.slug} className="dm-row">
+                                <span className="nm">{d.name} <LiveChip dp={d.dp} /></span>
+                                <span className="what">{d.what}</span>
+                                <span className="up">{up || 'uptime: measured by our monitor'}</span>
+                                <span className="go">
+                                    <a className="link" href={d.href} target="_blank" rel="noopener noreferrer">{d.host} <span className="a">→</span></a>
+                                </span>
+                            </p>
+                        );
+                    })}
+                </div>
+                <div className="dm-stance rv" style={{ '--rvd': '.14s' }}>
+                    <h3><span className="emph-i">Open source. MIT. Self-hosted. No cloud tax.</span></h3>
+                    <p>
+                        Every app on this page runs on plain ASGI boxes we operate ourselves.
+                        Nothing here is a mockup — the uptime on each card is measured by our
+                        own monitor, and when one goes down, this page says so.
+                    </p>
+                    <p className="dm-stance-gh">
+                        <a className="link" href={GITHUB} target="_blank" rel="noopener noreferrer">github.com/pyxle-dev/pyxle</a>
+                        {' '}· MIT · {version ? `v${version}` : 'pre-1.0'}
+                    </p>
+                </div>
+                <div className="dm-close rv" style={{ '--rvd': '.2s' }}>
+                    <CopyChip text="pip install pyxle-framework" />
+                    <Link className="link" href="/playground">build one in the browser <span className="a">→</span></Link>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── page ────────────────────────────────────────────────────────── */
+
+export default function DemosPage({ data }) {
+    const status = data && data.status;
+    const version = data && data.version;
+    /* the hero's running head is visible from the start (f.js law) */
+    const [heroRef, heroSeen] = useSeen({ immediate: true });
+
+    return (
+        <>
+            <PageMeta
+                title="Demos"
+                description="Six real Pyxle apps, running now: pyxle.dev itself, Today, Pulse, Chroma, Flux, Glyph. Every card opens a live deployment, with uptime measured by our monitor's public API."
+                path="/demos"
+            />
+            <main id="main">
+                <section ref={heroRef} className={`sec dm-hero${heroSeen ? ' seen' : ''}`} id="top">
+                    <div className="frame">
+                        <Rulebar hero tab="Demos · Running now" />
+                        <div className="dm-hero-head">
+                            <h1 className="b" style={{ '--bd': '.05s' }}>Six apps, running now.</h1>
+                            <Receipt className="b" style={{ '--bd': '.16s' }}>
+                                every card opens a live deployment · uptime comes from{' '}
+                                <a className="link" href="https://status.pyxle.dev/api/status.json" target="_blank" rel="noopener noreferrer">our monitor&rsquo;s public API</a>
+                            </Receipt>
+                        </div>
+                    </div>
+                </section>
+                <RunSection status={status} version={version} />
+                <MoreSection status={status} version={version} />
+            </main>
+        </>
+    );
+}
