@@ -281,6 +281,101 @@ async def increment_playground_views() -> int:
     return int(row["value"]) if row else 0
 
 
+# ── Guestbook (homepage hero) ─────────────────────────────────
+#
+# The homepage's printed specimen — pages/guestbook.pyxl — calls
+# ``db.recent(10)`` and ``db.add(name, note)``. These functions ARE that
+# API: the printed file compiles against this module, and the site's own
+# ``@action sign`` calls the same code with a ``visitor`` id added (the
+# production adaptation, disclosed on the page). Honesty scheme:
+#
+#   · SEED_ENTRIES are authored, live in code, and render for everyone —
+#     the SSR of ``/`` shows only these, so the loader stays
+#     visitor-independent and the 60s edge cache can never leak a row.
+#   · Real rows are keyed by a random per-browser visitor id (cookie
+#     ``pyxle_gb``); ``recent(visitor=…)`` returns seeds + THAT visitor's
+#     rows only. Zero public UGC; unguessable 128-bit ids.
+#   · ``add`` prunes each visitor to their newest 7 rows and sweeps rows
+#     older than 90 days opportunistically.
+
+SEED_ENTRIES = (
+    {"id": "s1", "name": "mira", "note": "says hi from a FastAPI shop"},
+    {"id": "s2", "name": "deno_fan", "note": "fine, this is neat"},
+    {"id": "s3", "name": "sam", "note": "shipped before my coffee cooled"},
+)
+
+_GUESTBOOK_KEEP_PER_VISITOR = 7
+_GUESTBOOK_SWEEP_DAYS = 90
+
+
+async def recent(limit: int = 10, visitor: str | None = None) -> list[dict]:
+    """The guestbook's entries, newest first: the visitor's own rows (if a
+    visitor id is given), then the authored seeds, capped at *limit*.
+
+    With no ``visitor`` — exactly the call the printed homepage specimen
+    makes — only the seeds return, which is precisely what the homepage's
+    server render shows everyone."""
+    entries: list[dict] = []
+    if visitor:
+        db = get_database()
+        rows = await db.fetchall(
+            "SELECT id, name, note FROM guestbook_entries "
+            "WHERE visitor = ? ORDER BY id DESC LIMIT ?",
+            (visitor, int(limit)),
+        )
+        entries = [
+            {"id": row["id"], "name": row["name"], "note": row["note"], "you": True}
+            for row in rows
+        ]
+    entries.extend(dict(seed) for seed in SEED_ENTRIES)
+    return entries[: int(limit)]
+
+
+async def add(name: str, note: str, visitor: str | None = None) -> None:
+    """Insert a guestbook entry; prune the visitor to their newest
+    :data:`_GUESTBOOK_KEEP_PER_VISITOR` rows; sweep entries older than
+    :data:`_GUESTBOOK_SWEEP_DAYS` days (opportunistic — no cron needed)."""
+    if not visitor:
+        return  # rows without an owner would be unreadable — never write them
+    db = get_database()
+    now = datetime.now(tz=timezone.utc)
+    cutoff = now - timedelta(days=_GUESTBOOK_SWEEP_DAYS)
+    async with db.transaction() as tx:
+        await tx.execute("DELETE FROM guestbook_entries WHERE created_at < ?", (cutoff,))
+        await tx.execute(
+            "INSERT INTO guestbook_entries (visitor, name, note, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (visitor, name, note, now),
+        )
+        await tx.execute(
+            "DELETE FROM guestbook_entries WHERE visitor = ? AND id NOT IN ("
+            "SELECT id FROM guestbook_entries WHERE visitor = ? "
+            "ORDER BY id DESC LIMIT ?)",
+            (visitor, visitor, _GUESTBOOK_KEEP_PER_VISITOR),
+        )
+
+
+async def clear_visitor(visitor: str) -> int:
+    """Delete every guestbook row the visitor owns — their data, their
+    eraser. Seeds live in code, so the pane falls back to the authored
+    three. Returns the number of rows removed so the caller can report
+    honestly."""
+    if not visitor:
+        return 0
+    db = get_database()
+    rows = await db.fetchall(
+        "SELECT COUNT(*) AS n FROM guestbook_entries WHERE visitor = ?",
+        (visitor,),
+    )
+    count = int(rows[0]["n"]) if rows else 0
+    if count:
+        async with db.transaction() as tx:
+            await tx.execute(
+                "DELETE FROM guestbook_entries WHERE visitor = ?", (visitor,)
+            )
+    return count
+
+
 # ── Rate limiting ─────────────────────────────────────────────
 
 

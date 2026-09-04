@@ -1,13 +1,205 @@
+import json as _json
 import re as _re
+import time as _time
+from pathlib import Path as _Path
+
+from pydantic import BaseModel, Field, field_validator
 from pyxle import __version__
 from pyxle.runtime import ActionError
 
 _EMAIL_RE = _re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
+# The moment this server process imported the page — the request-log
+# pane's `up hh:mm:ss` counts from here (real process uptime, ticking
+# client-side from the loader's value). Honest by construction: it is
+# exactly what a dev server's own log header would show.
+_T0 = _time.time()
+
+# The header's live GitHub star count — the one social-proof datum this
+# audience trusts, fetched the way a Pyxle app fetches things: cached at
+# module scope, refreshed through ``pyxle.tasks.enqueue`` (the framework's
+# in-process queue — ``request.state.background`` exists only in actions,
+# and the refresh must NEVER be awaited in the request path, so loader
+# TTFB is unaffected), errors swallowed so a GitHub outage costs the site
+# nothing but the number. The repo is the f-chrome GITHUB constant's,
+# kept in lockstep by hand.
+_STARS = {"n": None, "at": 0.0, "inflight": False}
+_STARS_TTL = 3600.0
+
+
+async def _fetch_stars() -> None:
+    import logging
+    import time
+
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=4.0) as client:
+            resp = await client.get(
+                "https://api.github.com/repos/pyxle-dev/pyxle",
+                headers={"Accept": "application/vnd.github+json"},
+            )
+        if resp.status_code == 200:
+            n = resp.json().get("stargazers_count")
+            if isinstance(n, int):
+                _STARS["n"] = n
+                _STARS["at"] = time.monotonic()
+    except Exception:  # noqa: BLE001 - the count is decoration, never load-bearing
+        logging.getLogger("pyxle_dev").debug("star count refresh failed", exc_info=True)
+    finally:
+        _STARS["inflight"] = False
+
+
+# The docs-page count for F3's receipt and F4's tile — computed from the
+# generated docs manifest, never typed (honest-numbers law). Cached for
+# the process lifetime, same trade the docs surface makes.
+_DOCS_COUNT = {"n": None, "tried": False}
+
+
+def _docs_page_count():
+    if not _DOCS_COUNT["tried"]:
+        _DOCS_COUNT["tried"] = True
+        try:
+            manifest = _json.loads(
+                (_Path("public") / "docs-data" / "manifest.json").read_text()
+            )
+            pages = manifest.get("pages")
+            if isinstance(pages, (list, dict)) and pages:
+                _DOCS_COUNT["n"] = len(pages)
+        except Exception:  # noqa: BLE001 - absent manifest → the count is absent, never faked
+            _DOCS_COUNT["n"] = None
+    return _DOCS_COUNT["n"]
+
 
 @server
 async def load_home(request):
-    return {"version": __version__}
+    """Everything the working copy prints, measured rather than typed.
+
+    Self-timed with ``perf_counter`` — the request-log pane's LOAD line
+    shows THIS number, so the loader's printed cost is its real cost.
+    SSR-rendered and identical on the first client render (the client
+    reads the same loader payload), so the measurement costs zero
+    hydration surface. Returns only visitor-independent data: the route
+    keeps its 60s edge cache and can never leak a guestbook row.
+    """
+    import time
+
+    t0 = time.perf_counter()
+
+    from db import recent
+
+    # Stale-while-revalidate for the star count: serve whatever we have,
+    # schedule ONE refresh in the background when it has aged out. The
+    # single-threaded event loop makes the check-then-set stampede-safe.
+    if (_STARS["n"] is None or time.monotonic() - _STARS["at"] > _STARS_TTL) and not _STARS["inflight"]:
+        try:
+            from pyxle.tasks import enqueue
+
+            _STARS["inflight"] = True
+            enqueue(_fetch_stars)
+        except Exception:  # noqa: BLE001 - queue absent/full: retry on a later request
+            _STARS["inflight"] = False
+
+    entries = await recent(10)  # no visitor → authored seeds only (cache-safe)
+    docs_count = _docs_page_count()
+    uptime_s = int(time.time() - _T0)
+    load_ms = round((time.perf_counter() - t0) * 1000, 2)
+    return {
+        "version": __version__,
+        "stars": _STARS["n"],
+        "entries": entries,
+        "docsCount": docs_count,
+        "uptimeS": uptime_s,
+        "loadMs": load_ms,
+    }
+
+
+# ── the guestbook — "your localhost, simulated honestly" ─────────────
+#
+# The hero's result pane depicts what YOU would see running the printed
+# guestbook.pyxl on your own machine — where you'd have your own
+# database. So production gives every visitor their own private
+# guestbook: real server execution, real Pydantic validation, real
+# storage (migrations/0004-guestbook.sql), zero public UGC. Rows are
+# keyed by the random `pyxle_gb` cookie the client sets before any
+# submit; a 128-bit id is unguessable, so no visitor can read another's
+# rows. The caption under the pane states exactly what is authored and
+# exactly what is real.
+
+
+class Entry(BaseModel):
+    """The printed specimen's model — line 4 of the hero file — with the
+    production guard rails (strip + length caps) the page's view-source
+    link discloses. A missing field fails with the framework's real 422
+    before ``sign`` ever runs; F3's validated-actions cell prints that
+    exact response."""
+
+    name: str = Field(min_length=1, max_length=40)
+    note: str = Field(min_length=1, max_length=200)
+
+    @field_validator("name", "note", mode="before")
+    @classmethod
+    def _strip(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+
+_VISITOR_RE = _re.compile(r"^[A-Za-z0-9-]{8,64}$")
+
+
+def _visitor_id(request) -> str:
+    vid = request.cookies.get("pyxle_gb") or ""
+    if not _VISITOR_RE.match(vid):
+        # Practically unreachable — the client sets the cookie on mount,
+        # before any submit is possible.
+        raise ActionError(
+            "no guestbook cookie — reload the page and sign again",
+            status_code=400,
+        )
+    return vid
+
+
+@action
+async def sign(request, body: Entry):
+    """The hero specimen's ``sign``, running for real. Same name, same
+    shape — ``useAction('sign')`` on this page is the printed line 19."""
+    from db import add, check_rate_limit, get_client_ip, recent
+
+    ip = get_client_ip(request)
+    if not await check_rate_limit(
+        ip, scope="guestbook_sign", max_attempts=30, window_seconds=3600
+    ):
+        raise ActionError(
+            "the guestbook is resting — try again in an hour", status_code=429
+        )
+    vid = _visitor_id(request)
+    await add(body.name, body.note, visitor=vid)
+    return {"entries": await recent(10, visitor=vid)}
+
+
+@action
+async def clear_mine(request):
+    """Erase the visitor's own rows on request — the private guestbook
+    comes with its own eraser. Response mirrors ``sign``'s shape; with
+    no valid cookie there is nothing to clear."""
+    from db import clear_visitor, recent
+
+    vid = request.cookies.get("pyxle_gb") or ""
+    if not _VISITOR_RE.match(vid):
+        return {"entries": await recent(10), "cleared": 0}
+    cleared = await clear_visitor(vid)
+    return {"entries": await recent(10, visitor=vid), "cleared": cleared}
+
+
+@action
+async def my_entries(request):
+    """A returning signer's own rows (merged post-mount, never SSR'd —
+    the served page stays visitor-independent for the edge cache)."""
+    from db import recent
+
+    vid = request.cookies.get("pyxle_gb") or ""
+    if not _VISITOR_RE.match(vid):
+        return {"entries": await recent(10)}
+    return {"entries": await recent(10, visitor=vid)}
 
 
 @action
@@ -135,168 +327,542 @@ async def _subscriber_row(email: str):
     return row.asdict() if row else None
 
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useAction, Link, Head, Image } from 'pyxle/client';
-import { LivePlayground } from './components/live-playground.jsx';
-import { tokenizeBlock } from './components/code-highlighter.jsx';
-import {
-    useScrollReveal, CopyButton, CodeBlock, PMark,
-    InkButton, EditorialLink, Plate, GpSection, GpHead, GalleyFooter,
-} from './components/galley.jsx';
+import './styles/f-index.css';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useAction } from 'pyxle/client';
+import { Rulebar, Receipt, CopyChip, useSeen } from './components/f-kit.jsx';
+import { GITHUB, INSTALL, StarIcon } from './components/f-chrome.jsx';
+import { PageMeta, DEFAULT_TITLE, DEFAULT_DESCRIPTION } from './components/e-meta.jsx';
+import { track } from './components/analytics.jsx';
 
+/* ═══════════════════════════════════════════════════════════════════════
+   F — THE WORKING COPY · the homepage.
 
-/* ════════════════════════════════════════════════════════════════
-   GALLEY PROOF — the page is typeset like a printed argument.
-   Flat paper/ink surfaces, hairline rules, hanging section numerals,
-   figures with captions instead of cards — and a motion language
-   built entirely from the logo's own gesture: a round-cap stroke
-   that draws itself, and a dot that lands like a period.
-   ════════════════════════════════════════════════════════════════ */
+   An annotated printed file. Light, ruled, dense at rest; it animates
+   only when the visitor acts. Ported from the approved prototype
+   onto the app's real primitives —
+   and past it: the prototype's client-simulated guestbook is REAL here
+   (a live @action with Pydantic validation, rate limiting and per-visitor
+   storage — the honesty scheme described below), and the
+   request-log pane's every number is measured, not quoted.
 
+   STATIC-FIRST: the full document — all 33 printed lines, seed entries,
+   the FIG, the complete terminal transcript — is the server-rendered
+   HTML. Boot print and reveals are CSS gated on `html.js` + `.seen`;
+   with JS off the whole argument reads at rest. SSR markup == first
+   client render everywhere: `useSeen` starts false on both, measured
+   values (nav timing, my_entries) land post-mount only, and every
+   animation delay is a deterministic inline style.
 
-/* ── Hero ────────────────────────────────────────────────────────── */
+   MOTION: diegetic only — the boot print (once), act-to-animate flashes
+   on the real guestbook request, one FIG draw + race, one terminal
+   replay of a real captured session, breathing LIVE dots. No framer
+   needed; everything dies under prefers-reduced-motion.
+   ═══════════════════════════════════════════════════════════════════════ */
 
-/* The hero specimen — a whole feature, small enough to read at a glance.
-   Deliberately shorter than the complete Fig. 1 in section 01: the hero
-   shows THAT it's one file; section 01 proves it isn't an excerpt. */
-const HERO_SPECIMEN = `# likes.pyxl
+/* ── the printed specimen — pages/guestbook.pyxl, 33 lines ──────────
+   Verbatim the file that `pyxle check` passes against the site's own
+   db.py (db.recent / db.add are this site's real module API — plan §2).
+   Segments: plain = Ink, c = Graphite (punctuation · strings), g = Run
+   Green (only the anatomy that runs — green job 5). `dsk`/`mob` pairs
+   are the same characters reflowed for the phone column. */
+const T = (s) => ({ s });
+const C = (s) => ({ s, k: 'c' });
+const G = (s) => ({ s, k: 'g' });
 
-@server
-async def load(req):
-    return {"likes": await db.count()}
-
-@action
-async def like(req):
-    return {"likes": await db.bump()}
-
-
-export default function Likes({ data }) {
-  const like = useAction('like')
-  return <button onClick={() => like()}>♥ {data.likes}</button>
-}`;
-
-/* Proofreader's margin tags, aligned to the three regions of the file.
-   Ochre marginalia (the site's one annotation ink), shown ≥lg where the
-   plate has room; the plate reads fine without them on smaller screens.
-   Percentages are calibrated to the specimen's rendered lines. */
-const HERO_TAGS = [
-    { top: '18%', label: 'loads' },
-    { top: '42%', label: 'mutates' },
-    { top: '71%', label: 'renders' },
+const SPEC_ROWS = [
+    { n: 1,  segs: [T('from pydantic import BaseModel')] },
+    { n: 2,  segs: [T('import db')] },
+    { n: 3,  segs: [] },
+    { n: 4,  segs: [T('class Entry'), C('('), T('BaseModel'), C('):')] },
+    { n: 5,  segs: [T('    name'), C(':'), T(' str')] },
+    { n: 6,  segs: [T('    note'), C(':'), T(' str')] },
+    { n: 7,  segs: [] },
+    { n: 8,  segs: [G('@server')] },
+    { n: 9,  segs: [T('async def load'), C('('), T('request'), C('):')] },
+    { n: 10, segs: [T('    return '), C('{"entries":'), T(' await db.recent'), C('('), T('10'), C(')}')] },
+    { n: 11, segs: [] },
+    { n: 12, act: true, segs: [G('@action')] },
+    { n: 13, act: true, segs: [T('async def sign'), C('('), T('request'), C(','), T(' body'), C(':'), T(' Entry'), C('):')] },
+    { n: 14, act: true, segs: [T('    await db.add'), C('('), T('body.name'), C(','), T(' body.note'), C(')')] },
+    { n: 15, act: true, segs: [T('    return '), C('{"entries":'), T(' await db.recent'), C('('), T('10'), C(')}')] },
+    { n: 16, seam: true },
+    { n: 17, segs: [T('export default function Guestbook'), C('({'), T(' data '), C('})'), T(' '), C('{')],
+             mob:  [T('export default function Guestbook'), C('(')] },
+    { cont: true, segs: [T('  '), C('{'), T(' data '), C('})'), T(' '), C('{')] },
+    { n: 18, segs: [T('  const '), C('['), T('entries'), C(','), T(' setEntries'), C(']'), T(' = useState'), C('('), T('data.entries'), C(')')],
+             mob:  [T('  const '), C('['), T('entries'), C(','), T(' setEntries'), C(']'), T(' =')] },
+    { cont: true, segs: [T('    useState'), C('('), T('data.entries'), C(')')] },
+    { n: 19, wire: true, segs: [T('  const sign = '), G('useAction'), C("('sign')")] },
+    { n: 20, segs: [T('  const submit = async '), C('('), T('e'), C(')'), T(' '), C('=>'), T(' '), C('{')] },
+    { n: 21, segs: [T('    e.preventDefault'), C('()')] },
+    { n: 22, segs: [T('    const form = Object.fromEntries'), C('('), T('new FormData'), C('('), T('e.target'), C('))')],
+             mob:  [T('    const form = Object.fromEntries'), C('(')] },
+    { cont: true, segs: [T('      new FormData'), C('('), T('e.target'), C('))')] },
+    { n: 23, wire: true, segs: [T('    const r = await sign'), C('('), T('form'), C(')')] },
+    { n: 24, segs: [T('    if '), C('('), T('r.ok'), C(')'), T(' setEntries'), C('('), T('r.entries'), C(')')] },
+    { n: 25, segs: [T('  '), C('}')] },
+    { n: 26, segs: [T('  return '), C('<'), T('form onSubmit'), C('={'), T('submit'), C('}>')] },
+    { n: 27, segs: [T('    '), C('<'), T('ul'), C('>{'), T('entries.map'), C('('), T('e '), C('=>')] },
+    { n: 28, segs: [T('      '), C('<'), T('li key'), C('={'), T('e.id'), C('}><'), T('b'), C('>{'), T('e.name'), C('}</'), T('b'), C('>'), T(' '), C('{'), T('e.note'), C('}</'), T('li'), C('>)}</'), T('ul'), C('>')],
+             mob:  [T('      '), C('<'), T('li key'), C('={'), T('e.id'), C('}>')] },
+    { cont: true, segs: [T('        '), C('<'), T('b'), C('>{'), T('e.name'), C('}</'), T('b'), C('>'), T(' '), C('{'), T('e.note'), C('}</'), T('li'), C('>)}</'), T('ul'), C('>')] },
+    { n: 29, segs: [T('    '), C('<'), T('input name'), C('="name"'), T(' placeholder'), C('="name"'), T(' '), C('/>')] },
+    { n: 30, segs: [T('    '), C('<'), T('input name'), C('="note"'), T(' placeholder'), C('="note"'), T(' '), C('/>')] },
+    { n: 31, segs: [T('    '), C('<'), T('button'), C('>'), T('Sign'), C('</'), T('button'), C('>')] },
+    { n: 32, segs: [T('  '), C('</'), T('form'), C('>')] },
+    { n: 33, segs: [C('}')] },
 ];
 
-/* A printed insert slip: an editorial "just shipped" announcement, set between
-   hairline rules with an ochre margin tag and an emerald period. It renders in
-   the SSR HTML (so it's there for the static hero, no-JS, and crawlers); a boot
-   script hides it flash-free for anyone who has dismissed this exact release,
-   and the dismiss control persists that choice. Bump ANN_KEY for the next one. */
-const ANN_KEY = 'pyxle-ann-0_8';
-const ANN_BOOT = `try{if(localStorage.getItem('${ANN_KEY}')==='1'){document.documentElement.classList.add('pyxle-ann-dismissed');}}catch(e){}`;
+const ANNS = [
+    { target: 'L9',  y: 192, n: '1·', text: 'loader runs on the server' },
+    { target: 'L10', y: 270, n: '2·', text: 'its return value is the page’s props' },
+    { target: 'L17', y: 394, n: '3·', text: 'HTML arrives finished, then hydrates' },
+    { target: 'L19', y: 468, n: '4·', text: 'the button calls Python in the same file' },
+];
 
-function JustShipped() {
-    const dismiss = useCallback(() => {
-        try { localStorage.setItem(ANN_KEY, '1'); } catch (e) {}
-        document.documentElement.classList.add('pyxle-ann-dismissed');
-    }, []);
-    return (
-        <>
-            <script dangerouslySetInnerHTML={{ __html: ANN_BOOT }} />
-            {/* border-b only: the fixed masthead's own bottom rule serves as
-               the banner's top rule when it sits flush beneath it. */}
-            <div className="just-shipped border-b border-rule">
-                <div className="mx-auto flex max-w-[76rem] flex-wrap items-center gap-x-4 gap-y-1.5 px-5 py-2.5 sm:px-8">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-press">In the box</span>
-                    <span className="hidden h-3.5 w-px bg-rule sm:block" aria-hidden="true" />
-                    <p className="text-[13px] leading-snug text-ink2">
-                        <span className="font-[520] text-ink">Pyxle Studio</span> and the{' '}
-                        <code className="text-[0.92em] text-acct">.pyxl</code> debugger<span className="text-accent">.</span>{' '}
-                        <span className="hidden sm:inline">A live dashboard, and breakpoints right in your files.</span>
-                    </p>
-                    <span className="ml-auto flex items-center gap-4">
-                        <Link href="/docs/guides/studio" className="focus-ring rounded font-mono text-[12px] text-acct underline decoration-1 underline-offset-4 transition-[text-decoration-thickness] hover:decoration-2">Studio</Link>
-                        <Link href="/docs/guides/debugging" className="focus-ring rounded font-mono text-[12px] text-acct underline decoration-1 underline-offset-4 transition-[text-decoration-thickness] hover:decoration-2">Debugger</Link>
-                        <button
-                            type="button"
-                            onClick={dismiss}
-                            aria-label="Dismiss announcement"
-                            className="focus-ring -mr-1 rounded p-1 text-ink2 transition-colors hover:text-ink"
-                        >
-                            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                                <path d="M3.5 3.5l7 7M10.5 3.5l-7 7" strokeLinecap="round" />
-                            </svg>
-                        </button>
-                    </span>
-                </div>
-            </div>
-        </>
-    );
+/* The F6 terminal — REAL output of pyxle 0.9.3, captured 2026-09-03 on
+   this machine (venv). Lines are verbatim; machine-local noise (a Vite
+   port-clash warning, the Vite/Routes info lines, pip's full package
+   list) is OMITTED, never altered — "output abridged" in the caption is
+   that omission. The ✅/ℹ️ glyphs are the CLI's own output: structural
+   UI on this page uses zero emoji; a quoted artifact stays verbatim
+   (falsifying tool output would be the deeper slop). */
+const TERM_LINES = [
+    '$ pip install pyxle-framework',
+    'Successfully installed pyxle-framework-0.9.3',
+    '  pyxle-langkit-0.3.5 starlette-1.3.1 uvicorn-0.51.0 …',
+    '$ pyxle init app',
+    '▶️  Creating project — app',
+    '✅ Project scaffolded at app',
+    '$ cd app && pyxle dev',
+    'ℹ️  node_modules/ not found — running \'npm install\'',
+    '✅ npm install completed',
+    '✅ Pyxle dev server ready in 1559 ms',
+    'ℹ️    Local:   http://127.0.0.1:8000',
+    'ℹ️    Studio:  http://127.0.0.1:8000/__pyxle/studio',
+];
+const TERM_CAPTION = 'output abridged · pyxle 0.9.3 · captured 2026-09-03';
+
+const STEPS = [
+    { n: '01', cmd: 'pip install pyxle-framework', match: 'pip install' },
+    { n: '02', cmd: 'pyxle init app', match: 'pyxle init' },
+    { n: '03', cmd: 'cd app && pyxle dev', match: 'pyxle dev' },
+];
+
+/* ── small shared bits ─────────────────────────────────────────────── */
+
+function Segs({ segs }) {
+    return segs.map((seg, i) => (seg.k
+        ? <span key={i} className={seg.k}>{seg.s}</span>
+        : <React.Fragment key={i}>{seg.s}</React.Fragment>));
 }
 
-function Hero({ version }) {
+const fmtUp = (total) => {
+    const pad = (n) => (n < 10 ? '0' : '') + n;
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    return 'up ' + (h ? h + ':' + pad(m) : pad(m)) + ':' + pad(s);
+};
+
+function ensureVisitorId() {
+    try {
+        const m = document.cookie.match(/(?:^|;\s*)pyxle_gb=([A-Za-z0-9-]{8,64})(?:;|$)/);
+        if (m) {
+            localStorage.setItem('pyxle-gb-id', m[1]);
+            return m[1];
+        }
+        const vid = (window.crypto && window.crypto.randomUUID)
+            ? window.crypto.randomUUID()
+            : Math.random().toString(36).slice(2) + Date.now().toString(36);
+        document.cookie = 'pyxle_gb=' + vid + '; path=/; max-age=31536000; SameSite=Lax';
+        localStorage.setItem('pyxle-gb-id', vid);
+        return vid;
+    } catch (e) {
+        return null;
+    }
+}
+
+const reducedNow = () => typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ═══ F1 · 01 FILE — the hero: specimen + the file, running ═════════ */
+
+function HeroSection({ data }) {
+    const version = data && data.version;
+    const seeds = (data && data.entries) || [];
+    const uptimeBase = (data && data.uptimeS) || 0;
+    const loadMs = data && data.loadMs != null ? data.loadMs : null;
+
+    /* the hero's running head is visible from the start (f.js law) */
+    const [seen, setSeen] = useState(false);
+    useEffect(() => { setSeen(true); }, []);
+
+    /* ── guestbook state — the one interaction ── */
+    const signAction = useAction('sign');
+    const myEntries = useAction('my_entries');
+    const clearAction = useAction('clear_mine');
+    const [entries, setEntries] = useState(seeds);
+    const [freshId, setFreshId] = useState(null);
+    const [hint, setHint] = useState({ text: 'sign it — watch the file run', told: false });
+    const [errField, setErrField] = useState(null);
+    const [signCount, setSignCount] = useState(0);
+
+    /* the request log — GET/LOAD SSR with measured values; POST rows land live */
+    const [getMs, setGetMs] = useState(null);          // '—' until Navigation Timing (post-mount)
+    const [postLines, setPostLines] = useState([]);    // rotating live rows
+    const [tick, setTick] = useState(0);               // uptime seconds since mount
+
+    const rowEls = useRef({});
+    const busyRef = useRef(false);
+    const timersRef = useRef([]);
+    const nameRef = useRef(null);
+    const noteRef = useRef(null);
+
+    const later = useCallback((fn, ms) => { timersRef.current.push(setTimeout(fn, ms)); }, []);
+    useEffect(() => () => { timersRef.current.forEach(clearTimeout); }, []);
+
+    /* mount: visitor cookie; a returning signer's rows come back (the
+       persistence IS the proof it's real); real Navigation Timing for
+       the GET line; the uptime starts ticking. All measure-after-mount. */
+    useEffect(() => {
+        ensureVisitorId();
+        let alive = true;
+        try {
+            if (localStorage.getItem('pyxle-gb-signed') === '1') {
+                myEntries({}).then((r) => {
+                    if (alive && r.ok && Array.isArray(r.entries)) setEntries(r.entries);
+                });
+            }
+        } catch (e) { /* storage denied — seeds stay */ }
+        try {
+            const nav = performance.getEntriesByType('navigation')[0];
+            if (nav && nav.responseEnd > 0) {
+                setGetMs(Math.max(0.1, Math.round((nav.responseEnd - nav.requestStart) * 10) / 10));
+            }
+        } catch (e) { /* timing unavailable — the cell keeps its — */ }
+        const iv = setInterval(() => setTick((t) => t + 1), 1000);
+        return () => { alive = false; clearInterval(iv); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const flash = useCallback((ids, cls, ms) => {
+        const els = ids.map((id) => rowEls.current[id]).filter(Boolean);
+        els.forEach((el) => el.classList.add(cls));
+        later(() => els.forEach((el) => el.classList.remove(cls)), ms);
+    }, [later]);
+
+    const addLog = useCallback((status, ms, tail, path) => {
+        setPostLines((lines) => {
+            const next = lines.concat({
+                key: Date.now() + Math.random(),
+                s: status,
+                ms,
+                tail,
+                p: path || '/action/sign',
+            });
+            return next.slice(-1);   /* one live row + GET + LOAD = the pane's three */
+        });
+    }, []);
+
+    const say = useCallback((text) => setHint({ text, told: true }), []);
+
+    const onSubmit = useCallback(async (e) => {
+        e.preventDefault();
+        if (busyRef.current) return;
+        busyRef.current = true;
+        const payload = Object.fromEntries(new FormData(e.target));
+        const t0 = performance.now();
+        const r = await signAction(payload);          /* the REAL POST */
+        const ms = Math.max(0.1, Math.round((performance.now() - t0) * 10) / 10);
+        const reduced = reducedNow();
+
+        if (!r.ok && r.fields) {
+            /* the framework's real 422 — Pydantic rejected it, sign never ran */
+            const missing = Object.keys(r.fields)[0] || 'note';
+            setErrField(missing === 'name' ? 'name' : 'note');
+            flash(['L4', 'L5', 'L6'], 'locate', 900);
+            addLog(422, ms, `{"fields": {"${missing}": […]}}`);
+            say(`422 — Entry wants a ${missing} · the action never ran`);
+            const el = missing === 'name' ? nameRef.current : noteRef.current;
+            if (el) el.focus();
+            busyRef.current = false;
+            return;
+        }
+        if (!r.ok) {
+            /* rate-limited (429) or down — the server's own words */
+            const resting = (r.error || '').indexOf('resting') !== -1;
+            addLog(resting ? 429 : 'ERR', ms, r.error || 'request failed');
+            say(r.error || 'request failed');
+            busyRef.current = false;
+            return;
+        }
+
+        try { localStorage.setItem('pyxle-gb-signed', '1'); } catch (err) { /* fine */ }
+        const nextCount = signCount + 1;
+        setSignCount(nextCount);
+        track('guestbook_signed', { nth: nextCount });
+        const newest = r.entries && r.entries[0];
+
+        const finish = () => {
+            setEntries(r.entries || []);
+            setFreshId(newest ? newest.id : null);
+            setErrField(null);
+            if (nameRef.current) nameRef.current.value = '';
+            if (noteRef.current) noteRef.current.value = '';
+            say(nextCount === 1
+                ? 'that ran @action sign · lines 12–15'
+                : `@action ran again · ${nextCount} requests, no API layer`);
+            busyRef.current = false;
+        };
+
+        if (reduced) {
+            addLog(200, ms, '{"entries": […]}');
+            finish();
+            return;
+        }
+        /* the request, staged: wire → seam → server → log → state */
+        flash(['L19', 'L23'], 'flash', 460);
+        later(() => {
+            const seam = rowEls.current.L16;
+            if (seam) {
+                seam.classList.add('seam-pulse');
+                later(() => seam.classList.remove('seam-pulse'), 600);
+            }
+        }, 170);
+        ['L12', 'L13', 'L14', 'L15'].forEach((id, i) => {
+            later(() => flash([id], 'flash', 340), 270 + i * 75);
+        });
+        later(() => addLog(200, ms, '{"entries": […]}'), 600);
+        later(finish, 760);
+    }, [signAction, signCount, flash, addLog, say, later]);
+
+    /* clearing is its own real request — the eraser is part of the demo */
+    const onClear = useCallback(async () => {
+        if (busyRef.current) return;
+        busyRef.current = true;
+        const t0 = performance.now();
+        const r = await clearAction({});
+        const ms = Math.max(0.1, Math.round((performance.now() - t0) * 10) / 10);
+        if (r.ok) {
+            setEntries(r.entries || []);
+            setFreshId(null);
+            try { localStorage.removeItem('pyxle-gb-signed'); } catch (err) { /* fine */ }
+            addLog(200, ms, `{"cleared": ${r.cleared != null ? r.cleared : 0}}`, '/action/clear_mine');
+            say(r.cleared ? `cleared — ${r.cleared} of your ${r.cleared === 1 ? 'row' : 'rows'} deleted, seeds remain` : 'nothing of yours to clear');
+            track('guestbook_cleared', { rows: r.cleared || 0 });
+        } else {
+            addLog('ERR', ms, r.error || 'request failed', '/action/clear_mine');
+            say(r.error || 'request failed');
+        }
+        busyRef.current = false;
+    }, [clearAction, addLog, say]);
+
+    /* marginalia ↔ listing: notes and lines locate each other */
+    const annEls = useRef({});
+    const locate = useCallback((target, on2) => {
+        const row = rowEls.current[target];
+        if (row) row.classList[on2 ? 'add' : 'remove']('locate');
+    }, []);
+    const light = useCallback((target, on2) => {
+        const ann = annEls.current[target];
+        if (ann) ann.classList[on2 ? 'add' : 'remove']('lit');
+    }, []);
+
+    let printIdx = 0;
+
     return (
-        // pt-16 clears the fixed h-16 masthead so the announcement sits flush
-        // beneath it; the hero content adds its own breathing room below.
-        <section className="relative pt-16">
-            <JustShipped />
-            <div className="mx-auto max-w-[76rem] px-5 pb-16 pt-12 sm:px-8 sm:pb-24 sm:pt-20">
-                {/* The whole hero paints statically — instant, like the page
-                   was simply already there. Only the brand gestures perform:
-                   the P draws itself and the period lands. The pitch — "one
-                   file" — isn't asserted in a paragraph; the file is right
-                   there beside the headline. */}
-                <div className="grid items-center gap-x-12 gap-y-12 lg:grid-cols-12">
-                    <div className="lg:col-span-6">
-                        <PMark load id="hero" dur={600} dotDelay={650} />
-                        <p className="mt-10 font-mono text-xs uppercase tracking-[0.14em] text-ink2">
-                            Pyxle — an open-source, full-stack Python framework
-                        </p>
-                        <h1 className="mt-5 font-display text-[2.7rem] font-[560] leading-[1.05] tracking-[-0.015em] text-ink sm:text-[3.6rem] lg:text-[4rem]">
-                            Python &amp; React.
-                            <br />
-                            <span className="whitespace-nowrap text-acct">One file</span><span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
-                            <span className="sr-only">.</span>
-                        </h1>
-                        <p className="mt-6 max-w-[42ch] text-pretty text-lg leading-[1.7] text-ink2">
-                            A feature's Python and its React in one{' '}
-                            <code className="text-[0.9em] text-acct">.pyxl</code> file —
-                            server-rendered, hydrated, and no API layer to keep in sync.
-                        </p>
-                        <div className="mt-8 flex flex-wrap items-center gap-5">
-                            <InkButton href="/docs/getting-started/installation">Get started</InkButton>
-                            <EditorialLink href="/playground">Open the playground →</EditorialLink>
+        <section className={`sec sec-hero${seen ? ' seen' : ''}`} id="file">
+            <div className="frame">
+                <Rulebar hero tab="01 · File" href="#file" />
+                <div className="hero-head">
+                    <h1 className="b" style={{ '--bd': '.05s' }}>
+                        The backend and&nbsp;the&nbsp;page.<br />
+                        <span className="emph">One&nbsp;file.<span className="emph-rule" aria-hidden="true" /></span>
+                    </h1>
+                    <Receipt className="b" style={{ '--bd': '.22s' }}>
+                        guestbook.pyxl · 33 lines · Python 3.10+ · React 18/19
+                    </Receipt>
+                    <div
+                        className="stamp b b-stamp" style={{ '--bd': '.5s' }} role="note"
+                        aria-label={`Working copy — v${version}, PyPI, MIT — runs as printed`}
+                    >
+                        <span className="stamp-top">Working copy</span>
+                        <span className="stamp-mid">v{version} · PyPI · MIT</span>
+                        <span className="stamp-low">runs as printed</span>
+                    </div>
+                </div>
+
+                <div className="hero-grid">
+                    {/* left: the specimen */}
+                    <div className="specimen-wrap">
+                        <svg className="leaders b b-flat" style={{ '--bd': '1.15s' }} aria-hidden="true" viewBox="0 0 32 780" preserveAspectRatio="none">
+                            <polyline points="0,211 10,211 26,238" /><circle cx="28" cy="238" r="2" />
+                            <polyline points="0,289 10,289 26,260" /><circle cx="28" cy="260" r="2" />
+                            <polyline points="0,413 10,413 26,414" /><circle cx="28" cy="414" r="2" />
+                            <polyline points="0,487 10,487 26,458" /><circle cx="28" cy="458" r="2" />
+                        </svg>
+                        <div className="marginalia b b-flat" style={{ '--bd': '1.15s' }}>
+                            {ANNS.map((ann) => (
+                                <p
+                                    key={ann.target}
+                                    ref={(el) => { annEls.current[ann.target] = el; }}
+                                    className="ann"
+                                    style={{ '--y': `${ann.y}px` }}
+                                    onMouseEnter={() => locate(ann.target, true)}
+                                    onMouseLeave={() => locate(ann.target, false)}
+                                >
+                                    <span className="ann-n">{ann.n}</span> {ann.text}
+                                </p>
+                            ))}
                         </div>
-                        <div className="mt-8 border-t border-rule pt-5">
-                            <div className="flex items-center gap-3 font-mono text-[13px] text-ink">
-                                <span className="select-none text-acct">$</span>
-                                <span className="truncate">pip install pyxle-framework</span>
-                                <span className="ml-auto"><CopyButton text="pip install pyxle-framework" /></span>
-                            </div>
-                            <p className="mt-3 font-mono text-[11px] leading-relaxed text-ink2">
-                                MIT{version ? ` · v${version}` : ''} · Python 3.10+ · any ASGI host ·{' '}
-                                <Link href="/benchmarks" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">
-                                    ~2.2× faster SSR than Next.js →
-                                </Link>
-                            </p>
-                        </div>
+
+                        <figure className="pane pane-specimen b b-flat" style={{ '--bd': '.14s', margin: 0 }}>
+                            <figcaption className="pane-head">
+                                <span className="ph-path">pages/guestbook.pyxl</span>
+                                <span className="ph-meta">33 lines</span>
+                            </figcaption>
+                            <pre className="code" id="specimen"><code>
+                                {SPEC_ROWS.map((row) => {
+                                    const rd = `${(0.4 + printIdx * 0.021).toFixed(3)}s`;
+                                    printIdx += 1;
+                                    if (row.seam) {
+                                        return (
+                                            <span
+                                                key="L16" id="L16"
+                                                ref={(el) => { rowEls.current.L16 = el; }}
+                                                className="row seam-row" style={{ '--rd': rd }}
+                                                aria-label="line 16, blank — the seam"
+                                            >
+                                                <span className="n">16</span>
+                                                <span className="t" />
+                                                <span className="seam-halo" />
+                                                <span className="seam-line" />
+                                                <span className="seam-tag"># ← the API layer (one blank line)</span>
+                                            </span>
+                                        );
+                                    }
+                                    if (row.cont) {
+                                        return (
+                                            <span key={`cont-${printIdx}`} className="row mob-only" style={{ '--rd': rd }}>
+                                                <span className="n" />
+                                                <span className="t"><Segs segs={row.segs} /></span>
+                                            </span>
+                                        );
+                                    }
+                                    const id = `L${row.n}`;
+                                    const cls = `row${row.act ? ' act' : ''}${row.wire ? ' wire' : ''}`;
+                                    return (
+                                        <span
+                                            key={id} id={id} className={cls} style={{ '--rd': rd }}
+                                            ref={(el) => { rowEls.current[id] = el; }}
+                                            onMouseEnter={ANNS.some((a) => a.target === id) ? () => light(id, true) : undefined}
+                                            onMouseLeave={ANNS.some((a) => a.target === id) ? () => light(id, false) : undefined}
+                                        >
+                                            <span className="n">{row.n}</span>
+                                            <span className="t">
+                                                {row.mob ? (
+                                                    <>
+                                                        <span className="dsk"><Segs segs={row.segs} /></span>
+                                                        <span className="mob"><Segs segs={row.mob} /></span>
+                                                    </>
+                                                ) : <Segs segs={row.segs} />}
+                                            </span>
+                                        </span>
+                                    );
+                                })}
+                            </code></pre>
+                        </figure>
+
+                        <ol className="ann-strip b" style={{ '--bd': '.9s' }} aria-label="How to read the file">
+                            <li><span className="ann-n">1·</span> loader runs on the server <span className="ann-at">— line 9</span></li>
+                            <li><span className="ann-n">2·</span> its return value is the page&rsquo;s props <span className="ann-at">— line 10</span></li>
+                            <li><span className="ann-n">3·</span> HTML arrives finished, then hydrates <span className="ann-at">— line 17</span></li>
+                            <li><span className="ann-n">4·</span> the button calls Python in the same file <span className="ann-at">— line 19</span></li>
+                        </ol>
                     </div>
 
-                    {/* The specimen — the whole feature, shown not told. */}
-                    <div className="min-w-0 lg:col-span-6">
-                        <Plate
-                            label="likes.pyxl"
-                            meta="one file"
-                            caption={<>The whole feature — it <span className="text-ink">loads</span>, <span className="text-ink">mutates</span>, and <span className="text-ink">renders</span>, with no API in between.</>}
-                        >
-                            <div className="duotone relative">
-                                <CodeBlock code={HERO_SPECIMEN} className="p-5 text-[12.5px]" />
-                                {HERO_TAGS.map((m) => (
-                                    <span key={m.label} className="absolute right-3 hidden items-center gap-2 lg:flex" style={{ top: m.top }} aria-hidden="true">
-                                        <span className="h-px w-5" style={{ background: 'var(--c-press)', opacity: 0.6 }} />
-                                        <span className="font-mono text-[11px] italic text-press">{m.label}</span>
-                                    </span>
+                    {/* right: the result — the file, running on this server */}
+                    <div className="result-col">
+                        <figure className="pane pane-result b" style={{ '--bd': '1s', margin: 0 }}>
+                            <figcaption className="pane-head pane-head-url">
+                                <span className="urlbar">localhost:8000</span>
+                                <span className="devchip">dev</span>
+                            </figcaption>
+                            <div className="app">
+                                <h2 className="app-h">Guestbook</h2>
+                                <ul className="app-list">
+                                    {entries.slice(0, 3).map((entry) => (
+                                        <li key={entry.id} className={entry.id === freshId ? 'fresh' : undefined}>
+                                            <b>{entry.name}</b> {entry.note}
+                                            {entry.you ? <span className="you-tag">you</span> : null}
+                                        </li>
+                                    ))}
+                                </ul>
+                                <form className="app-form" onSubmit={onSubmit} autoComplete="off">
+                                    <input
+                                        ref={nameRef} name="name" placeholder="name" aria-label="name"
+                                        className={errField === 'name' ? 'err' : undefined}
+                                        onInput={() => errField === 'name' && setErrField(null)}
+                                    />
+                                    <input
+                                        ref={noteRef} name="note" placeholder="note" aria-label="note"
+                                        className={errField === 'note' ? 'err' : undefined}
+                                        onInput={() => errField === 'note' && setErrField(null)}
+                                    />
+                                    <button type="submit">Sign</button>
+                                </form>
+                                <p className={`app-hint${hint.told ? ' told' : ''}`} aria-live="polite">{hint.text}</p>
+                            </div>
+                        </figure>
+
+                        <p className="gb-honesty b" style={{ '--bd': '1.06s' }}>
+                            seed entries are authored · yours are real — stored by this
+                            server, shown only to your browser
+                            {entries.some((entry) => entry.you) ? (
+                                <> · <button type="button" className="gb-clear" onClick={onClear}>clear yours</button></>
+                            ) : null}
+                        </p>
+
+                        <figure className="pane pane-log b" style={{ '--bd': '1.12s', margin: 0 }}>
+                            <figcaption className="log-head">
+                                <span>request log</span>
+                                <span className="log-up" aria-hidden="true">{fmtUp(uptimeBase + tick)}</span>
+                            </figcaption>
+                            <div className="log-body">
+                                <p className="log-line">
+                                    <span className="lg-m">GET</span><span className="lg-p">/</span>
+                                    <span className="lg-s">200</span>
+                                    <span className="lg-ms">{getMs === null ? '—' : `${getMs} ms`}</span>
+                                    <span className="lg-c">← HTML, finished</span>
+                                </p>
+                                <p className="log-line">
+                                    <span className="lg-m">LOAD</span><span className="lg-p">load_home()</span>
+                                    <span className="lg-s">200</span>
+                                    <span className="lg-ms">{loadMs === null ? '—' : loadMs < 0.1 ? '<0.1 ms' : `${loadMs.toFixed(1)} ms`}</span>
+                                    <span className="lg-c">← {'{"entries": […]}'}</span>
+                                </p>
+                                {postLines.map((line) => (
+                                    <p key={line.key} className="log-line fresh-log">
+                                        <span className="lg-m">POST</span><span className="lg-p">{line.p}</span>
+                                        <span className={`lg-s${String(line.s) === '200' ? '' : ' lg-4xx'}`}>{line.s}</span>
+                                        <span className="lg-ms">{line.ms} ms</span>
+                                        <span className="lg-c">← {line.tail}</span>
+                                    </p>
                                 ))}
                             </div>
-                        </Plate>
+                        </figure>
+
+                        <div className="hero-ctas b" style={{ '--bd': '1.22s' }}>
+                            <CopyChip text={INSTALL} quickstart />
+                            <p className="cta-line">
+                                <Link className="link" href="/playground">Open the playground <span className="a">→</span></Link>
+                            </p>
+                            <p className="cta-receipt">
+                                <span>runs .pyxl files in your browser</span> <span>· CPython via Pyodide</span> <span>· ~12&nbsp;MB once</span>
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -304,985 +870,482 @@ function Hero({ version }) {
     );
 }
 
+/* ═══ F2 · 02 REQUEST — FIG 01 draws itself, then the request runs ══ */
 
-/* ── 01 · The file (the wedge + the Deletion) ────────────────────── */
+function RequestSection() {
+    const [ref, seen] = useSeen();
+    const figRef = useRef(null);
+    const runRef = useRef(null);
+    const [runVisible, setRunVisible] = useState(false);
 
-const OLD_WAY_FILES = [
-    'app/api/likes/route.ts',
-    'lib/validators.ts',
-    'types/likes.d.ts',
-    'hooks/use-likes.ts',
-    'lib/api-client.ts',
-    'components/LikeButton.tsx',
-    'components/LikeButtonSkeleton.tsx',
-    'app/posts/[id]/page.tsx',
-];
+    useEffect(() => {
+        const fig = figRef.current;
+        if (!fig || reducedNow() || typeof IntersectionObserver === 'undefined') return undefined;
+        fig.classList.add('pre');
+        const timers = [];
+        const race = () => {
+            fig.classList.remove('race');
+            void fig.offsetWidth;               /* restart the animation */
+            fig.classList.add('race');
+        };
+        fig._race = race;
+        let fired = false;
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach((en) => {
+                if (en.isIntersecting && !fired) {
+                    fired = true;
+                    requestAnimationFrame(() => fig.classList.add('go'));
+                    timers.push(setTimeout(race, 1500));
+                    timers.push(setTimeout(() => setRunVisible(true), 4800));
+                    io.disconnect();
+                }
+            });
+        }, { threshold: 0.45 });
+        io.observe(fig);
+        return () => { io.disconnect(); timers.forEach(clearTimeout); };
+    }, []);
 
-const LIKES_PYXL = `# likes.pyxl
+    const runAgain = useCallback(() => {
+        const btn = runRef.current;
+        const fig = figRef.current;
+        if (btn) {
+            btn.classList.remove('spin');
+            void btn.offsetWidth;
+            btn.classList.add('spin');
+        }
+        if (fig && fig._race) fig._race();
+    }, []);
 
-@server
-async def load(request):
-    pid = request.path_params["id"]
-    return {"id": pid, "likes": await db.likes(pid)}
-
-@action
-async def toggle_like(request):
-    body = await request.json()
-    return {"likes": await db.toggle(body["id"])}
-
-
-import React from 'react';
-import { useAction } from 'pyxle/client';
-
-export default function Likes({ data }) {
-    const toggle = useAction('toggle_like');
     return (
-        <button onClick={() => toggle({ id: data.id })}>
-            ♥ {data.likes} likes
-        </button>
-    );
-}`;
+        <section ref={ref} className={`sec sec-request${seen ? ' seen' : ''}`} id="request">
+            <div className="frame">
+                <Rulebar tab="02 · Request" href="#request" folio="02" />
+                <div className="sec-head rv">
+                    <h2>One request, start to finish.</h2>
+                    <Receipt>what the server does, in order — no magic left in the margin</Receipt>
+                </div>
 
-/* One filename, struck out by a hand-drawn pen stroke. The slight
-   sag in the path is what makes it a pen, not a text-decoration. */
-function StruckFile({ name, i }) {
-    return (
-        <li style={{ ['--i']: i }}>
-            <span className="relative inline-block">
-                <span className="gp-struck-text font-mono text-[13px] leading-[2.3] text-ink2 sm:text-[15px]">{name}<span className="sr-only"> (replaced)</span></span>
-                <svg className="gp-strike pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
-                    <path d="M -1 13.5 C 30 11.8, 70 14.8, 101 12.6" pathLength="1" fill="none" stroke="var(--c-accent)" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
-            </span>
-        </li>
-    );
-}
-
-const MARGINALIA = [
-    { top: '15%', note: 'runs on the server' },
-    { top: '36%', note: 'the API layer, gone' },
-    { top: '63%', note: 'same file renders both' },
-];
-
-function TheFile() {
-    return (
-        <GpSection n="01" id="the-file">
-            <GpHead
-                n="01"
-                eyebrow="The file"
-                title="Eight files was never the point."
-                lead="The usual React-plus-API stack scatters one feature across eight files, stitched together by convention and hope. In Pyxle it's one file — one read tells you everything it does."
-            />
-
-            <div className="mt-14 grid items-start gap-12 lg:grid-cols-12">
-                {/* The Deletion */}
-                <div data-reveal data-rt="late" className="min-w-0 lg:col-span-5">
-                    <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">The usual way</p>
-                    <ul className="mt-4">
-                        {OLD_WAY_FILES.map((f, i) => <StruckFile key={f} name={f} i={i} />)}
-                    </ul>
-                    <div className="mt-5">
-                        <span className="relative inline-block">
-                            <span className="font-mono text-[15px] font-medium text-ink sm:text-lg">likes.pyxl</span>
-                            <svg className="pointer-events-none absolute -bottom-1.5 left-0 h-[5px] w-full" viewBox="0 0 100 5" preserveAspectRatio="none" aria-hidden="true">
-                                <path d="M0 2.5 H100" pathLength="1" className="gp-draw" style={{ ['--draw-delay']: '1080ms', ['--draw-dur']: '320ms' }} fill="none" stroke="var(--c-accent)" strokeWidth="2.5" strokeLinecap="round" />
-                            </svg>
-                            <span className="gp-dot absolute -right-3.5 bottom-0 h-2 w-2 rounded-full bg-accent" style={{ ['--dot-delay']: '1400ms' }} aria-hidden="true" />
-                        </span>
-                        <span className="ml-7 font-mono text-xs text-ink2">— the same feature</span>
+                <figure ref={figRef} className="fig plate rv" id="fig01" style={{ '--rvd': '.08s' }}>
+                    <div className="plate-head">
+                        <span className="plate-tag">FIG 01</span>
+                        <button ref={runRef} className="fig-run" type="button" hidden={!runVisible} onClick={runAgain}>
+                            <span className="rg">↻</span> run it again
+                        </button>
                     </div>
-                </div>
-
-                {/* Fig. 1 — the file itself, with proofreader's marginalia */}
-                <div data-reveal className="min-w-0 lg:col-span-7" style={{ ['--reveal-delay']: '120ms' }}>
-                    <Plate
-                        label="likes.pyxl"
-                        meta="24 lines"
-                        caption={<>Fig. 1 — <span className="text-ink">likes.pyxl</span>, complete. This is not an excerpt.</>}
-                    >
-                        <div className="duotone relative">
-                            <CodeBlock code={LIKES_PYXL} className="p-5 text-[12.5px]" />
-                            {MARGINALIA.map((m) => (
-                                <span key={m.note} className="absolute right-4 hidden items-center gap-2 xl:flex" style={{ top: m.top }} aria-hidden="true">
-                                    <span className="h-px w-6" style={{ background: 'var(--c-press)', opacity: 0.6 }} />
-                                    <span className="font-mono text-[11px] italic text-press">{m.note}</span>
-                                </span>
-                            ))}
-                        </div>
-                    </Plate>
-                </div>
-            </div>
-            <div data-reveal className="mt-12">
-                <EditorialLink href="/compare">See the same feature across four stacks →</EditorialLink>
-            </div>
-        </GpSection>
-    );
-}
-
-
-/* ── 02 · The playground centerfold ──────────────────────────────── */
-
-function Centerfold() {
-    return (
-        <GpSection n="02" id="playground" wide>
-            {/* Running head — a magazine spread header on a hairline rule */}
-            <div data-reveal="none" className="flex items-center gap-4">
-                <span className="font-mono text-xs uppercase tracking-[0.14em] text-press">02 — Interactive</span>
-                <span className="gp-rule-x gp-from-left h-px flex-1 bg-rule" style={{ ['--rule-delay']: '150ms' }} aria-hidden="true" />
-                <span className="hidden font-mono text-xs uppercase tracking-[0.14em] text-ink2 sm:block">A real .pyxl, executed in your browser</span>
-            </div>
-
-            <div data-reveal="none" className="mt-12 max-w-2xl">
-                <h2 className="font-display text-[2rem] font-[540] leading-[1.08] tracking-[-0.01em] text-ink sm:text-[2.6rem]">
-                    <span className="gp-lm"><span>Change the Python. Watch the page.</span></span>
-                </h2>
-                <p className="mt-5 max-w-[58ch] text-pretty text-base leading-[1.7] text-ink2">
-                    The <code className="text-[0.9em] text-acct">@server</code> loader and{' '}
-                    <code className="text-[0.9em] text-acct">@action</code> handlers below execute
-                    in genuine, sandboxed CPython; the component renders live in the
-                    preview pane. Edit anything — nothing here is a video.
-                </p>
-            </div>
-
-            <div data-reveal className="mt-10" style={{ ['--reveal-delay']: '100ms' }}>
-                <Plate caption={<>Fig. 2 — the playground. Loader and actions run in sandboxed CPython; nothing leaves your browser. Full version at <Link href="/playground" className="focus-ring rounded text-acct underline decoration-1 underline-offset-2 hover:decoration-2">/playground</Link>.</>}>
-                    <div className="duotone bg-[#0b0b0d]">
-                        <LivePlayground paneHeight="h-[300px] sm:h-[400px] lg:h-[440px]" />
-                    </div>
-                </Plate>
-            </div>
-        </GpSection>
-    );
-}
-
-
-/* ── 03 · The index (what's in the box) ──────────────────────────── */
-
-/* [name, gloss, doc] — a third entry sets the name in an editorial link;
-   the two newest parts carry one so the index is also the way in. */
-const INDEX_ROWS = [
-    ['File-based routing', "drop a file in pages/ — it's a route"],
-    ['SSR + hydration', 'HTML first, interactive after'],
-    ['Hot reload', 'Vite HMR, Python changes included'],
-    ['Server actions', '@action replaces the API layer'],
-    ['Studio', 'a dashboard for routes, loaders & actions', '/docs/guides/studio'],
-    ['The debugger', 'breakpoints in .pyxl — Python and React', '/docs/guides/debugging'],
-    ['Plugins', 'auth, database, and your own'],
-    ['ASGI underneath', 'uvicorn today, any host tomorrow'],
-];
-
-function TheIndex() {
-    return (
-        <GpSection n="03" id="in-the-box">
-            <GpHead
-                n="03"
-                eyebrow="In the box"
-                title="Everything you'd assemble, already assembled."
-                lead="No meta-framework archaeology. Pyxle ships the parts a product actually needs, and stays out of the way for the rest."
-            />
-
-            <div className="mt-12 max-w-3xl">
-                {INDEX_ROWS.map(([name, desc, doc], i) => (
-                    <div
-                        key={name}
-                        data-reveal
-                        className="group flex items-baseline gap-4 py-3.5"
-                        style={{ ['--reveal-delay']: `${(i % 2) * 90}ms` }}
-                    >
-                        <span className="font-display text-xl font-[540] tracking-[-0.01em] text-ink sm:text-2xl">
-                            {doc
-                                ? <Link href={doc} className="focus-ring rounded underline decoration-rule decoration-2 underline-offset-[6px] transition-colors hover:decoration-accent">{name}</Link>
-                                : name}
-                        </span>
-                        <span className="gp-leader group-hover:border-accent" aria-hidden="true" />
-                        <span className="text-right font-mono text-xs text-ink2 transition-colors group-hover:text-ink sm:text-[13px]">{desc}</span>
-                    </div>
-                ))}
-            </div>
-        </GpSection>
-    );
-}
-
-
-/* ── 04 · Studio & the debugger (the dev surface, shown) ─────────── */
-
-/* The debug specimen: one .pyxl, two breakpoints — one inside the Python
-   loader, one inside the React component below it. */
-const DEBUG_SPECIMEN = `# post.pyxl
-
-@server
-async def load(request):
-    pid = request.path_params["id"]
-    post = await db.post(pid)
-    return {"post": post}
-
-
-export default function Post({ data }) {
-  const words = data.post.body.split(' ').length
-  return <h1>{data.post.title} · {words} words</h1>
-}`;
-
-/* The two lines that carry a gutter dot — matched on their content, so a
-   re-typeset specimen can never strand a mark on the wrong line. */
-const BREAKPOINT_LINES = new Set([
-    '    post = await db.post(pid)',
-    "  const words = data.post.body.split(' ').length",
-]);
-
-/* The listing prints its own gutter: a breakpoint dot on those two lines,
-   an empty cell on every other, so the marks sit on their lines by
-   construction rather than by calibration. */
-function DebugListing() {
-    const lines = DEBUG_SPECIMEN.split('\n');
-    return (
-        <pre className="overflow-x-auto p-5 font-mono text-[12.5px] leading-[1.9]">
-            <code>
-                {tokenizeBlock(DEBUG_SPECIMEN, 'pyxl').map((tokens, i) => (
-                    <React.Fragment key={i}>
-                        <span
-                            aria-hidden="true"
-                            className={`mr-3 inline-block h-2 w-2 rounded-full align-middle ${BREAKPOINT_LINES.has(lines[i]) ? 'bg-[#E5534B]' : ''}`}
-                        />
-                        {tokens.map((t, j) => <span key={j} className={t.cls}>{t.text}</span>)}
-                        {'\n'}
-                    </React.Fragment>
-                ))}
-            </code>
-        </pre>
-    );
-}
-
-function StudioAndDebugger() {
-    return (
-        <GpSection n="04" id="studio-debugger">
-            <div className="grid gap-12 lg:grid-cols-12">
-                <div className="order-1 min-w-0 lg:col-span-6">
-                    <GpHead
-                        n="04"
-                        eyebrow="Studio & the debugger"
-                        title="Two breakpoints, one file."
-                        lead="Set one in the @server loader and one in the React component below it — both bind, in the same .pyxl. The VS Code extension contributes each half as its own F5 launch: Backend runs your dev server under the Python debugger, Frontend attaches the browser to it."
-                    />
-                    <p data-reveal className="mt-8 max-w-[54ch] text-pretty text-base leading-[1.7] text-ink2">
-                        The same run serves <span className="text-ink">Studio</span> at{' '}
-                        <code className="text-[0.9em] text-acct">/__pyxle/studio</code> — every route with
-                        its loaders and actions, a tester that runs them against the live server, and the
-                        request feed as it happens. Dev-only by construction: a production{' '}
-                        <code className="text-[0.9em] text-acct">pyxle serve</code> doesn't contain it.
-                    </p>
-                    <div data-reveal className="mt-8 border-t border-rule pt-5">
-                        <div className="flex items-center gap-3 font-mono text-[13px] text-ink">
-                            <span className="select-none text-acct">$</span>
-                            <span className="truncate">pyxle studio</span>
-                            <span className="ml-auto"><CopyButton text="pyxle studio" /></span>
-                        </div>
-                        <p className="mt-3 font-mono text-[11px] leading-relaxed text-ink2">
-                            routes · tester · request feed · latency · resolved config · pyxle check
-                        </p>
-                    </div>
-                    <div data-reveal className="mt-5 border-t border-rule pt-5">
-                        <div className="flex items-center gap-3 font-mono text-[13px] text-ink">
-                            <span className="select-none text-acct">$</span>
-                            <span className="truncate">code --install-extension pyxle.pyxle-language-tools</span>
-                            <span className="ml-auto"><CopyButton text="code --install-extension pyxle.pyxle-language-tools" /></span>
-                        </div>
-                        <p className="mt-3 font-mono text-[11px] leading-relaxed text-ink2">
-                            F5 needs the extension · already on Pyxle?{' '}
-                            <span className="text-ink">pip install --upgrade pyxle-framework</span>
-                        </p>
-                    </div>
-                    <p data-reveal className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3">
-                        <EditorialLink href="/docs/guides/debugging">Debug a .pyxl file →</EditorialLink>
-                        <EditorialLink href="/docs/guides/studio">Studio, panel by panel →</EditorialLink>
-                        <EditorialLink href="https://marketplace.visualstudio.com/items?itemName=pyxle.pyxle-language-tools" external>
-                            Get the VS Code extension ↗
-                        </EditorialLink>
-                    </p>
-                </div>
-
-                <div className="order-2 min-w-0 lg:col-span-6">
-                    <div data-reveal style={{ ['--reveal-delay']: '100ms' }}>
-                        <Plate
-                            label="post.pyxl"
-                            meta="two breakpoints"
-                            caption={<>Fig. 3 — the <span className="text-ink">loader</span> breakpoint pauses the request in Python; the <span className="text-ink">component</span> breakpoint pauses the render in the browser. Same file, no compiled output to chase.</>}
-                        >
-                            <div className="duotone">
-                                <DebugListing />
-                            </div>
-                        </Plate>
-                    </div>
-                </div>
-            </div>
-        </GpSection>
-    );
-}
-
-
-/* ── 05 · The numbers (a typeset ledger) ─────────────────────────── */
-
-// From the July 2026 off-box EC2 run on Pyxle 0.7.1 (2× c7i.2xlarge,
-// oha on its own box; SSR measured per core, API at 8 workers) — see /benchmarks.
-const LEDGER = [
-    ['~2.2×', 'faster server-side rendering than Next.js, per core'],
-    ['2–3×', 'smaller HTML than Next.js for the same page'],
-    ['1.3×', "FastAPI's throughput on database-heavy pages, at 8 workers"],
-];
-
-function CircledZero() {
-    return (
-        <svg className="h-[0.78em] w-[0.78em]" viewBox="0 0 48 48" fill="none" role="img" aria-label="0">
-            <circle cx="24" cy="24" r="20" pathLength="1" className="gp-draw" style={{ ['--draw-dur']: '400ms' }} stroke="var(--c-accent)" strokeWidth="3.5" strokeLinecap="round" transform="rotate(-90 24 24)" />
-            <circle cx="24" cy="24" r="4.5" className="gp-dot" style={{ ['--dot-delay']: '420ms' }} fill="var(--c-accent)" />
-        </svg>
-    );
-}
-
-function TheNumbers() {
-    return (
-        <GpSection n="05" id="numbers">
-            <GpHead
-                n="05"
-                eyebrow="The numbers"
-                title="Measured, not marketed."
-                lead="Same hardware, same load generator, both frameworks tuned in good faith. When a setup is unfair to a competitor, we fix the setup — not the chart."
-            />
-
-            <div className="mt-12 max-w-3xl">
-                {/* dt (the label) precedes dd (the value) per the dl content
-                   model; flex-row-reverse keeps the numeral typeset left. */}
-                <dl>
-                    {LEDGER.map(([num, desc], i) => (
-                        <div key={num} data-reveal className="flex flex-row-reverse items-baseline justify-between gap-6 border-t border-rule py-5" style={{ ['--reveal-delay']: `${i * 80}ms` }}>
-                            <dt className="text-right text-sm text-ink2 sm:text-base">{desc}</dt>
-                            <dd className="font-mono text-[2.4rem] font-medium leading-none tracking-tight text-ink sm:text-[3.4rem]">{num}</dd>
-                        </div>
-                    ))}
-                    <div data-reveal className="flex flex-row-reverse items-baseline justify-between gap-6 border-y border-rule py-6" style={{ ['--reveal-delay']: '240ms' }}>
-                        <dt className="text-right text-sm text-ink2 sm:text-base">errors under sustained load</dt>
-                        <dd className="font-mono text-[2.4rem] font-medium leading-none tracking-tight text-ink sm:text-[3.4rem]"><CircledZero /></dd>
-                    </div>
-                </dl>
-                <p data-reveal className="mt-6 font-mono text-xs leading-relaxed text-ink2">
-                    Measured July 2026 on Pyxle 0.7.1, and not re-measured for the 0.9 line.{' '}
-                    Reproduce them yourself — full methodology, hardware, and harness at{' '}
-                    <Link href="/benchmarks" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">/benchmarks →</Link>
-                </p>
-                <p data-reveal className="mt-3 font-mono text-xs leading-relaxed text-ink2" style={{ ['--reveal-delay']: '80ms' }}>
-                    Beyond raw speed — the full picture against Django, FastAPI, and Next.js is in{' '}
-                    <Link href="/compare" className="focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2">the comparison →</Link>
-                </p>
-            </div>
-        </GpSection>
-    );
-}
-
-
-/* ── 06 · For the agents ─────────────────────────────────────────── */
-
-function ContextStrip() {
-    /* One continuous stroke vs. eight broken segments — context per
-       feature read, in one glance. */
-    const segs = Array.from({ length: 8 }, (_, i) => 10 + i * 36);
-    return (
-        <figure data-reveal className="mt-8" style={{ ['--reveal-delay']: '120ms' }}>
-            <div className="space-y-5 border-y border-rule py-6">
-                <div className="flex items-center gap-4">
-                    <span className="w-36 shrink-0 font-mono text-[11px] text-ink">pyxle — one file</span>
-                    <svg viewBox="0 0 310 16" className="h-4 min-w-0 flex-1" preserveAspectRatio="none" aria-hidden="true">
-                        <path d="M4 9 C 80 4, 200 13, 288 7" pathLength="1" className="gp-draw" style={{ ['--draw-dur']: '700ms' }} fill="none" stroke="var(--c-accent)" strokeWidth="3.5" strokeLinecap="round" />
-                        <circle cx="299" cy="7" r="4" className="gp-dot" style={{ ['--dot-delay']: '700ms' }} fill="var(--c-accent)" />
-                    </svg>
-                </div>
-                <div className="flex items-center gap-4">
-                    <span className="w-36 shrink-0 font-mono text-[11px] text-ink2">typical stack — 8 files</span>
-                    <svg viewBox="0 0 310 16" className="h-4 min-w-0 flex-1" preserveAspectRatio="none" aria-hidden="true">
-                        {segs.map((x) => (
-                            <path key={x} d={`M${x} 8 H${x + 24}`} stroke="var(--c-ink2)" strokeOpacity="0.45" strokeWidth="3.5" strokeLinecap="round" vectorEffect="non-scaling-stroke" fill="none" />
-                        ))}
-                    </svg>
-                </div>
-            </div>
-            <figcaption className="mt-3 font-mono text-xs text-ink2">Fig. 5 — context per feature read.</figcaption>
-        </figure>
-    );
-}
-
-function ForAgents() {
-    return (
-        <GpSection n="06" id="agents">
-            <div className="grid gap-12 lg:grid-cols-12">
-                <div className="order-2 min-w-0 lg:order-1 lg:col-span-6">
-                    <div data-reveal style={{ ['--reveal-delay']: '100ms' }}>
-                        <Plate
-                            label="terminal"
-                            caption={<>Fig. 4 — <span className="text-ink">pyxle check</span>, verbatim. Structured diagnostics, an exit code an agent can branch on.</>}
-                        >
-                            {/* A real transcript — reproduce it by running
-                               `pyxle check` on a project with these two bugs. */}
-                            <pre className="duotone overflow-x-auto p-5 font-mono text-[12.5px] leading-[1.9]">
-                                <code>
-                                    <span className="sh-cmd">$</span> <span className="sh-fn">pyxle check</span>{'\n'}
-                                    <span className="sh-cmt">ℹ️  Checked 2 .pyxl file(s) in my-app/</span>{'\n'}
-                                    {'  error: '}<span className="sh-kw">[python]</span> line 2: <span className="sh-str">expected ':'</span>{'\n'}
-                                    <span className="sh-cmt">    --&gt; pages/feed.pyxl</span>{'\n'}
-                                    {'  error: '}<span className="sh-kw">[jsx]</span> line 6: <span className="sh-str">JSX syntax error: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment &lt;&gt;...&lt;/&gt;? (6:8)</span>{'\n'}
-                                    <span className="sh-cmt">    --&gt; pages/likes.pyxl</span>{'\n'}
-                                    ❌ Check failed with 2 error(s){'\n'}
-                                    <span className="sh-cmd">$</span> <span className="sh-fn">echo $?</span>{'\n'}
-                                    1
-                                </code>
-                            </pre>
-                        </Plate>
-                    </div>
-                    <ContextStrip />
-                </div>
-
-                <div className="order-1 min-w-0 lg:order-2 lg:col-span-6">
-                    <GpHead
-                        n="06"
-                        eyebrow="For the agents"
-                        title="One file is also how an agent reads."
-                        lead="Context windows are budgets. A Pyxle feature is one read — loader, mutations, and UI in a single pass, not a scavenger hunt across eight files before the first edit."
-                    />
-                    <p data-reveal className="mt-8 max-w-[54ch] text-pretty text-base leading-[1.7] text-ink2">
-                        And it's all Python — the language models write best.
-                    </p>
-                    <p data-reveal className="mt-7">
-                        <EditorialLink href="/docs/guides/for-ai-agents">Read the full case →</EditorialLink>
-                    </p>
-                </div>
-            </div>
-        </GpSection>
-    );
-}
-
-
-/* ── 07 · As Markdown (readable by machines) ─────────────────────── */
-
-function ReadableAsMarkdown() {
-    return (
-        <GpSection n="07" id="markdown">
-            <div className="grid gap-12 lg:grid-cols-12">
-                <div className="order-1 min-w-0 lg:col-span-6">
-                    <GpHead
-                        n="07"
-                        eyebrow="Markdown, built in"
-                        title="Every page is also Markdown."
-                        lead="Your readers increasingly arrive with an AI in the loop — and it wants text, not your HTML. Flip one flag and every page serves a clean Markdown twin: append .md to any URL, or send Accept: text/markdown. This page included."
-                    />
-                    <p data-reveal className="mt-8">
-                        <EditorialLink href="/docs/guides/llms">How it works →</EditorialLink>
-                    </p>
-                </div>
-
-                <div className="order-2 min-w-0 lg:col-span-6">
-                    <div data-reveal style={{ ['--reveal-delay']: '100ms' }}>
-                        <Plate
-                            label="terminal"
-                            caption={<>Fig. 6 — any URL, plus <span className="text-ink">.md</span>. Turned on with one line: <span className="text-ink">"llms": true</span>.</>}
-                        >
-                            <pre className="duotone overflow-x-auto p-5 font-mono text-[12.5px] leading-[1.9]">
-                                <code>
-                                    <span className="sh-cmd">$</span> <span className="sh-fn">curl</span> pyxle.dev/docs/core-concepts/routing<span className="sh-kw">.md</span>{'\n'}
-                                    <span className="sh-cmt">&gt; Markdown rendition of that page,</span>{'\n'}
-                                    <span className="sh-cmt">&gt; served for agents. Index: /llms.txt</span>{'\n'}
-                                    {'\n'}
-                                    <span className="sh-kw"># Routing</span>{'\n'}
-                                    {'\n'}
-                                    {'Pyxle uses '}<span className="sh-str">**file-based routing**</span>{'. The'}{'\n'}
-                                    {'structure of your '}<span className="sh-str">`pages/`</span>{' directory is'}{'\n'}
-                                    {'your URL routes — no router config,'}{'\n'}
-                                    {'no tag soup, just the words.'}
-                                </code>
-                            </pre>
-                        </Plate>
-                    </div>
-                </div>
-            </div>
-        </GpSection>
-    );
-}
-
-
-/* ── 08 · In the wild (live specimens) ───────────────────────────── */
-
-const DEMOS = [
-    { name: 'Today', tagline: 'To-do list, no email', href: 'https://today.pyxle.app', kind: 'today' },
-    { name: 'Flux', tagline: 'SaaS analytics', href: 'https://flux.pyxle.app', kind: 'chart' },
-    { name: 'Chroma', tagline: 'Color palette', href: 'https://chroma.pyxle.app', kind: 'palette' },
-    { name: 'Glyph', tagline: 'Generative art', href: 'https://glyph.pyxle.app', kind: 'spiro' },
-];
-
-/* Miniature of each app — a photograph of the real thing, so the
-   specimens keep their own colors inside the plate frame. */
-function DemoPreview({ kind }) {
-    // today — the list itself, not its login screen: warm paper, the serif
-    // wordmark with its red full stop, two done rows struck through and two
-    // still open. Drawn from a screenshot of the running app, so the plate stays
-    // a photograph of the real thing like Chroma's palette and Flux's chart.
-    if (kind === 'today') {
-        const rows = [
-            { done: true, w: '62%' },
-            { done: true, w: '48%' },
-            { done: false, w: '70%' },
-            { done: false, w: '54%' },
-        ];
-        return (
-            <div
-                className="flex h-28 w-full items-stretch bg-[#f2ece0]"
-                aria-hidden="true"
-            >
-                <div className="flex h-full w-full flex-col justify-center bg-[#f5f1e8] px-5 py-3">
-                    <span className="font-display text-[17px] leading-none tracking-[-0.02em] text-[#241b12]">
-                        Today<span className="text-[#c0492e]">.</span>
-                    </span>
-                    <span className="mt-[4px] h-[1.5px] w-full bg-[#ddd2c0]">
-                        <span className="block h-full w-[55%] bg-[#c0492e]" />
-                    </span>
-                    <div className="mt-[6px] flex flex-col gap-[5px]">
-                        {rows.map((r, i) => (
-                            <span key={i} className="flex items-center gap-[5px]">
-                                <span
-                                    className={`h-[6px] w-[6px] shrink-0 rounded-full ${
-                                        r.done ? 'bg-[#c0492e]' : 'border border-[#b3a289]'
-                                    }`}
-                                />
-                                <span
-                                    className={`h-[3.5px] rounded-full ${
-                                        r.done ? 'bg-[#cdc0a8]' : 'bg-[#8d7b5f]'
-                                    }`}
-                                    style={{ width: r.w }}
-                                />
+                    <div className="fig-grid">
+                        <span className="rail-label">pyxle</span>
+                        <div className="rail rail-pyxle">
+                            <span className="pip pip-pyxle" aria-hidden="true" />
+                            <span className="node nd" style={{ '--i': 0 }}>GET /</span>
+                            <span className="conn cn" style={{ '--i': 1 }} />
+                            <span className="node nd" style={{ '--i': 2 }}>load(request)</span>
+                            <span className="conn cn" style={{ '--i': 3 }} />
+                            <span className="node nd" style={{ '--i': 4 }}>props</span>
+                            <span className="conn conn-seam cn" style={{ '--i': 5 }}>
+                                <span className="cap cap-server">server side</span>
+                                <span className="cap cap-browser">browser side</span>
                             </span>
-                        ))}
+                            <span className="node nd" style={{ '--i': 6 }}>HTML</span>
+                            <span className="conn cn" style={{ '--i': 7 }} />
+                            <span className="node nd nd-final" style={{ '--i': 8 }}>hydrate()</span>
+                        </div>
+                        <span className="rail-label rail-label-conv">conventional</span>
+                        <div className="rail rail-conv">
+                            <span className="pip pip-conv" aria-hidden="true" />
+                            <span className="cnode">route</span>
+                            <span className="conn conn-tick" />
+                            <span className="cnode">serialize</span>
+                            <span className="conn conn-tick" />
+                            <span className="cnode">fetch</span>
+                            <span className="conn conn-tick" />
+                            <span className="cnode">parse</span>
+                            <span className="conn conn-tick" />
+                            <span className="cnode">render</span>
+                        </div>
                     </div>
-                </div>
+                    <figcaption className="fig-cap">the same request, with and without an API layer.</figcaption>
+                </figure>
             </div>
-        );
-    }
-    if (kind === 'palette') {
-        return (
-            <div className="flex h-28 w-full" aria-hidden="true">
-                {['#FF6B6B', '#FF8E72', '#FFA45B', '#FFD166', '#F4E285'].map((c, i) => (
-                    <div key={i} className="flex-1" style={{ backgroundColor: c }} />
-                ))}
-            </div>
-        );
-    }
-    if (kind === 'chart') {
-        const heights = [42, 58, 66, 54, 78, 72, 90];
-        return (
-            <div className="flex h-28 w-full items-end gap-1 bg-[#0e0f14] px-4 py-3" aria-hidden="true">
-                {heights.map((h, i) => (
-                    <div
-                        key={i}
-                        className="flex-1 rounded-t bg-gradient-to-t from-indigo-500 to-purple-600"
-                        style={{ height: `${h}%`, opacity: 0.55 + (i / heights.length) * 0.45 }}
-                    />
-                ))}
-            </div>
-        );
-    }
-    // spiro — a deterministic spirograph, drawn server-side
-    const spiroPath = Array.from({ length: 720 }, (_, i) => {
-        const t = (i * Math.PI) / 40;
-        const R = 45, r = 13, d = 28;
-        const x = (R - r) * Math.cos(t) + d * Math.cos(((R - r) * t) / r);
-        const y = (R - r) * Math.sin(t) - d * Math.sin(((R - r) * t) / r);
-        return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-    }).join(' ');
+        </section>
+    );
+}
+
+/* ═══ F3 · 03 FRAMEWORK — six ruled cells, every one linked ═════════ */
+
+function Cell({ tab, ver, children, note, href, path, delay }) {
     return (
-        <div className="flex h-28 w-full items-center justify-center bg-[#08080c]" aria-hidden="true">
-            <svg viewBox="-90 -90 180 180" className="h-full w-auto py-1.5">
-                <path d={spiroPath} fill="none" stroke="#22d3ee" strokeWidth="1" opacity="0.8" />
-            </svg>
+        <div className="cell rv" style={{ '--rvd': delay }}>
+            <h3 className="cell-tab">{tab}{ver ? <span className="chip-ver">{ver}</span> : null}</h3>
+            {children}
+            <p className="cell-note">{note}</p>
+            <p className="cell-link">
+                <Link className="link" href={href}>docs <span className="a">→</span></Link>
+                <span className="cell-path">{path}</span>
+            </p>
         </div>
     );
 }
 
-/* The features Pulse exercises — the pitch is "every one of these, in one app". */
-const PULSE_FEATURES = [
-    'SSR + ISR', 'Streaming', 'WebSockets', '@action + Pydantic',
-    'Background jobs', 'Auth', 'pyxle-db', 'Observability', 'Rate limiting',
-];
-
-/* The flagship specimen, given its own plate: Pulse is the reference app that
-   uses every feature, so it leads the section rather than sitting in the grid. */
-function FeaturedPulse() {
+function FrameworkSection({ docsCount }) {
+    const [ref, seen] = useSeen();
     return (
-        <a
-            href="https://pulse.pyxle.app"
-            target="_blank"
-            rel="noreferrer"
-            data-reveal
-            className="focus-ring group mt-12 block rounded"
-        >
-            <div className="grid items-center gap-8 lg:grid-cols-[1.45fr_1fr] lg:gap-12">
-                <Plate label="pulse.pyxle.app" meta="the reference app">
-                    <Image
-                        src="/visual/pulse-og.svg"
-                        alt="Pulse — a real-time service status page built with Pyxle"
-                        width={1200}
-                        height={630}
-                        priority
-                        className="w-full transition-opacity group-hover:opacity-95"
-                    />
-                </Plate>
-                <div>
-                    <div className="flex items-baseline gap-3">
-                        <span className="font-display text-2xl font-[560] tracking-[-0.01em] text-ink">Pulse</span>
-                        <span className="font-mono text-[11px] text-ink2">real-time status page</span>
-                        <span className="ml-auto font-mono text-[11px] text-acct opacity-0 transition-opacity group-hover:opacity-100">open it ↗</span>
-                    </div>
-                    <p className="mt-4 max-w-[48ch] text-pretty text-[15px] leading-[1.7] text-ink2">
-                        The reference app — a service-status page with a live incident war room — built to
-                        exercise <span className="text-ink">every</span> Pyxle feature in one coherent product.
-                        Python loaders and React UI in the same <code className="font-mono text-[13px] text-ink">.pyxl</code> file,
-                        server-rendered, streamed, and hydrated.
-                    </p>
-                    <div className="mt-5 flex flex-wrap gap-1.5">
-                        {PULSE_FEATURES.map((f) => (
-                            <span key={f} className="rounded-md border border-rule px-2 py-0.5 font-mono text-[10.5px] text-ink2">{f}</span>
-                        ))}
-                    </div>
+        <section ref={ref} className={`sec sec-framework${seen ? ' seen' : ''}`} id="framework">
+            <div className="frame">
+                <Rulebar tab="03 · Framework" href="#framework" folio="03" />
+                <div className="sec-head rv">
+                    <h2>A whole framework, not a trick.</h2>
+                    <Receipt>
+                        {docsCount
+                            ? `six of ${docsCount} documented pages — every cell links to its docs`
+                            : 'six documented corners — every cell links to its docs'}
+                    </Receipt>
                 </div>
-            </div>
-        </a>
-    );
-}
 
-function InTheWild() {
-    return (
-        <GpSection n="08" id="demos">
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-                <GpHead
-                    n="08"
-                    eyebrow="In the wild"
-                    title="Built with Pyxle, running live."
-                    lead="One reference app that uses every feature, plus a few small specimens — each a handful of .pyxl files, deployed the boring way. Open the source next to the live app; the whole feature really is in one file."
-                />
-                <p data-reveal className="shrink-0 pb-1">
-                    <EditorialLink href="https://github.com/pyxle-dev/pyxle-demos" external>Source on GitHub ↗</EditorialLink>
-                </p>
-            </div>
-
-            <FeaturedPulse />
-
-            <p data-reveal className="mt-16 font-mono text-xs uppercase tracking-[0.14em] text-press">Smaller specimens</p>
-            <div className="mt-6 grid gap-10 md:grid-cols-3 md:gap-8">
-                {DEMOS.map((d, i) => (
-                    <a
-                        key={d.name}
-                        href={d.href}
-                        target="_blank"
-                        rel="noreferrer"
-                        data-reveal
-                        className="focus-ring group block rounded"
-                        style={{ ['--reveal-delay']: `${i * 90}ms` }}
+                <div className="cells">
+                    <Cell
+                        tab="Routing" delay="0.05s" note="Files are routes. Brackets are params."
+                        href="/docs/core-concepts/routing" path="/docs/core-concepts/routing"
                     >
-                        <figure>
-                            <div className="rounded-[10px] border border-plateb bg-paper p-[3px] shadow-[0_1px_2px_rgba(20,25,21,0.06)] transition-colors group-hover:border-accent dark:shadow-none">
-                                <div className="overflow-hidden rounded-[7px] bg-plate">
-                                    <DemoPreview kind={d.kind} />
-                                </div>
-                            </div>
-                            <figcaption className="mt-3 flex items-baseline gap-3">
-                                <span className="font-display text-lg font-[540] tracking-[-0.01em] text-ink">{d.name}</span>
-                                <span className="font-mono text-[11px] text-ink2">{d.tagline}</span>
-                                <span className="ml-auto font-mono text-[11px] text-acct opacity-0 transition-opacity group-hover:opacity-100">try it ↗</span>
-                            </figcaption>
-                        </figure>
-                    </a>
-                ))}
+                        <pre className="art"><code>{'pages/\n├── index.pyxl          '}<span className="c">→ /</span>{'\n├── layout.pyxl         '}<span className="c">→ wraps children</span>{'\n└── posts/\n   └── [slug].pyxl      '}<span className="c">→ /posts/:slug</span></code></pre>
+                    </Cell>
+
+                    <Cell
+                        tab="Streaming SSR" delay="0.12s" note="HTML streams while Python awaits."
+                        href="/docs/guides/streaming" path="/docs/guides/streaming"
+                    >
+                        <pre className="art"><code><span className="c">&lt;</span>h1<span className="c">&gt;{'{'}</span>data.title<span className="c">{'}'}&lt;/</span>h1<span className="c">&gt;</span>  <span className="c">{'{/* shell */}'}</span>{'\n\n'}<span className="c">&lt;</span>Suspense fallback<span className="c">={'{'}&lt;</span>p<span className="c">&gt;</span>Loading…<span className="c">&lt;/</span>p<span className="c">&gt;{'}'}&gt;</span>{'\n  '}<span className="c">&lt;</span>ActivityFeed <span className="c">/&gt;</span>  <span className="c">{'{/* streams in */}'}</span>{'\n'}<span className="c">&lt;/</span>Suspense<span className="c">&gt;</span></code></pre>
+                    </Cell>
+
+                    <Cell
+                        tab="Validated actions" delay="0.19s"
+                        note={<>The hero&rsquo;s <span className="mono-inline">Entry</span> model, failing honestly: per-field errors, typed.</>}
+                        href="/docs/core-concepts/server-actions" path="/docs/core-concepts/server-actions"
+                    >
+                        <pre className="art"><code><span className="g">@action</span>{'\n'}async def sign<span className="c">(</span>request<span className="c">,</span> body<span className="c">:</span> Entry<span className="c">):</span> …</code></pre>
+                        <pre className="art art-json"><code><span className="c">{'// bad input — 422, action never ran'}</span>{'\n'}<span className="c">{'{"ok":'}</span> false<span className="c">,</span>{'\n '}<span className="c">{'"error": "Validation failed",'}</span>{'\n '}<span className="c">{'"fields": {"note": ["Field required"]}}'}</span></code></pre>
+                    </Cell>
+
+                    <Cell
+                        tab="Realtime" delay="0.26s"
+                        note={<>The page serves its own WebSocket. Abridged from <span className="mono-inline">examples/chat</span>.</>}
+                        href="/docs/guides/websockets" path="/docs/guides/websockets"
+                    >
+                        <pre className="art"><code>async with channel<span className="c">(</span>{'\n        '}ws<span className="c">,</span> f<span className="c">{'"room:{'}</span>room<span className="c">{'}")'}</span> as live<span className="c">:</span>{'\n    '}async for text in ws.iter_text<span className="c">():</span>{'\n        '}await live.publish<span className="c">(</span>text<span className="c">)</span>{'\n\n'}const <span className="c">{'{'}</span> send <span className="c">{'}'}</span> = useWebSocket<span className="c">(</span>{'\n  '}<span className="c">'/chat/'</span> + room<span className="c">, {'{'}</span> onMessage <span className="c">{'})'}</span></code></pre>
+                    </Cell>
+
+                    <Cell
+                        tab="Auth plugin" ver="pyxle-auth 0.4" delay="0.33s"
+                        note={<>Sliding sessions in HttpOnly cookies; <span className="mono-inline">request.user</span> on every loader.</>}
+                        href="/docs/plugins/pyxle-auth" path="/docs/plugins/pyxle-auth"
+                    >
+                        <pre className="art"><code>const <span className="c">{'{'}</span> user<span className="c">,</span> isAuthenticated<span className="c">,</span>{'\n        '}logout <span className="c">{'}'}</span> = useAuth<span className="c">()</span>{'\n\n'}if <span className="c">(!</span>isAuthenticated<span className="c">)</span>{'\n  '}return <span className="c">&lt;</span>a href<span className="c">="/login"&gt;</span>Sign in<span className="c">&lt;/</span>a<span className="c">&gt;</span></code></pre>
+                    </Cell>
+
+                    <Cell
+                        tab="Studio &amp; debugger" delay="0.40s"
+                        note="Routes, requests, metrics — and breakpoints in .pyxl files."
+                        href="/docs/guides/studio" path="/docs/guides/studio"
+                    >
+                        <img className="cell-shot" src="/shots/studio.png" alt="Pyxle Studio at /__pyxle/studio — route table of a scaffolded app" width="1200" height="520" loading="lazy" />
+                    </Cell>
+                </div>
             </div>
-        </GpSection>
+        </section>
     );
 }
 
+/* ═══ F4 · 04 NUMBERS — every figure carries its own conditions ═════ */
 
-/* ── 09 · Start (a recipe) + the newsletter coda ─────────────────── */
+function NumbersSection({ docsCount }) {
+    const [ref, seen] = useSeen();
+    return (
+        <section ref={ref} className={`sec sec-numbers${seen ? ' seen' : ''}`} id="numbers">
+            <div className="frame">
+                <Rulebar tab="04 · Numbers" href="#numbers" folio="04" />
+                <div className="sec-head rv">
+                    <h2>Numbers we can defend.</h2>
+                    <Receipt>every figure carries its own test conditions</Receipt>
+                </div>
 
-const RECIPE = [
-    ['pip install pyxle-framework', 'installs the compiler, server, and CLI'],
-    ['pyxle init my-app && cd my-app', 'scaffolds pages/, config, and a first route'],
-    ['pyxle install', 'installs the pinned JS toolchain'],
-    ['pyxle dev', 'SSR dev server with HMR at localhost:8000'],
-];
-
-const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-let _turnstileLoader = null;
-function loadTurnstile() {
-    if (typeof window === 'undefined') return Promise.resolve(null);
-    if (window.turnstile) return Promise.resolve(window.turnstile);
-    if (_turnstileLoader) return _turnstileLoader;
-    _turnstileLoader = new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = TURNSTILE_SRC;
-        s.async = true;
-        s.defer = true;
-        s.onload = () => resolve(window.turnstile || null);
-        s.onerror = reject;
-        document.head.appendChild(s);
-    });
-    return _turnstileLoader;
+                <div className="tiles">
+                    <div className="tile tile-wide rv" style={{ '--rvd': '.06s' }}>
+                        <p className="tile-v">~2.2×</p>
+                        <div className="bars" aria-hidden="true">
+                            <p className="bar-row"><span className="bar-l">pyxle</span><span className="bar-track"><span className="bar bar-g" style={{ '--w': '100%' }} /></span><span className="bar-n">2.2</span></p>
+                            <p className="bar-row"><span className="bar-l">next.js</span><span className="bar-track"><span className="bar bar-k" style={{ '--w': '45.5%' }} /></span><span className="bar-n">1.0</span></p>
+                        </div>
+                        <p className="tile-l">median per-core SSR throughput vs Next.js</p>
+                        <p className="tile-c">measured July 2026 on Pyxle 0.7.1 · normalized, Next.js = 1.0 · full harness → <Link className="link" href="/benchmarks">/benchmarks</Link></p>
+                    </div>
+                    <div className="tile rv" style={{ '--rvd': '.13s' }}>
+                        <p className="tile-v tile-v-word">FastAPI<br />parity</p>
+                        <p className="tile-l">raw JSON endpoints</p>
+                        <p className="tile-c">same harness, July 2026 · Pyxle is Starlette underneath</p>
+                    </div>
+                    <div className="tile rv" style={{ '--rvd': '.2s' }}>
+                        <p className="tile-v">{docsCount != null ? docsCount : '—'}</p>
+                        <p className="tile-l">documentation pages, in the repo</p>
+                        <p className="tile-c">counted from the docs manifest at load · <Link className="link" href="/docs">/docs</Link></p>
+                    </div>
+                    <div className="tile tile-last rv" style={{ '--rvd': '.27s' }}>
+                        <p className="tile-v">3</p>
+                        <p className="tile-l">apps we run in production</p>
+                        <p className="tile-c">all three below ↓ · click them</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
 }
 
-function GetStarted() {
-    // Turnstile site key — public, injected into the client bundle at build time
-    // via the PYXLE_PUBLIC_ convention. Guarded so an unset key degrades to ''.
-    const turnstileSiteKey = (import.meta.env && import.meta.env.PYXLE_PUBLIC_TURNSTILE_SITE_KEY) || '';
-    const subscribe = useAction('subscribe_newsletter');
-    const [email, setEmail] = useState('');
-    const [status, setStatus] = useState(null);
-    const [message, setMessage] = useState('');
-    const successRef = useRef(null);
+/* ═══ F5 · 05 PRODUCTION — demos, really deployed ═══════════════════ */
 
-    // Cloudflare Turnstile — armed lazily on first focus of the email field so
-    // the script never loads for visitors who don't engage the form.
-    const widgetRef = useRef(null);
-    const widgetIdRef = useRef(null);
-    const [tsToken, setTsToken] = useState('');
-    // True between a submit click and the Turnstile token landing — lets us
-    // wait (and auto-submit) instead of erroring when the check isn't done yet.
-    const [verifying, setVerifying] = useState(false);
-    const verifyTimerRef = useRef(null);
+function ProductionSection({ stars, docsCount }) {
+    const [ref, seen] = useSeen();
+    return (
+        <section ref={ref} className={`sec sec-production${seen ? ' seen' : ''}`} id="production">
+            <div className="frame">
+                <Rulebar tab="05 · Production" href="#production" folio="05" />
+                <div className="sec-head rv">
+                    <h2>Demos, running in production.</h2>
+                    <Receipt>click them — they are not screenshots of screenshots</Receipt>
+                </div>
 
-    const armTurnstile = useCallback(() => {
-        if (!turnstileSiteKey || widgetIdRef.current !== null) return;
-        loadTurnstile().then((ts) => {
-            if (!ts || !widgetRef.current || widgetIdRef.current !== null) return;
-            widgetIdRef.current = ts.render(widgetRef.current, {
-                sitekey: turnstileSiteKey,
-                appearance: 'interaction-only',
-                callback: setTsToken,
-                'expired-callback': () => setTsToken(''),
-                'error-callback': () => setTsToken(''),
-            });
-        }).catch(() => {});
-    }, [turnstileSiteKey]);
+                <div className="demos">
+                    <div className="demo demo-feature rv" style={{ '--rvd': '.06s' }}>
+                        <a className="demo-main" href="https://pyxle.dev" target="_blank" rel="noopener noreferrer">
+                            <span className="demo-shot"><img src="/shots/pyxle-dev.png" alt="pyxle.dev — this site's homepage, served by Pyxle" width="880" height="557" loading="lazy" /></span>
+                            <span className="demo-body">
+                                <span className="demo-name">This site <span className="live"><span className="live-dot" style={{ '--dp': '.15s' }} />live</span></span>
+                                <span className="demo-url">pyxle.dev</span>
+                                <span className="demo-note">The page you are reading. Every route here is a .pyxl file — the hero&rsquo;s guestbook is a live @action, and the footer links each page&rsquo;s source.</span>
+                            </span>
+                        </a>
+                        <p className="demo-foot"><a className="link" href="https://github.com/pyxle-dev/pyxle.dev" target="_blank" rel="noopener noreferrer">source <span className="a">→</span></a></p>
+                    </div>
+                    <div className="demo rv" style={{ '--rvd': '.14s' }}>
+                        <a className="demo-main" href="https://today.pyxle.app" target="_blank" rel="noopener noreferrer">
+                            <span className="demo-shot"><img src="/shots/today.png" alt="Today — today.pyxle.app sign-in page" width="880" height="557" loading="lazy" /></span>
+                            <span className="demo-body">
+                                <span className="demo-name">Today <span className="live"><span className="live-dot" style={{ '--dp': '.45s' }} />live</span></span>
+                                <span className="demo-url">today.pyxle.app</span>
+                                <span className="demo-note">Sessions via pyxle-auth.</span>
+                            </span>
+                        </a>
+                        <p className="demo-foot"><a className="link" href="https://today.pyxle.app" target="_blank" rel="noopener noreferrer">visit <span className="a">→</span></a> <a className="link" href="https://github.com/pyxle-dev/pyxle-demos/tree/main/today" target="_blank" rel="noopener noreferrer">source <span className="a">→</span></a></p>
+                    </div>
+                    <div className="demo rv" style={{ '--rvd': '.22s' }}>
+                        <a className="demo-main" href="https://pulse.pyxle.app" target="_blank" rel="noopener noreferrer">
+                            <span className="demo-shot"><img src="/shots/pulse.png" alt="Pulse — pulse.pyxle.app status platform" width="880" height="557" loading="lazy" /></span>
+                            <span className="demo-body">
+                                <span className="demo-name">Pulse <span className="live"><span className="live-dot" style={{ '--dp': '.75s' }} />live</span></span>
+                                <span className="demo-url">pulse.pyxle.app</span>
+                                <span className="demo-note">DB-backed pages, prerendered.</span>
+                            </span>
+                        </a>
+                        <p className="demo-foot"><a className="link" href="https://pulse.pyxle.app" target="_blank" rel="noopener noreferrer">visit <span className="a">→</span></a> <a className="link" href="https://github.com/pyxle-dev/pyxle-demos/tree/main/pulse" target="_blank" rel="noopener noreferrer">source <span className="a">→</span></a></p>
+                    </div>
+                </div>
 
-    // The form unmounts on success — move focus to the confirmation so
-    // keyboard users aren't dropped at the document body.
-    useEffect(() => {
-        if (status === 'success' && successRef.current) successRef.current.focus();
-    }, [status]);
+                <div className="stance rv">
+                    <h3><span className="emph-i">Open source. MIT. Self-hosted. No cloud tax.</span></h3>
+                    <p>
+                        There is no logo wall here — Pyxle is weeks past 0.9. What exists is
+                        running software: these apps, a playground,
+                        {docsCount ? ` ${docsCount} pages of docs,` : ' the docs,'} and the
+                        framework&rsquo;s source. Kick the tires.
+                    </p>
+                    <p className="stance-gh">
+                        <a className="link" href={GITHUB} target="_blank" rel="noopener noreferrer">github.com/pyxle-dev/pyxle</a>
+                        {typeof stars === 'number' ? ` · ★ ${stars}` : ''} · MIT
+                    </p>
+                </div>
+            </div>
+        </section>
+    );
+}
 
-    // The network submit, shared by the direct path (token already present) and
-    // the deferred path (token arrives after the click — see the effect below).
-    const doSubscribe = useCallback(async (token) => {
-        if (verifyTimerRef.current) {
-            clearTimeout(verifyTimerRef.current);
-            verifyTimerRef.current = null;
-        }
-        setVerifying(false);
-        const result = await subscribe({ email, turnstileToken: token });
-        if (result.ok) {
-            setStatus('success');
-            setMessage(result.message);
-            setEmail('');
-        } else {
-            setStatus('error');
-            setMessage(result.error);
-            // Turnstile tokens are single-use — get a fresh one for the retry.
-            if (widgetIdRef.current !== null && window.turnstile) {
-                window.turnstile.reset(widgetIdRef.current);
-                setTsToken('');
+/* ═══ F6 · 06 START — three commands; the terminal replays a real
+       captured session, and the typing lights each step ═════════════ */
+
+function QuickTerminal({ onStep }) {
+    const [view, setView] = useState(null);   // null → the full static transcript (SSR truth)
+    const playingRef = useRef(false);
+    const playedRef = useRef(false);
+    const timersRef = useRef([]);
+    const bodyRef = useRef(null);
+    const replayRef = useRef(null);
+
+    const later = useCallback((fn, ms) => { timersRef.current.push(setTimeout(fn, ms)); }, []);
+    useEffect(() => () => timersRef.current.forEach(clearTimeout), []);
+
+    const play = useCallback(() => {
+        if (playingRef.current) return;
+        playingRef.current = true;
+        let li = 0;
+        const nextLine = () => {
+            if (li >= TERM_LINES.length) {
+                playingRef.current = false;
+                setView({ upTo: TERM_LINES.length, partial: null, cursor: true });
+                onStep(-1);
+                return;
             }
-        }
-    }, [email, subscribe]);
+            const line = TERM_LINES[li];
+            if (line.charAt(0) === '$') {
+                onStep(STEPS.findIndex((st) => line.indexOf(st.match) !== -1));
+                let ci = 1;
+                const tick = () => {
+                    setView({ upTo: li, partial: line.slice(0, ci), cursor: true });
+                    ci += 1;
+                    if (ci <= line.length) {
+                        later(tick, 16);
+                    } else {
+                        li += 1;
+                        setView({ upTo: li, partial: null, cursor: true });
+                        later(nextLine, 300);
+                    }
+                };
+                tick();
+            } else {
+                li += 1;
+                setView({ upTo: li, partial: null, cursor: true });
+                later(nextLine, line === '' ? 40 : 115);
+            }
+        };
+        nextLine();
+    }, [later, onStep]);
 
-    const handleSubmit = useCallback((e) => {
-        e.preventDefault();
-        setStatus(null);
-        setMessage('');
-        if (turnstileSiteKey && !tsToken) {
-            // The token isn't ready (the widget is still arming, or a challenge
-            // needs solving). Don't error — arm it and wait; the effect below
-            // fires the submit the instant the token lands, so there's no
-            // second click and no scary red error on a legitimate visitor.
-            armTurnstile();
-            setVerifying(true);
-            setStatus('verifying');
-            setMessage('One moment — running a quick human check…');
-            if (verifyTimerRef.current) clearTimeout(verifyTimerRef.current);
-            verifyTimerRef.current = setTimeout(() => {
-                verifyTimerRef.current = null;
-                setVerifying(false);
-                setStatus('error');
-                setMessage("Couldn't finish the human check — please try again.");
-            }, 30000);
-            return;
-        }
-        doSubscribe(tsToken);
-    }, [turnstileSiteKey, tsToken, armTurnstile, doSubscribe]);
-
-    // A submit is waiting on the human check and the token just arrived → send it.
     useEffect(() => {
-        if (verifying && tsToken) doSubscribe(tsToken);
-    }, [verifying, tsToken, doSubscribe]);
+        const el = bodyRef.current;
+        if (!el || reducedNow() || typeof IntersectionObserver === 'undefined') return undefined;
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach((en) => {
+                if (en.isIntersecting && !playedRef.current) {
+                    playedRef.current = true;
+                    play();
+                    io.disconnect();
+                }
+            });
+        }, { threshold: 0.4 });
+        io.observe(el);
+        return () => io.disconnect();
+    }, [play]);
 
-    // Drop the pending timer if we unmount mid-verify.
-    useEffect(() => () => {
-        if (verifyTimerRef.current) clearTimeout(verifyTimerRef.current);
-    }, []);
+    const replay = useCallback(() => {
+        if (playingRef.current) return;
+        const btn = replayRef.current;
+        if (btn) {
+            btn.classList.remove('spin');
+            void btn.offsetWidth;
+            btn.classList.add('spin');
+        }
+        if (reducedNow()) { setView(null); return; }
+        play();
+    }, [play]);
+
+    const renderLine = (line, key, partial) => {
+        const text = partial != null ? partial : line;
+        if (text.charAt(0) === '$') {
+            return <React.Fragment key={key}><span className="tg2">$</span>{text.slice(1)}{partial == null ? '\n' : ''}</React.Fragment>;
+        }
+        return <React.Fragment key={key}>{text}{partial == null ? '\n' : ''}</React.Fragment>;
+    };
+
+    const shown = view === null
+        ? TERM_LINES.map((line, i) => renderLine(line, i))
+        : TERM_LINES.slice(0, view.upTo).map((line, i) => renderLine(line, i))
+            .concat(view.partial != null ? [renderLine(view.partial, 'partial', view.partial)] : []);
 
     return (
-        <GpSection n="09" id="start">
-            <GpHead
-                n="09"
-                eyebrow="Start"
-                title="Four commands. The fourth is a running app."
-            />
-
-            <div className="mt-12 grid gap-16 lg:grid-cols-12">
-                {/* The recipe */}
-                <div className="min-w-0 lg:col-span-7">
-                    <ol className="border-t border-rule">
-                        {RECIPE.map(([cmd, gloss], i) => (
-                            <li key={cmd} data-reveal className="relative border-b border-rule py-4" style={{ ['--reveal-delay']: `${i * 90}ms` }}>
-                                <div className="flex items-baseline gap-4">
-                                    <span className="font-display text-lg font-[540] text-press" aria-hidden="true">{i + 1}</span>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-baseline gap-3">
-                                            <code className="truncate font-mono text-[13px] text-ink sm:text-sm">{cmd}</code>
-                                            <span className="ml-auto shrink-0"><CopyButton text={cmd} /></span>
-                                        </div>
-                                        <p className="mt-1 font-mono text-[11px] text-ink2">{gloss}</p>
-                                    </div>
-                                </div>
-                                {i === RECIPE.length - 1 && (
-                                    <svg className="absolute -bottom-[2px] right-0 h-[3px] w-8" viewBox="0 0 32 3" fill="none" aria-hidden="true">
-                                        <path d="M0 1.5 H32" pathLength="1" className="gp-draw" style={{ ['--draw-delay']: '500ms', ['--draw-dur']: '320ms' }} stroke="var(--c-accent)" strokeWidth="3" strokeLinecap="round" />
-                                    </svg>
-                                )}
-                            </li>
-                        ))}
-                    </ol>
-                    <p data-reveal className="mt-8 max-w-[58ch] text-pretty text-base leading-[1.7] text-ink2">
-                        Then open <code className="text-[0.9em] text-acct">pages/</code>, add a file,
-                        and you've shipped a route. The docs take it from there.
-                    </p>
-                    <div data-reveal className="mt-8 flex flex-wrap items-center gap-5">
-                        <InkButton href="/docs">Read the docs</InkButton>
-                        <EditorialLink href="https://github.com/pyxle-dev/pyxle" external>Star on GitHub ↗</EditorialLink>
-                    </div>
+        <figure className="terminal-wrap rv" style={{ '--rvd': '.12s', margin: 0 }}>
+            <div className="terminal">
+                <div className="term-head">
+                    <span className="term-title">terminal</span>
+                    <button ref={replayRef} className="term-replay" type="button" onClick={replay}>
+                        <span className="rg">↻</span> replay
+                    </button>
                 </div>
-
-                {/* The coda — a form that is also the proof */}
-                <div className="min-w-0 lg:col-span-5">
-                    <div data-reveal style={{ ['--reveal-delay']: '150ms' }}>
-                        <h3 className="font-display text-[1.5rem] font-[540] tracking-[-0.01em] text-ink">This form is the demo.</h3>
-                        <p className="mt-3 max-w-[48ch] text-pretty text-sm leading-[1.7] text-ink2">
-                            The input below posts to an <code className="text-[0.9em] text-acct">@action</code> defined
-                            in <code className="text-[0.9em] text-acct">index.pyxl</code> — the file that rendered this
-                            page. Release notes, occasionally. No noise.
-                        </p>
-
-                        {/* Persistent announcer — it exists in both states, so
-                           the success swap is actually announced. The visible
-                           block then receives focus so keyboard users follow. */}
-                        <div role="status" aria-live="polite" className="sr-only">{status === 'success' ? message : ''}</div>
-                        {status === 'success' ? (
-                            <div className="mt-8">
-                                <p ref={successRef} tabIndex={-1} className="font-display text-xl font-[460] leading-snug text-ink focus:outline-none">
-                                    {message}
-                                    <span className="gp-dot-load ml-[0.35em] inline-block h-[0.14em] w-[0.14em] rounded-full bg-accent" style={{ ['--dot-delay']: '150ms' }} aria-hidden="true" />
-                                </p>
-                                <p className="mt-3 font-mono text-[11px] text-ink2">— returned by subscribe_newsletter() just now.</p>
-                            </div>
-                        ) : (
-                            <>
-                                <form onSubmit={handleSubmit} className="mt-8 flex items-end gap-4">
-                                    <label htmlFor="newsletter-email" className="sr-only">Email address</label>
-                                    <input
-                                        id="newsletter-email"
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => { setEmail(e.target.value); setStatus(null); }}
-                                        onFocus={armTurnstile}
-                                        placeholder="you@example.com"
-                                        required
-                                        autoComplete="email"
-                                        className="gp-baseline-input w-full min-w-0 flex-1 font-mono text-sm text-ink placeholder:text-ink2"
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={verifying || subscribe.pending}
-                                        className="focus-ring shrink-0 rounded-[3px] bg-ink px-5 py-2.5 font-mono text-[13px] text-paper transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        {verifying ? 'Verifying…' : subscribe.pending ? 'Sending…' : 'Subscribe'}
-                                    </button>
-                                </form>
-                                <div ref={widgetRef} className="mt-3 empty:hidden" />
-                                <div className="min-h-[1.5rem] pt-2" aria-live="polite">
-                                    {status === 'error' && <p className="font-mono text-xs text-red-600 dark:text-red-400">error: {message}</p>}
-                                    {status === 'verifying' && <p className="font-mono text-xs text-ink2">{message}</p>}
-                                </div>
-                                <p className="mt-2 font-mono text-[11px] leading-relaxed text-ink2">
-                                    def subscribe_newsletter(request) · validated, rate-limited, and stored by{' '}
-                                    <Link href="/docs/core-concepts/server-actions" className="focus-ring rounded text-acct underline decoration-1 underline-offset-2 hover:decoration-2">an @action</Link> on this server.
-                                </p>
-                            </>
-                        )}
-                    </div>
-                </div>
+                <pre ref={bodyRef} className="term-body"><code>
+                    {shown}
+                    {view && view.cursor ? <span className="term-cursor" aria-hidden="true" /> : null}
+                </code></pre>
             </div>
-        </GpSection>
+            <figcaption className="term-cap">{TERM_CAPTION}</figcaption>
+        </figure>
     );
 }
 
+function StartSection() {
+    const [ref, seen] = useSeen();
+    const [stepOn, setStepOn] = useState(-1);
+    return (
+        <section ref={ref} className={`sec sec-start${seen ? ' seen' : ''}`} id="start">
+            <div className="frame">
+                <Rulebar tab="06 · Start" href="#start" folio="06" />
+                <div className="sec-head rv">
+                    <h2>Three commands to a running app.</h2>
+                    <Receipt>the terminal on the right replays a real captured session</Receipt>
+                </div>
 
-/* ── Page ────────────────────────────────────────────────────────── */
+                <div className="start-grid">
+                    <div className="steps rv" style={{ '--rvd': '.06s' }}>
+                        {STEPS.map((st, i) => (
+                            <div key={st.n} className={`step${stepOn === i ? ' on' : ''}`}>
+                                <span className="step-n">{st.n}</span>
+                                <CopyChip text={st.cmd} quickstart />
+                            </div>
+                        ))}
+                        <div className="exits">
+                            <Link className="link" href="/docs">Docs</Link>
+                            <Link className="link" href="/playground">Playground</Link>
+                            <a className="link" href={GITHUB} target="_blank" rel="noreferrer">GitHub</a>
+                        </div>
+                    </div>
+                    <QuickTerminal onStep={setStepOn} />
+                </div>
+            </div>
+        </section>
+    );
+}
 
-export const slots = {
-    'nav-extra': () => (
-        <a
-            href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/index.pyxl"
-            target="_blank"
-            rel="noreferrer"
-            title="View this page's source"
-            className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
-        >
-            source ↗
-        </a>
-    ),
+/* ═══ the header star count ════════════════════════════════════════
+   Page-contributed into the layout header's `nav-extra` slot (the docs
+   page's own mechanism) — homepage-only by construction, zero
+   layout.pyxl surface. Renders NOTHING while the loader has no number
+   yet (first-ever request, GitHub down): the header is then
+   byte-identical to every other page's. Locale pinned so server and
+   client format the same bytes. */
+const fmtStars = (n) => (n < 10000 ? n.toLocaleString('en-US') : (n / 1000).toFixed(1) + 'k');
+
+export const createSlots = (props) => {
+    const data = props && props.data;
+    const n = data && typeof data.stars === 'number' ? data.stars : null;
+    if (n === null) return {};
+    return {
+        'nav-extra': () => (
+            <a
+                className="hd-stars starrable" href={GITHUB} target="_blank" rel="noreferrer"
+                aria-label={'GitHub — ' + fmtStars(n) + ' stars'}
+            ><StarIcon />{fmtStars(n)}</a>
+        ),
+    };
 };
-export const createSlots = () => slots;
 
+/* ═══ the page ═════════════════════════════════════════════════════
+   Header, footer, the real newsletter line and the mobile bar all
+   arrive from pages/layout.pyxl — this file prints the document. */
 export default function Page({ data }) {
-    useScrollReveal();
-    const version = data && data.version;
     return (
         <>
-            <Head>
-                <title>Pyxle — Python + React in one file</title>
-                <meta name="description" content="The full-stack Python framework. Async server loaders, React UI, and server actions in a single .pyxl file. SSR, file-based routing, zero glue code." />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <meta name="theme-color" content="#101411" />
-                <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-                <link rel="alternate icon" href="/favicon.ico" />
-                <meta property="og:title" content="Pyxle — Python + React in one file" />
-                <meta property="og:description" content="The full-stack Python framework. Python loaders, React UI, server actions — zero glue code." />
-                <meta property="og:type" content="website" />
-                <meta property="og:url" content="https://pyxle.dev" />
-                <meta property="og:image" content="https://pyxle.dev/branding/og-default.png" />
-                <meta name="twitter:card" content="summary_large_image" />
-                <meta name="twitter:image" content="https://pyxle.dev/branding/og-default.png" />
-            </Head>
+            <PageMeta fullTitle={DEFAULT_TITLE} description={DEFAULT_DESCRIPTION} path="/" />
             <main id="main">
-                <Hero version={version} />
-                <TheFile />
-                <Centerfold />
-                <TheIndex />
-                <StudioAndDebugger />
-                <TheNumbers />
-                <ForAgents />
-                <ReadableAsMarkdown />
-                <InTheWild />
-                <GetStarted />
+                <HeroSection data={data} />
+                <RequestSection />
+                <FrameworkSection docsCount={data && data.docsCount} />
+                <NumbersSection docsCount={data && data.docsCount} />
+                <ProductionSection stars={data && data.stars} docsCount={data && data.docsCount} />
+                <StartSection />
             </main>
-            <GalleyFooter version={version} />
         </>
     );
 }
