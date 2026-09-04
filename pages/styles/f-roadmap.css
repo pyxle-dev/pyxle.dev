@@ -1,0 +1,139 @@
+/* ═══════════════════════════════════════════════════════════════════
+   F — THE WORKING COPY · /roadmap — "the ledger".
+   One left rule runs the page (the spine law); every release is a
+   station on it — mono version tag in the margin, claim in sans,
+   receipts in mono. The current work wears the WORKING COPY stamp
+   (the device's one reuse outside the homepage); live stations carry
+   the LIVE chip (green job 3 — running status, the same meaning it
+   has everywhere). The future is Graphite and undated on purpose.
+   Page-owned classes are rm-*.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rulebar-hero { border-top: none; height: 0; }
+.rulebar-hero .tab { top: -8px; }
+
+/* ── cadence ────────────────────────────────────────────────────── */
+.rm-hero { padding-top: 0; padding-bottom: 72px; }
+.rm-hero-head { position: relative; margin-top: 64px; }
+/* the stamp owns the top-right corner — the claim never runs under it */
+.rm-hero-head h1 { padding-right: 250px; }
+.sec-shipped .rulebar { margin-bottom: 84px; }
+.sec-shipped { padding-bottom: 88px; }
+.sec-now .rulebar { margin-bottom: 84px; }
+.sec-now { padding-bottom: 88px; }
+.sec-queued .rulebar { margin-bottom: 84px; }
+.sec-queued { padding-bottom: 80px; }
+
+/* ── the stamp — the ledger's "you are here", inked ─────────────── */
+.rm-stamp {
+    position: absolute;
+    right: 8px;
+    top: 4px;
+    transform: rotate(-2.5deg);
+    border: 1.5px solid var(--graphite);
+    outline: 1px solid var(--rule2);
+    outline-offset: 3px;
+    border-radius: 6px;
+    padding: 10px 16px 11px;
+    color: var(--graphite);
+    text-align: left;
+    user-select: none;
+}
+.rm-stamp span { display: block; font-family: var(--mono); }
+.rm-stamp-top { font-size: 13px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; }
+.rm-stamp-mid { font-size: 11.5px; margin-top: 5px; letter-spacing: 0.02em; }
+.rm-stamp-low { font-size: 11.5px; font-style: italic; margin-top: 2px; letter-spacing: 0.02em; }
+
+/* ── the ledger — stations on one spine ─────────────────────────── */
+.rm-led { max-width: 940px; }
+.rm-st {
+    display: grid;
+    grid-template-columns: 128px minmax(0, 1fr);
+    margin: 0;
+}
+.rm-tag {
+    font: 500 12.5px/1.5 var(--mono);
+    color: var(--graphite);
+    text-align: right;
+    padding: 18px 26px 0 0;
+    white-space: nowrap;
+}
+.rm-tag a { color: inherit; text-decoration: none; transition: color .15s ease; }
+.rm-tag a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.rm-body {
+    position: relative;
+    border-left: 1px solid var(--rule2);   /* THE spine */
+    padding: 16px 0 22px 30px;
+    min-width: 0;
+}
+/* the station node — a printed tick sitting ON the spine */
+.rm-body::before {
+    content: "";
+    position: absolute;
+    left: -4px;
+    top: 24px;
+    width: 7px;
+    height: 7px;
+    border-radius: 6px;
+    background: var(--bond);
+    border: 1px solid var(--graphite);
+}
+.rm-st.q .rm-body::before { border-color: var(--rule2); }
+.rm-st.live .rm-body::before { background: var(--green); border-color: var(--green); } /* running — job 3 */
+.rm-t { margin: 0; font: 600 17px/1.4 var(--sans); color: var(--ink); letter-spacing: -0.01em; }
+.rm-l { margin: 6px 0 0; font: 400 12.5px/1.7 var(--mono); color: var(--graphite); overflow-wrap: break-word; }
+.rm-l .link { color: inherit; }
+.rm-l .link:hover { color: var(--ink); }
+.rm-st.q .rm-t { color: var(--graphite); font-weight: 500; }
+.rm-st.q .rm-l { color: var(--faint); }
+.rm-st.q .rm-l .link { color: var(--graphite); }
+
+/* the LIVE chip — running status, the same green it means everywhere */
+.rm-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    vertical-align: 2px;
+    margin-left: 10px;
+    font: 500 10px/1 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--green);
+    background: var(--tint);
+    border-radius: 6px;
+    padding: 4px 7px;
+}
+.rm-live i {
+    width: 5px;
+    height: 5px;
+    border-radius: 6px;
+    background: var(--green);
+}
+
+/* the ledger's closing line inside a section */
+.rm-close { margin-top: 40px; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.rm-close .chip-wrap { max-width: 420px; flex: 1 1 300px; }
+
+/* ── responsive — the spine holds; tags fold above their claim ──── */
+@media (max-width: 760px) {
+    .rm-hero-head { margin-top: 44px; }
+    .rm-hero-head h1 { padding-right: 0; }
+    .rm-stamp { position: static; display: inline-block; margin-top: 22px; transform: rotate(-2deg); padding: 8px 12px 9px; }
+    .rm-stamp-top { font-size: 11.5px; }
+    .rm-stamp-mid, .rm-stamp-low { font-size: 10.5px; }
+    .sec-shipped .rulebar, .sec-now .rulebar, .sec-queued .rulebar { margin-bottom: 60px; }
+    .rm-st { grid-template-columns: minmax(0, 1fr); }
+    .rm-tag {
+        text-align: left;
+        border-left: 1px solid var(--rule2);
+        padding: 16px 0 0 30px;
+    }
+    .rm-body { padding-top: 4px; }
+    .rm-body::before { top: 10px; }
+    .rm-close .link { display: inline-block; padding-block: 11px; margin-block: -6px; }
+}
+
+/* ── motion discipline ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .rm-tag a { transition: none !important; }
+}

@@ -1,0 +1,307 @@
+/* ═══════════════════════════════════════════════════════════════════
+   F — THE WORKING COPY · /benchmarks — "the full datasheet".
+   F4 grown into a page: every benchmark is a FIG on a Deck plate,
+   green bars are Pyxle's own measured runs, Faint bars are everyone
+   else (the losses included), and the methodology is set INSIDE each
+   plate — a figure is not allowed to leave home without its test
+   conditions. No animated counters; bars draw once on `.seen`, and
+   after that they move only when the visitor acts (endpoint tabs,
+   the workers toggle). Page-owned classes are bm-*; house classes
+   (frame, rulebar, pane, chip, receipt, rv/seen, .b boot) come from
+   tailwind.css. Keyframes carry bm- names — page CSS files can
+   coexist under client routing and must never collide.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* the hero borrows the header hairline as its rule (shared idiom) */
+.rulebar-hero { border-top: none; height: 0; }
+.rulebar-hero .tab { top: -8px; }
+
+/* ── cadence — asymmetric on purpose ────────────────────────────── */
+.bm-hero { padding-top: 0; padding-bottom: 64px; }
+.bm-hero-head { margin-top: 64px; margin-bottom: 0; }
+.sec-ssr .rulebar,
+.sec-field .rulebar,
+.sec-scaling .rulebar { margin-bottom: 84px; }
+.sec-losses .rulebar { margin-bottom: 96px; }
+.sec-bytes .rulebar,
+.sec-method .rulebar { margin-bottom: 72px; }
+.sec-real .rulebar { margin-bottom: 64px; }
+.sec-reproduce .rulebar { margin-bottom: 96px; }
+.sec-ssr, .sec-field, .sec-scaling { padding-bottom: 96px; }
+.sec-losses { padding-bottom: 104px; }
+.sec-bytes, .sec-method { padding-bottom: 84px; }
+.sec-real { padding-bottom: 72px; }
+.sec-reproduce { padding-bottom: 88px; }
+
+/* ── the printed contents — six findings, each a row in the index ── */
+.bm-contents { margin-top: 40px; border-top: 1px solid var(--rule); }
+.bm-toc {
+    display: grid;
+    grid-template-columns: 56px 96px minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 18px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--rule);
+    text-decoration: none;
+    transition: background-color .15s ease;
+}
+.bm-toc:hover { background: var(--sheet); }
+.bm-toc .n { font: 400 12px/1.4 var(--mono); color: var(--faint); }
+.bm-toc .v { font: 500 14px/1.4 var(--mono); color: var(--ink); }
+.bm-toc .l { font: 400 14.5px/1.5 var(--sans); color: var(--graphite); min-width: 0; }
+.bm-toc .g2 { font: 400 12.5px/1.4 var(--mono); color: var(--faint); transition: color .15s ease; }
+.bm-toc:hover .g2 { color: var(--ink); }
+
+/* ── the plate — every figure sits on the same recessed bed ─────── */
+.bm-plate {
+    background: var(--deck);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 30px 36px 26px;
+    margin: 0;
+}
+.bm-plate-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 30px;
+}
+.bm-plate-tag {
+    font: 500 11px/16px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--graphite);
+}
+/* the per-figure reproduce control — copies the real harness command */
+.bm-repro {
+    font: 400 12px/1 var(--mono);
+    color: var(--graphite);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 0;
+    white-space: nowrap;
+    transition: color .15s ease;
+}
+.bm-repro:hover { color: var(--ink); }
+.bm-repro .d { color: var(--green); }        /* $ — green job 2 */
+.bm-repro.copied { color: var(--green); }    /* the copied flash — job 2 */
+
+/* the conditions line — set inside the plate, never a footnote */
+.bm-cond {
+    margin: 26px 0 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+    font: 400 12.5px/1.7 var(--mono);
+    color: var(--graphite);
+}
+.bm-cond b { font-weight: 500; color: var(--ink); }
+
+/* ── bar rows — the measured runs, drawn ────────────────────────── */
+.bm-rows { display: flex; flex-direction: column; gap: 12px; }
+.bm-row {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr) 170px;
+    align-items: center;
+    gap: 16px;
+    margin: 0;
+}
+.bm-row .fn { font: 400 12.5px/1 var(--mono); color: var(--graphite); }
+.bm-row.me .fn { color: var(--ink); font-weight: 500; }
+.bm-track {
+    height: 10px;
+    background: var(--sheet);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.bm-bar {
+    display: block;
+    height: 100%;
+    width: var(--w);
+    border-radius: 6px;
+    transform-origin: left center;
+    transition: width .5s var(--ease);
+}
+.bm-bar-g { background: var(--green); }   /* our own measured run — job 6 */
+.bm-bar-k { background: var(--faint); }   /* everyone else */
+.bm-row .fv {
+    font: 400 12.5px/1.35 var(--mono);
+    color: var(--ink);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.bm-row .fv i { font-style: normal; color: var(--graphite); }
+/* draw once on .seen; act-to-animate width changes ride the transition */
+.js .seen .bm-bar { transform: scaleX(0); animation: bm-barin .7s var(--ease) forwards; }
+.js .seen .bm-bar-k { animation-delay: .12s; }
+@keyframes bm-barin { to { transform: scaleX(1); } }
+
+/* ── FIG 01 — the SSR pairs ─────────────────────────────────────── */
+.bm-pairs { display: flex; flex-direction: column; gap: 26px; }
+.bm-pair { position: relative; }
+.bm-pair-h {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin: 0 0 10px;
+}
+.bm-pair-h .pg { font: 500 14px/1.4 var(--sans); color: var(--ink); }
+.bm-pair-h .dt { font: 400 12px/1.4 var(--mono); color: var(--graphite); min-width: 0; }
+.bm-pair-h .dx {
+    margin-left: auto;
+    font: 500 13px/1 var(--mono);
+    color: var(--ink);
+    white-space: nowrap;
+}
+.bm-pair .bm-row + .bm-row { margin-top: 8px; }
+
+/* ── FIG 02/03 — tab + toggle controls (mono tabs on a hairline) ── */
+.bm-tabs {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 22px;
+}
+.bm-tab {
+    font: 400 12.5px/1 var(--mono);
+    color: var(--graphite);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 6px 0 10px;
+    cursor: pointer;
+    transition: color .15s ease, border-color .15s ease;
+    white-space: nowrap;
+}
+.bm-tab:hover { color: var(--ink); }
+.bm-tab[aria-pressed="true"] {
+    color: var(--ink);
+    font-weight: 500;
+    border-bottom-color: var(--ink);   /* the current fact — ink, never green */
+}
+.bm-tab .d { color: var(--green); }    /* $ prompt on command tabs — job 2 */
+.bm-epdesc { margin: 0 0 20px; font: 400 12.5px/1.6 var(--mono); color: var(--graphite); }
+
+/* the scaling rows carry longer test names; the ×-multiplier reads
+   ink inside the value cell */
+.bm-scale-row { grid-template-columns: 150px minmax(0, 1fr) 170px; }
+.bm-row .fv .fx-m { font-style: normal; color: var(--ink); font-weight: 500; }
+
+/* ── FIG 04/05 — the losses, side by side ───────────────────────── */
+.bm-losses {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+    align-items: stretch;
+}
+
+/* ── method — two boxes, one wire; then the ruled spec rows ─────── */
+.bm-boxes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr);
+    align-items: center;
+    margin-bottom: 36px;
+}
+.bm-box {
+    background: var(--sheet);
+    border: 1px solid var(--rule2);
+    border-radius: 6px;
+    padding: 16px 18px;
+    font: 400 12.5px/1.65 var(--mono);
+    color: var(--graphite);
+}
+.bm-box b { display: block; font-weight: 500; color: var(--ink); margin-bottom: 4px; }
+.bm-wire { position: relative; height: 1px; background: var(--rule2); }
+.bm-wire::after {
+    content: "oha →";
+    position: absolute;
+    left: 50%;
+    top: -22px;
+    transform: translateX(-50%);
+    font: 400 11px/1 var(--mono);
+    color: var(--faint);
+    white-space: nowrap;
+}
+
+.bm-facts { border-top: 1px solid var(--rule); }
+.bm-fact {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 20px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+}
+.bm-fact .fk { font: 400 12px/1.6 var(--mono); color: var(--graphite); }
+.bm-fact .fv { font: 400 13px/1.6 var(--mono); color: var(--ink); min-width: 0; overflow-wrap: break-word; }
+
+/* ── real world — the four Lighthouse numerals in one ruled row ─── */
+.bm-lh {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    max-width: 760px;
+}
+.bm-lh-c { background: var(--sheet); padding: 22px 24px 20px; min-width: 0; }
+.bm-lh-c .n {
+    display: block;
+    font: 500 40px/1 var(--mono);
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin: 0;
+}
+.bm-lh-c .l { display: block; margin-top: 10px; font: 400 12px/1.4 var(--mono); color: var(--graphite); }
+
+/* ── reproduce ──────────────────────────────────────────────────── */
+.bm-cmds { display: flex; flex-direction: column; gap: 10px; max-width: 620px; }
+.bm-exits { margin-top: 28px; display: flex; gap: 22px; flex-wrap: wrap; font: 400 14.5px/1.5 var(--sans); }
+
+/* ── responsive ─────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .bm-losses { grid-template-columns: minmax(0, 1fr); }
+    .bm-boxes { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .bm-wire { display: none; }
+}
+@media (max-width: 760px) {
+    .bm-hero-head { margin-top: 44px; margin-bottom: 34px; }
+    .sec-ssr .rulebar, .sec-field .rulebar, .sec-scaling .rulebar { margin-bottom: 60px; }
+    .sec-losses .rulebar { margin-bottom: 64px; }
+    .sec-bytes .rulebar, .sec-method .rulebar, .sec-real .rulebar { margin-bottom: 52px; }
+    .sec-reproduce .rulebar { margin-bottom: 64px; }
+    .bm-toc { grid-template-columns: 34px 68px minmax(0, 1fr); gap: 10px; padding: 13px 0; }
+    .bm-toc .g2 { display: none; }
+    .bm-plate { padding: 20px 16px 18px; }
+    .bm-plate-head { margin-bottom: 22px; flex-wrap: wrap; }
+    .bm-repro { padding: 16px 6px; margin: -12px 0; }   /* ≥44px touch */
+    .bm-tab { padding: 12px 0 14px; }
+    .bm-row { grid-template-columns: 64px minmax(0, 1fr); gap: 10px; }
+    .bm-row .fn { font-size: 11.5px; }
+    .bm-row .fv {
+        grid-column: 2;
+        text-align: left;
+        margin-top: 2px;
+        font-size: 11.5px;
+        white-space: normal;   /* long receipts wrap instead of widening the page */
+    }
+    .bm-scale-row { grid-template-columns: minmax(0, 1fr); }
+    .bm-scale-row .fv { grid-column: 1; }
+    .bm-pair-h { flex-wrap: wrap; }
+    .bm-pair-h .dx { margin-left: 0; flex-basis: 100%; }
+    .bm-fact { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 13px 0; }
+    .bm-lh { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .bm-lh-c .n { font-size: 32px; }
+    .bm-exits .link { display: inline-block; padding-block: 11px; margin-block: -6px; }
+}
+
+/* ── motion discipline — everything dies under reduced motion ───── */
+@media (prefers-reduced-motion: reduce) {
+    .js .seen .bm-bar { transform: none !important; animation: none !important; }
+    .bm-bar { transition: none !important; }
+    .bm-tab, .bm-repro, .bm-toc { transition: none !important; }
+}

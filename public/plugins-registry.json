@@ -1,5 +1,5 @@
 {
-  "_comment": "Forward-compatible ecosystem registry. The page renders official plugins + the founding cohort TODAY; as community plugins arrive it grows into a capability-organised directory (group by `category`, tier within each: official > recommended > community) with NO page rewrite — just more rows here. `categories` is the published taxonomy a plugin slots into. `tier`: official (Pyxle team) | recommended (community, reviewed, the suggested default for its category) | community (listed, meets standards). `contract` names the capability interface a plugin implements, so providers in one category become swappable by config — the ecosystem's real differentiator.",
+  "_comment": "Forward-compatible ecosystem registry. The page renders official plugins + the founding cohort TODAY; as community plugins arrive it grows into a capability-organised directory (group by `category`, tier within each: official > recommended > community) with NO page rewrite — just more rows here. `categories` is the published taxonomy a plugin slots into. `tier`: official (Pyxle team) | recommended (community, reviewed, the suggested default for its category) | community (listed, meets standards). `contract` names the capability interface a plugin implements, so providers in one category become swappable by config — the ecosystem's real differentiator. `version` is the released version shown in the directory (bump on release). `highlights` are the 3–4 short spec lines the card renders — labels, not sentences.",
   "categories": [
     "Authentication",
     "Databases",
@@ -22,8 +22,15 @@
     {
       "name": "pyxle-db",
       "tier": "official",
+      "version": "0.3.0",
       "category": "Databases",
       "contract": "DatabaseLike",
+      "highlights": [
+        "SQLite · PostgreSQL · MySQL, one explicit-SQL API",
+        "optional SQLAlchemy ORM",
+        "request-scoped injection · automatic transactions",
+        "migration CLI — checksum migrator or Alembic"
+      ],
       "description": "Database for Pyxle over SQLite, PostgreSQL, and MySQL — an explicit-SQL API or an optional SQLAlchemy ORM, both with request-scoped injection, automatic transactions, and a migration CLI (checksum migrator or Alembic).",
       "pypi": "https://pypi.org/project/pyxle-db/",
       "docs": "/docs/plugins/pyxle-db",
@@ -33,8 +40,15 @@
     {
       "name": "pyxle-auth",
       "tier": "official",
+      "version": "0.4.2",
       "category": "Authentication",
       "contract": null,
+      "highlights": [
+        "email + password accounts on argon2id",
+        "sliding sessions · reset & verification flows",
+        "wildcard RBAC · scoped API tokens · request guards",
+        "fail-secure by default"
+      ],
       "description": "Email + password accounts on argon2id — sliding sessions, password-reset and verification flows, wildcard RBAC, scoped API tokens, and request guards. Fail-secure by default.",
       "pypi": "https://pypi.org/project/pyxle-auth/",
       "docs": "/docs/plugins/pyxle-auth",
@@ -44,8 +58,15 @@
     {
       "name": "pyxle-mail",
       "tier": "official",
+      "version": "0.1.0",
       "category": "Mail",
       "contract": "MailProvider",
+      "highlights": [
+        "swappable MailProvider contract",
+        "console · SMTP · Resend providers",
+        "sender defaults · fail-loud config",
+        "carries pyxle-auth's reset & verification tokens"
+      ],
       "description": "Transactional email over a swappable MailProvider contract — console, SMTP, and Resend providers, sender defaults, and fail-loud config. The mailer pyxle-auth's reset and verification flows hand their tokens to.",
       "pypi": "https://pypi.org/project/pyxle-mail/",
       "docs": "/docs/plugins/pyxle-mail",

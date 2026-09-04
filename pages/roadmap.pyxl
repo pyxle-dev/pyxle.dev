@@ -4,282 +4,216 @@ async def load_roadmap(request):
     return {"version": __version__}
 
 
-import React, { useEffect, useRef } from 'react';
-import { Head } from 'pyxle/client';
-import {
-    useScrollReveal, EditorialLink, InkButton,
-    GpSection, GpHead, GalleyFooter,
-} from './components/galley.jsx';
+import './styles/f-roadmap.css';
+import React from 'react';
+import { Link } from 'pyxle/client';
+import { PageMeta } from './components/e-meta.jsx';
+import { Rulebar, Receipt, CopyChip, useSeen } from './components/f-kit.jsx';
 
 /* ════════════════════════════════════════════════════════════════
-   GALLEY PROOF — /roadmap. Three sections and no more: what's done,
-   what's in progress, what's upcoming. One ink line draws itself down
-   the page as you scroll — solid through what shipped, pulsing where
-   the press is running, hollow into what's ahead.
+   F — THE WORKING COPY · /roadmap — the ledger.
 
-   Shipped entries stay one line each and cite their release; the
-   version chip links to that entry in the changelog, which is where
-   the detail belongs. Do not re-expand this into a section per
-   release — the changelog already is that.
+   One left rule runs the page; every release is a station on it —
+   mono version tag in the margin, claim in sans, what actually
+   landed as a mono receipt. The current work wears the WORKING COPY
+   stamp (the device's one reuse outside the homepage) and its
+   stations carry the LIVE chip, because they are literally running.
+   The future is set in Graphite with no dates at all: nothing ahead
+   carries a date it can't keep. `pre-1.0 · API may change` is
+   printed on the stamp — a fact, not a footnote.
+
+   Every shipped line cites its release and links the changelog;
+   detail belongs to /docs/changelog, so shipped entries stay one
+   line each. The version in the stamp and the closing facts comes
+   from pyxle.__version__ via the loader — never typed.
    ════════════════════════════════════════════════════════════════ */
 
-export const slots = {
-    'nav-extra': () => (
-        <a
-            href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/roadmap.pyxl"
-            target="_blank"
-            rel="noreferrer"
-            title="View this page's source"
-            className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
-        >
-            source ↗
-        </a>
-    ),
-};
-export const createSlots = () => slots;
-
-/* ── content ─────────────────────────────────────────────────── */
-
-const ERAS = [
-    {
-        n: '01',
-        id: 'shipped',
-        eyebrow: 'Printed',
-        title: "What's done.",
-        lead: 'Every line below is released, documented, and running in production — most of it on this very site. Each cites its release; the version links to that entry in the changelog.',
-        status: 'shipped',
-        items: [
-            ['The one-file core', 'The .pyxl format: async loader, server actions, and the React component in a single file — server-rendered, hydrated, hot-reloading, with file-based routing.', 'v0.1 \u2192 0.2'],
-            ['Plugins, realtime & the nav cache', 'Declare plugins in pyxle.config.json and they wire services, middleware, and their own schema at startup. WebSocket endpoints and the client navigation cache landed alongside.', 'v0.3'],
-            ['The production story', 'Edge caching with per-route TTLs, sanitized production errors, layout loaders, a faster static path, and live route-shape changes with no restarts.', 'v0.4'],
-            ['Multi-core serving & a security wave', 'pyxle serve --workers N runs an independent server per core with small assets served from memory. HEAD output moved behind a sanitising allowlist and CSRF exemptions began matching on path boundaries.', 'v0.4.3'],
-            ['The depth release', 'The wave that took Pyxle from rendering pages to running apps: Pydantic-validated actions with OpenAPI output, streaming SSR through <Suspense>, caching with SSG and ISR, WebSocket pub/sub, background work, built-in observability, a Next.js-parity <Image>, a rate limiter, and a type-aware JSX side.', 'v0.5'],
-            ['Your app, in Markdown', 'Enable the llms feature and every page answers at its URL with .md appended, or to an Accept: text/markdown request — plus a generated /llms.txt index and discovery headers. This page has a twin; so does every doc.', 'v0.6'],
-            ['The hardened run', 'A release forged by testing: React 19 and Vite 7 in new projects with pyxle init asking what to include, concurrent streaming SSR with per-request isolation, a calmer dev server, shadcn/ui wired end to end.', 'v0.7'],
-            ['Studio & the debugger', 'A dev-only dashboard at /__pyxle/studio built into pyxle dev — routes, an interactive tester, a live request feed, metrics, resolved config — and breakpoints that bind on both sides of a .pyxl file at once, with tracebacks that finally name your source.', 'v0.8'],
-            ['The honest dev loop', 'The release that made failure visible: a page that will not compile is no longer reported as a 404, a JSX typo fails the rebuild instead of logging a green tick, a rebuild error names the file that broke, one bad file no longer freezes hot reload for the whole project, and the error overlay survives a page reload. Plus a Recharts example driven straight from a Python loader, and a starter page that proves it hydrated.', 'v0.9'],
-            ['Official plugins on PyPI', 'pyxle-db (SQLite, PostgreSQL and MySQL behind one explicit-SQL API), pyxle-auth (argon2id sessions, RBAC, API tokens) and pyxle-mail (SMTP, Resend or console) — every plugin tested in CI, the database claims against live PostgreSQL and MySQL.', 'plugins 0.2'],
-            ['Benchmarks in the open', 'Reproducible two-box benchmarks against six frameworks, the load generator on its own hardware, and the losses shown next to the wins.', 'site'],
-        ],
-    },
-    {
-        n: '02',
-        id: 'in-motion',
-        eyebrow: 'On the press',
-        title: "What's in progress.",
-        lead: 'Started, public, and moving — these have pages you can act on today.',
-        status: 'now',
-        items: [
-            ['The founding plugin cohort', 'A launch program: the first five community plugins that meet the published standards are recognised as ecosystem pioneers, with the spotlight and a roadmap seat. The bar is public; the race is to the bar, not to the submit button.', '/plugins', 'Claim a spot'],
-            ['RFC: plugin routes & pages', 'The Phase B design discussion is open — how plugins will ship their own API endpoints, then whole pages. Founding authors co-design it.', '/docs/plugins/rfc-plugin-pages', 'Read the RFC'],
-        ],
-    },
-    {
-        n: '03',
-        id: 'ahead',
-        eyebrow: 'The next pull',
-        title: "What's upcoming.",
-        lead: 'Planned and intended, in rough order — undated on purpose. When something here starts moving, it moves up a section.',
-        status: 'planned',
-        items: [
-            ['Plugins ship API routes (Phase B1)', 'pyxle-auth providing its own sign-in endpoints out of the box; webhook plugins owning their URLs with the right CSRF posture.'],
-            ['Plugins ship pages (Phase B2)', 'Sign-in screens, dashboards — and the admin-panel moment this framework should eventually have.'],
-            ['Capability contracts', 'The DatabaseLike idea, generalised: framework-defined interfaces for mail, storage, cache, and more, so providers (Postmark, SES, S3, R2…) are swappable by config, not code. Pyxle ships the interface; the community ships the adapters — one recommended pick per capability, alternatives behind it.'],
-            ['The ecosystem quests', 'Mail, storage, jobs, observability — the plugins the ideas page calls for, built by the community or by us.', '/docs/plugins/ideas', 'Browse the ideas'],
-            ['TypeScript, all the way through', 'The type-aware JSX side — generated .d.ts declarations and a pyxle typecheck gate — shipped in v0.5. Next is writing .tsx directly in your .pyxl, with loader-data types generated from the Python side: the request that comes up most, answered end to end.'],
-            ['The component inspector', 'The overlay the debugger did not ship: click any element on screen and jump to the .pyxl that rendered it, plus a bundle-size treemap for the client build.'],
-            ['Deeper editor tooling', 'Diagnostics, completions, and go-to-definition that cross the Python↔JSX boundary; pyxle check growing into a real linter.'],
-            ['The Pyxle blog', 'Engineering notes and honest write-ups — how the SSR pool works, what the benchmarks taught us, what broke.'],
-            ['1.0 — the stability line', 'The release where minor versions stop being allowed to break you. It lands when the plugin API has proven itself, not on a date.'],
-            ['Pyxle Cloud', 'Managed hosting from the people who write the framework: push a Pyxle app and skip the server story entirely — with AI scaffolding in the mix. In development; the newsletter hears it first.', '/#start', 'Be first to know'],
-        ],
-    },
-];
-
-/* A clean ``vX.Y[.Z]`` release tag links to its changelog entry. The
-   changelog's heading anchors are the full three-part version with the dots
-   removed (0.4.3 -> #043, 0.8.0 -> #080), so a two-part tag is normalised to
-   ``.0`` first — that keeps the chip reading "v0.8" while the link resolves.
-   Anything that is not a framework release ("v0.1 → 0.2" from before the
-   changelog, "site", "plugins 0.2") stays plain text. */
-function changelogHref(tag) {
-    const m = /^v(\d+)\.(\d+)(?:\.(\d+))?$/.exec(tag || '');
-    if (!m) return null;
-    return `/docs/changelog#${m[1]}${m[2]}${m[3] ?? '0'}`;
-}
-
-/* ── timeline machinery ──────────────────────────────────────── */
-
-function useInkLine(wrapRef, inkRef) {
-    useEffect(() => {
-        const wrap = wrapRef.current;
-        const ink = inkRef.current;
-        if (!wrap || !ink) return;
-        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            ink.style.transform = 'scaleY(1)';
-            return;
-        }
-        let raf = 0;
-        const update = () => {
-            raf = 0;
-            const r = wrap.getBoundingClientRect();
-            // The ink front sits ~70% down the viewport, like a reader's eye.
-            const p = Math.min(1, Math.max(0, (window.innerHeight * 0.7 - r.top) / r.height));
-            ink.style.transform = `scaleY(${p})`;
-        };
-        const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
-        update();
-        window.addEventListener('scroll', onScroll, { passive: true });
-        window.addEventListener('resize', onScroll, { passive: true });
-        return () => {
-            window.removeEventListener('scroll', onScroll);
-            window.removeEventListener('resize', onScroll);
-            if (raf) cancelAnimationFrame(raf);
-        };
-    }, [wrapRef, inkRef]);
-}
-
-function Dot({ status }) {
-    const base = 'rm-dot absolute -left-[5px] top-[0.45em] h-[11px] w-[11px] rounded-full border-2';
-    if (status === 'shipped') return <span aria-hidden="true" className={`${base} rm-dot--shipped border-rule bg-paper`} />;
-    if (status === 'now') return <span aria-hidden="true" className={`${base} rm-dot--now border-rule bg-paper`} />;
-    return <span aria-hidden="true" className={`${base} border-dashed border-rule bg-paper`} />;
-}
-
-function Milestone({ item, status, index }) {
-    const [title, body, tagOrHref, linkLabel] = item;
-    const isLink = typeof tagOrHref === 'string' && tagOrHref.startsWith('/');
+function Station({ tag, cls, live, title, children, delay }) {
     return (
-        <li data-reveal className="relative pb-10 pl-9 last:pb-2 sm:pl-12" style={{ ['--reveal-delay']: `${Math.min(index, 4) * 70}ms` }}>
-            <Dot status={status} />
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                <h3 className="font-display text-[1.35rem] font-[540] leading-snug text-ink">{title}</h3>
-                {!isLink && tagOrHref && (
-                    changelogHref(tagOrHref) ? (
-                        <a
-                            href={changelogHref(tagOrHref)}
-                            title={`${tagOrHref} in the changelog`}
-                            className="focus-ring rounded-full border border-rule px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink2 transition-colors hover:border-accent hover:text-acct"
-                        >
-                            {tagOrHref}
-                        </a>
-                    ) : (
-                        <span className="rounded-full border border-rule px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink2">{tagOrHref}</span>
-                    )
-                )}
-                {status === 'now' && (
-                    <span className="rounded-full border border-accent px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-acct">live</span>
-                )}
-            </div>
-            <p className="mt-2 max-w-[58ch] text-pretty text-[15px] leading-[1.7] text-ink2">{body}</p>
-            {isLink && (
-                <div className="mt-3">
-                    <EditorialLink href={tagOrHref}>{linkLabel} →</EditorialLink>
-                </div>
-            )}
-        </li>
-    );
-}
-
-function Timeline() {
-    const wrapRef = useRef(null);
-    const inkRef = useRef(null);
-    useInkLine(wrapRef, inkRef);
-
-    return (
-        <div ref={wrapRef} className="relative mx-auto max-w-[76rem] px-5 sm:px-8">
-            <div className="relative lg:ml-16">
-                {/* the rule the run is printed on, and the ink that fills it */}
-                <span aria-hidden="true" className="absolute bottom-0 left-0 top-0 w-px bg-rule" />
-                <span ref={inkRef} aria-hidden="true" className="rm-ink absolute bottom-0 left-0 top-0 w-px bg-accent" />
-                {ERAS.map((era) => (
-                    <section key={era.id} id={era.id} className="gp-cv relative pb-16 pt-16 first:pt-20 sm:pb-20">
-                        <div className="pl-9 sm:pl-12">
-                            <GpHead n={era.n} eyebrow={era.eyebrow} title={era.title} lead={era.lead} />
-                        </div>
-                        <ol className="mt-12">
-                            {era.items.map((item, i) => (
-                                <Milestone key={item[0]} item={item} status={era.status} index={i} />
-                            ))}
-                        </ol>
-                    </section>
-                ))}
+        <div className={`rm-st rv${cls ? ` ${cls}` : ''}`} style={delay ? { '--rvd': delay } : undefined}>
+            <span className="rm-tag">{tag}</span>
+            <div className="rm-body">
+                <h3 className="rm-t">
+                    {title}
+                    {live ? <span className="rm-live"><i aria-hidden="true" />live</span> : null}
+                </h3>
+                <p className="rm-l">{children}</p>
             </div>
         </div>
     );
 }
 
-/* ── Hero ────────────────────────────────────────────────────── */
+/* ── 01 · shipped — released, documented, running in production ──── */
 
-function Hero() {
+function ShippedSection() {
+    const [ref, seen] = useSeen();
     return (
-        <section className="relative">
-            <div className="mx-auto max-w-[76rem] px-5 pb-10 pt-28 sm:px-8 sm:pb-14 sm:pt-36">
-                <p className="font-mono text-xs uppercase tracking-[0.14em] text-ink2">
-                    The print run
-                </p>
-                <h1 className="mt-5 font-display text-[2.9rem] font-[560] leading-[1.04] tracking-[-0.015em] text-ink sm:text-[4.2rem] lg:text-[5.2rem]">
-                    Proofed, pressed,
-                    <br />
-                    and&nbsp;ahead<span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
-                    <span className="sr-only">.</span>
-                </h1>
-                <p className="mt-7 max-w-[52ch] text-pretty text-lg leading-[1.7] text-ink2">
-                    Every shipped line cites its release. Nothing ahead carries a
-                    date it can't keep.
-                </p>
-                <p data-reveal className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">
-                    <span><span className="text-acct">0.1 → 0.9</span> in under five months</span>
-                    <EditorialLink href="/docs/changelog">Read the changelog →</EditorialLink>
-                </p>
+        <section ref={ref} className={`sec sec-shipped${seen ? ' seen' : ''}`} id="shipped">
+            <div className="frame">
+                <Rulebar tab="01 · Shipped" href="#shipped" folio="01" />
+                <div className="sec-head rv">
+                    <h2>Executed.</h2>
+                    <Receipt>released, documented, running in production — one line per release; the detail is the <Link className="link" href="/docs/changelog">changelog</Link></Receipt>
+                </div>
+                <div className="rm-led">
+                    <Station tag={<Link href="/docs/changelog">v0.1–0.2</Link>} title="The one-file core" delay=".04s">
+                        loader · actions · React component in one .pyxl — server-rendered, hydrated, hot-reloading, file-routed
+                    </Station>
+                    <Station tag={<Link href="/docs/changelog#030">v0.3</Link>} title="Plugins, realtime, the nav cache" delay=".08s">
+                        pyxle.config.json wires services at startup · WebSocket endpoints · client navigation cache
+                    </Station>
+                    <Station tag={<Link href="/docs/changelog#040">v0.4</Link>} title="The production story" delay=".12s">
+                        edge caching, per-route TTLs · sanitized production errors · layout loaders · faster static path · live route changes
+                    </Station>
+                    <Station tag={<Link href="/docs/changelog#043">v0.4.3</Link>} title="Multi-core serving, a security wave" delay=".16s">
+                        serve --workers N, one server per core · small assets from memory · HEAD allowlist · CSRF path boundaries
+                    </Station>
+                    <Station tag={<Link href="/docs/changelog#050">v0.5</Link>} title="The depth release" delay=".2s">
+                        Pydantic actions + OpenAPI · streaming SSR through &lt;Suspense&gt; · SSG &amp; ISR · pub/sub · background work · observability · &lt;Image&gt; · rate limiter · type-aware JSX
+                    </Station>
+                    <Station tag={<Link href="/docs/changelog#060">v0.6</Link>} title="Your app, in Markdown" delay=".24s">
+                        every page answers in .md at its URL · generated /llms.txt · discovery headers — this page has a twin
+                    </Station>
+                    <Station tag={<Link href="/docs/changelog#070">v0.7</Link>} title="The hardened run" delay=".28s">
+                        React 19 · Vite 7 · concurrent streaming SSR, per-request isolation · calmer dev server · shadcn/ui end to end
+                    </Station>
+                    <Station tag={<Link href="/docs/changelog#080">v0.8</Link>} title="Studio &amp; the debugger" delay=".32s">
+                        /__pyxle/studio in pyxle dev · breakpoints on both halves of a .pyxl at once · tracebacks that name your source
+                    </Station>
+                    <Station tag={<Link href="/docs/changelog#090">v0.9</Link>} title="The honest dev loop" delay=".36s">
+                        a page that won&rsquo;t compile is an error, not a 404 · a JSX typo fails the rebuild · errors name the file · overlay survives reload
+                    </Station>
+                    <Station tag={<Link href="/plugins">plugins 0.2</Link>} title="Official plugins on PyPI" delay=".4s">
+                        pyxle-db · pyxle-auth · pyxle-mail — CI against live PostgreSQL and MySQL
+                    </Station>
+                    <Station tag={<Link href="/benchmarks">site</Link>} title="Benchmarks in the open" delay=".44s">
+                        reproducible two-box runs · six rival frameworks · load generator on its own hardware · losses shown next to wins
+                    </Station>
+                </div>
             </div>
         </section>
     );
 }
 
-function Closing() {
+/* ── 02 · executing — the caret is here ──────────────────────────── */
+
+function NowSection() {
+    const [ref, seen] = useSeen();
     return (
-        <GpSection n="04" id="join" wide>
-            <div className="mx-auto max-w-2xl text-center">
-                <h2 className="font-display text-[2rem] font-[540] leading-[1.1] text-ink sm:text-[2.4rem]">
-                    <span className="gp-lm"><span>The fastest way to move this page.</span></span>
-                </h2>
-                <div className="mt-8 flex flex-wrap items-center justify-center gap-5">
-                    <InkButton href="/plugins">Claim a founding slot</InkButton>
-                    <EditorialLink href="/docs/plugins/rfc-plugin-pages">Comment on the RFC</EditorialLink>
+        <section ref={ref} className={`sec sec-now${seen ? ' seen' : ''}`} id="now">
+            <div className="frame">
+                <Rulebar tab="02 · Executing" href="#now" folio="02" />
+                <div className="sec-head rv">
+                    <h2>In motion, now.</h2>
+                    <Receipt>both stations are live — not announcements</Receipt>
+                </div>
+                <div className="rm-led">
+                    <Station tag="live" live title="The founding plugin cohort" delay=".04s">
+                        first five community plugins to clear the published bar · spotlight, core-team review, a roadmap seat · <Link className="link" href="/plugins">claim a slot</Link>
+                    </Station>
+                    <Station tag="live" live title="RFC — plugin routes &amp; pages" delay=".1s">
+                        Phase B, co-designed in the open with founding authors · <Link className="link" href="/docs/plugins/rfc-plugin-pages">read the RFC</Link>
+                    </Station>
                 </div>
             </div>
-        </GpSection>
+        </section>
     );
 }
 
-/* ── Page ────────────────────────────────────────────────────── */
+/* ── 03 · queued — in rough order, undated on purpose ────────────── */
+
+function QueuedSection({ version }) {
+    const [ref, seen] = useSeen();
+    return (
+        <section ref={ref} className={`sec sec-queued${seen ? ' seen' : ''}`} id="queued">
+            <div className="frame">
+                <Rulebar tab="03 · Queued" href="#queued" folio="03" />
+                <div className="sec-head rv">
+                    <h2>Ahead, in rough order.</h2>
+                    <Receipt>planned · subject to change · never dated — when something moves, it moves up</Receipt>
+                </div>
+                <div className="rm-led">
+                    <Station cls="q" tag="B1" title="Plugins ship API routes" delay=".04s">
+                        pyxle-auth&rsquo;s sign-in endpoints out of the box · webhook plugins own their URLs, right CSRF posture
+                    </Station>
+                    <Station cls="q" tag="B2" title="Plugins ship pages" delay=".08s">
+                        sign-in screens · dashboards · the admin-panel moment
+                    </Station>
+                    <Station cls="q" tag="·" title="Capability contracts" delay=".12s">
+                        framework interfaces for mail, storage, cache — providers swappable by config, adapters from the community
+                    </Station>
+                    <Station cls="q" tag="·" title="The ecosystem quests" delay=".16s">
+                        mail · storage · jobs · observability — <Link className="link" href="/docs/plugins/ideas">browse the ideas</Link>
+                    </Station>
+                    <Station cls="q" tag="·" title="TypeScript, all the way through" delay=".2s">
+                        .tsx inside your .pyxl · loader-data types generated from the Python side · typecheck gate shipped in v0.5
+                    </Station>
+                    <Station cls="q" tag="·" title="The component inspector" delay=".24s">
+                        click any element → the .pyxl that rendered it · bundle-size treemap for the client build
+                    </Station>
+                    <Station cls="q" tag="·" title="Deeper editor tooling" delay=".28s">
+                        diagnostics, completions, go-to-definition across the Python↔JSX boundary · pyxle check grows into a linter
+                    </Station>
+                    <Station cls="q" tag="·" title="The Pyxle blog" delay=".32s">
+                        engineering notes — how the SSR pool works · what the benchmarks taught · what broke
+                    </Station>
+                    <Station cls="q" tag="1.0" title="The stability line" delay=".36s">
+                        minor versions stop being allowed to break you · lands when the plugin API has proven itself, not on a date
+                    </Station>
+                    <Station cls="q" tag="cloud" title="Pyxle Cloud" delay=".4s">
+                        push a Pyxle app, skip the server story — AI scaffolding in the mix · in development · the newsletter hears it first
+                    </Station>
+                </div>
+                <div className="rm-close rv" style={{ '--rvd': '.14s' }}>
+                    <CopyChip text="pip install pyxle-framework" />
+                    <a className="link" href="https://github.com/pyxle-dev/pyxle-plugins/issues/new?template=submit-plugin.yml" target="_blank" rel="noreferrer">
+                        claim a founding slot <span className="a">→</span>
+                    </a>
+                </div>
+                <Receipt className="rv" style={{ marginTop: 20, '--rvd': '.18s' }}>
+                    MIT · {version ? `v${version}` : 'pre-1.0'} · Python 3.10+ · 0.1 → 0.9 in under five months
+                </Receipt>
+            </div>
+        </section>
+    );
+}
+
+/* ── page ────────────────────────────────────────────────────────── */
 
 export default function RoadmapPage({ data }) {
-    const { version } = data;
-    useScrollReveal();
-
+    const version = data && data.version;
+    /* the hero's running head is visible from the start (f.js law) */
+    const [heroRef, heroSeen] = useSeen({ immediate: true });
     return (
         <>
-            <Head>
-                <title>Roadmap - Pyxle Framework</title>
-                <meta name="description" content="The Pyxle roadmap, typeset as a print run: what shipped (with releases cited), what's in motion — the Founding Plugin Program and the Phase B RFC — and what's queued, undated on purpose." />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <meta name="theme-color" content="#101411" />
-                <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-                <meta property="og:title" content="Pyxle Roadmap - proofed, pressed, and ahead" />
-                <meta property="og:description" content="What shipped, what's on the press, and what's next for Pyxle." />
-                <meta property="og:image" content="https://pyxle.dev/branding/og-default.png" />
-                <meta property="og:type" content="website" />
-                <meta name="twitter:card" content="summary_large_image" />
-                <meta name="twitter:image" content="https://pyxle.dev/branding/og-default.png" />
-            </Head>
+            <PageMeta
+                title="Roadmap"
+                description="The Pyxle roadmap as a printed ledger: every shipped line cites its release, the current work wears the WORKING COPY stamp, and nothing ahead carries a date it can't keep."
+                path="/roadmap"
+            />
             <main id="main">
-                <Hero />
-                <Timeline />
-                <Closing />
+                <section ref={heroRef} className={`sec rm-hero${heroSeen ? ' seen' : ''}`} id="top">
+                    <div className="frame">
+                        <Rulebar hero tab="Roadmap · The ledger" />
+                        <div className="rm-hero-head">
+                            <h1 className="b" style={{ '--bd': '.05s' }}>Every shipped line cites its release.</h1>
+                            <Receipt className="b" style={{ '--bd': '.16s' }}>
+                                0.1 → 0.9 in under five months · ahead is undated on purpose ·
+                                the detail lives in the <Link className="link" href="/docs/changelog">changelog</Link>
+                            </Receipt>
+                            {/* the stamp's one reuse: the ledger's "you are here" */}
+                            <div className="rm-stamp b b-stamp" style={{ '--bd': '.5s' }} aria-label={`working copy — version ${version || 'pre-1.0'}, pre-1.0, API may change`}>
+                                <span className="rm-stamp-top">Working copy</span>
+                                <span className="rm-stamp-mid">{version ? `v${version}` : 'pre-1.0'} · executing</span>
+                                <span className="rm-stamp-low">pre-1.0 · API may change</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <ShippedSection />
+                <NowSection />
+                <QueuedSection version={version} />
             </main>
-            <GalleyFooter version={version} />
         </>
     );
 }

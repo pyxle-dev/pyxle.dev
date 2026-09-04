@@ -1,696 +1,569 @@
-@server
-async def load_benchmarks(request):
-    from pyxle import __version__
-    return {"version": __version__}
-
-
-import React, { useState } from 'react';
-import { Head } from 'pyxle/client';
-import {
-    useScrollReveal, CopyButton, InkButton, EditorialLink,
-    GpSection, GpHead, GalleyFooter,
-} from './components/galley.jsx';
+import './styles/f-benchmarks.css';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'pyxle/client';
+import { PageMeta } from './components/e-meta.jsx';
+import { Rulebar, Receipt, CopyChip, useSeen } from './components/f-kit.jsx';
 
 /* ════════════════════════════════════════════════════════════════
-   GALLEY PROOF — /benchmarks, set as a lab report. The method is a
-   spec sheet, the findings a numbered list, the results a typeset
-   ledger and printed bars. Every number is real and reproducible;
-   the page's only flourish is the logo's own gesture — a stroke
-   that draws itself and a dot that lands like a period.
+   F — THE WORKING COPY · /benchmarks — the full datasheet.
+
+   The homepage's F4 ("Numbers we can defend.") grown into a page:
+   every benchmark is a FIG on a Deck plate, green bars are Pyxle's
+   own measured runs, Faint bars are everyone else — including the
+   figures we lose — and the test conditions are printed INSIDE each
+   plate. No animated counters, no scroll scrub: bars draw once when
+   a figure enters the viewport, and after that the page moves only
+   when the visitor acts (endpoint tabs, the workers toggle).
+
+   Every figure is the real measured number (req/s at 100 concurrent
+   connections — two AWS c7i.2xlarge boxes: the seven frameworks on
+   one, oha on the other, over the private network; native
+   multi-process production mode at 8 workers, dynamic SSR per core;
+   median of 3 reps). Measured July 2026 on Pyxle 0.7.1, straight
+   from the raw oha JSON (benchmarks/results/0.7.1-run) — and NOT
+   re-measured for the 0.9 line, which the page says plainly.
+
+   Hydration law: the default state (form POST · Python only ·
+   8 workers) is server-rendered and identical on the first client
+   render; bar widths are deterministic inline styles; `.seen` starts
+   false on both sides and flips post-mount.
    ════════════════════════════════════════════════════════════════ */
 
-export const slots = {
-    'nav-extra': () => (
-        <a
-            href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/benchmarks.pyxl"
-            target="_blank"
-            rel="noreferrer"
-            title="View this page's source"
-            className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
-        >
-            source ↗
-        </a>
-    ),
+const RUN = 'July 2026 · median of 3 reps';
+const HARNESS = 'https://github.com/pyxle-dev/benchmarks';
+const REPRO_CMD = `git clone ${HARNESS} && cd benchmarks && ./bench.sh --suite=all --workers=auto`;
+const fmt = (n) => n.toLocaleString('en-US');
+
+/* ── data — byte-matched to the published 0.7.1 run ─────────────── */
+
+const FW = {
+    pyxle:   { name: 'Pyxle',   ver: 'Pyxle 0.7.1' },
+    fastapi: { name: 'FastAPI', ver: 'FastAPI 0.139' },
+    flask:   { name: 'Flask',   ver: 'Flask 3.1' },
+    django:  { name: 'Django',  ver: 'Django 5.2' },
+    express: { name: 'Express', ver: 'Express 5.2' },
+    hono:    { name: 'Hono',    ver: 'Hono 4.12' },
+    nextjs:  { name: 'Next.js', ver: 'Next.js 16.2' },
 };
-export const createSlots = () => slots;
+const PY_SET = ['pyxle', 'fastapi', 'flask', 'django'];
+const ALL_SET = ['pyxle', 'fastapi', 'flask', 'django', 'express', 'hono', 'nextjs'];
 
-/* ── data ────────────────────────────────────────────────────────
-   req/s at 100 concurrent connections — two AWS c7i.2xlarge boxes
-   (8 vCPU each): the seven frameworks on one, the load generator
-   (oha) on the other, over the private network. Native multi-process
-   production mode at 8 workers (dynamic SSR measured per core); median of
-   3 reps. Measured July 2026 on Pyxle 0.7.1; numbers taken straight from the
-   raw oha JSON (benchmarks/results/0.7.1-run) before publishing. ────────── */
-
-const PYTHON_FRAMEWORKS = [
-    { key: "pyxle", name: "Pyxle", type: "Full-stack (SSR + API)" },
-    { key: "fastapi", name: "FastAPI", type: "API framework" },
-    { key: "django", name: "Django", type: "Full-stack (no SSR)" },
-    { key: "flask", name: "Flask", type: "Micro framework" },
-];
-
-const ALL_FRAMEWORKS = [
-    ...PYTHON_FRAMEWORKS,
-    { key: "express", name: "Express", type: "API framework" },
-    { key: "hono", name: "Hono", type: "Ultralight API" },
-    { key: "nextjs", name: "Next.js", type: "Full-stack (SSR + API)" },
-];
-
-const TESTS = {
+const EP = {
     form: {
-        name: "Form Submission (POST)",
-        desc: "Parse a JSON body, validate fields, return a response. Measures the request-processing pipeline.",
+        label: 'form POST',
+        desc: 'parse a JSON body · validate fields · respond — the request-processing pipeline',
         data: { pyxle: 52438, fastapi: 47125, django: 8576, flask: 21264, express: 42949, hono: 79278, nextjs: 7805 },
     },
     json: {
-        name: "JSON Serialization",
-        desc: "Return a static JSON object. Measures pure framework and serialization overhead.",
+        label: 'JSON',
+        desc: 'return a static JSON object — pure framework + serialization overhead',
         data: { pyxle: 59766, fastapi: 61565, django: 9126, flask: 23809, express: 53164, hono: 212528, nextjs: 8854 },
     },
     health: {
-        name: "Health Check",
-        desc: "A minimal endpoint. Measures raw framework routing overhead.",
+        label: 'health check',
+        desc: 'a minimal endpoint — raw routing overhead',
         data: { pyxle: 59785, fastapi: 63040, django: 9138, flask: 24094, express: 54058, hono: 214692, nextjs: 8953 },
     },
     db: {
-        name: "Single DB Query",
-        desc: "Read one random row from SQLite with a persistent per-worker connection. The driver dominates here, not the framework.",
+        label: '1 DB query',
+        desc: 'one random SQLite row, persistent per-worker connection — the driver dominates, not the framework',
         data: { pyxle: 29299, fastapi: 32319, django: 6970, flask: 21382, express: 47937, hono: 172870, nextjs: 8667 },
     },
-    queries5: {
-        name: "Multiple Queries (5)",
-        desc: "Read 5 random rows from SQLite. Measures query-loop performance.",
+    q5: {
+        label: '5 queries',
+        desc: 'five random SQLite rows — query-loop performance',
         data: { pyxle: 24681, fastapi: 22013, django: 6298, flask: 18286, express: 41031, hono: 105988, nextjs: 8121 },
     },
-    queries20: {
-        name: "Multiple Queries (20)",
-        desc: "Read 20 random rows from SQLite. A heavier database workload where the query loop dominates.",
+    q20: {
+        label: '20 queries',
+        desc: 'twenty random SQLite rows — the query loop dominates',
         data: { pyxle: 15569, fastapi: 11862, django: 5432, flask: 14213, express: 26205, hono: 34547, nextjs: 7601 },
     },
 };
 
-// Dynamic SSR — the full page re-rendered on every request, at 100
-// concurrent connections, per core (single worker — SSR is CPU-bound
-// on the Node render, so per-core isolates true render efficiency and
-// avoids core oversubscription). Pyxle's @server vs Next.js
-// force-dynamic, on equivalent pages (same data, same DOM —
-// parity-verified; see the payload note below).
-const SSR_COMPARISON = [
-    { page: "Landing page", detail: "Hero, feature grid, stats — a typical marketing home", pyxle: 1151, nextjs: 524, pyxleP50: 84, nextjsP50: 183 },
-    { page: "300-row data table", detail: "A large inventory table, fully server-rendered", pyxle: 158, nextjs: 75, pyxleP50: 644, nextjsP50: 1344 },
-    { page: "Nested dashboard", detail: "Stat cards, grouped category cards, and a data table", pyxle: 237, nextjs: 103, pyxleP50: 419, nextjsP50: 983 },
-    { page: "API route, same app", detail: "A JSON endpoint served through each full SSR app", pyxle: 11784, nextjs: 2149, pyxleP50: 8, nextjsP50: 45 },
+// Dynamic SSR — the full page re-rendered per request, per core
+// (a separate single-worker pass isolates true render efficiency).
+const SSR = [
+    { key: 'landing',  page: 'Landing page',        detail: 'hero, feature grid, stats — a typical marketing home', p: { rps: 1151,  p50: 84 },  n: { rps: 524,  p50: 183 },  x: '2.20' },
+    { key: 'table',    page: '300-row data table',  detail: 'a large inventory table, fully server-rendered',       p: { rps: 158,   p50: 644 }, n: { rps: 75,   p50: 1344 }, x: '2.11' },
+    { key: 'dash',     page: 'Nested dashboard',    detail: 'stat cards, grouped category cards, and a data table', p: { rps: 237,   p50: 419 }, n: { rps: 103,  p50: 983 },  x: '2.30' },
+    { key: 'apiroute', page: 'API route, same app', detail: 'a JSON endpoint served through each full SSR app',     p: { rps: 11784, p50: 8 },   n: { rps: 2149, p50: 45 },   x: '5.48' },
 ];
 
 // Same app, same box — the only change is `pyxle serve --workers 8`.
-// req/s at 100 connections, 1 worker vs 8 workers.
-const SCALING = [
-    { test: "JSON serialization", one: 11820, eight: 59766 },
-    { test: "Form POST", one: 10705, eight: 52438 },
-    { test: "Single DB query", one: 3816, eight: 29299 },
-    { test: "Five-query page", one: 1961, eight: 24681 },
+const SCALE = [
+    { test: 'JSON serialization', one: 11820, eight: 59766, x: '5.1×' },
+    { test: 'Form POST',          one: 10705, eight: 52438, x: '4.9×' },
+    { test: 'Single DB query',    one: 3816,  eight: 29299, x: '7.7×' },
+    { test: 'Five-query page',    one: 1961,  eight: 24681, x: '12.6×' },
 ];
 
-// The five takeaways as a scoreboard — the numeral carries the point;
-// the tables and bars below are the accessible detail. Kept honest: a
-// range where the data is a range, the losses stated as a fact.
-const SCOREBOARD = [
-    { n: "~2.2×", label: "Next.js throughput at dynamic SSR, per core" },
-    { n: "2–3×", label: "smaller HTML for the same DOM — no hydration blob" },
-    { n: "±3%", label: "of FastAPI on JSON — ahead once real work appears, behind on a single-row read" },
-    { n: "~5×", label: "more throughput with one flag: pyxle serve --workers 8" },
-    { n: "0", label: "errors, timeouts, or non-2xx across the whole suite" },
-    { n: "Hono", label: "owns raw JSON — a Node ultralight, and we say so" },
+// Bytes on the wire — same DOM, per response (per-request pages only).
+const BYTES = [
+    { page: 'Landing page',       detail: 'whole HTML document, per response', pv: '5.4 KB',  nv: '13.7 KB', pct: 39.4 },
+    { page: '300-row data table', detail: 'the table page, fully rendered',    pv: '145 KB',  nv: '332 KB',  pct: 43.7 },
 ];
 
-/* ── Lighthouse score gauge ──────────────────────────────────
-   Four circular gauges matching the visual language of the
-   Google Lighthouse report. Values are pyxle.dev's actual
-   production desktop scores. Update if the real numbers change.
-   ────────────────────────────────────────────────────────── */
-
-const LH_SCORES = [
-    { label: "Performance", value: 100 },
-    { label: "Accessibility", value: 100 },
-    { label: "Best Practices", value: 100 },
-    { label: "SEO", value: 100 },
+// pyxle.dev's actual production desktop Lighthouse scores.
+const LH = [
+    ['100', 'Performance'], ['100', 'Accessibility'], ['100', 'Best Practices'], ['100', 'SEO'],
 ];
 
-/* ── shared page furniture ───────────────────────────────────── */
-
-const METHOD_ROWS = [
-    ["Generator", "oha v1.14 — on a separate box"],
-    ["Hardware", "2× AWS c7i.2xlarge (8 vCPU each)"],
-    ["Protocol", "100 connections · median of 3 reps"],
-    ["Duration", "12s per test, 8s warmup"],
-    ["Workers", "8 per framework (native multi-process)"],
-    ["Correctness", "0 errors · 0 non-2xx · 0 timeouts"],
+/* the printed contents — six findings, each a row in the index */
+const TOC = [
+    ['#ssr',     '01', '~2.2×',  'Next.js dynamic-SSR throughput, per core — the cross-ecosystem reference'],
+    ['#field',   '02', '±3%',    'parity with FastAPI on JSON — ahead once real work appears'],
+    ['#scaling', '03', '~5×',    'more throughput with one flag — pyxle serve --workers 8'],
+    ['#losses',  '04', 'Hono',   'owns raw JSON — a Node ultralight, and we say so'],
+    ['#bytes',   '05', '2–3×',   'smaller HTML for the same DOM — no hydration blob'],
+    ['#method',  '06', '0',      'errors, timeouts, or non-2xx across the whole suite'],
 ];
 
-const noteLinkCls = 'focus-ring rounded text-acct underline decoration-1 underline-offset-4 hover:decoration-2';
+/* ── shared figure furniture ─────────────────────────────────────── */
 
-/* ── Hero ────────────────────────────────────────────────────── */
+/* $ reproduce — every figure carries the real harness command */
+function ReproChip() {
+    const [copied, setCopied] = useState(false);
+    const timerRef = useRef(null);
+    useEffect(() => () => clearTimeout(timerRef.current), []);
+    const go = useCallback(() => {
+        const done = () => {
+            setCopied(true);
+            clearTimeout(timerRef.current);
+            timerRef.current = setTimeout(() => setCopied(false), 1400);
+        };
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(REPRO_CMD).then(done, done);
+        } else done();
+    }, []);
+    return (
+        <button type="button" className={`bm-repro${copied ? ' copied' : ''}`} onClick={go}>
+            <span className="d" aria-hidden="true">$</span> reproduce · {copied ? 'copied' : 'copy'}
+            <span role="status" className="sr">{copied ? 'Copied to clipboard' : ''}</span>
+        </button>
+    );
+}
+
+function Plate({ tag, children }) {
+    return (
+        <figure className="bm-plate">
+            <div className="bm-plate-head">
+                <span className="bm-plate-tag">{tag}</span>
+                <ReproChip />
+            </div>
+            {children}
+        </figure>
+    );
+}
+
+function BarRow({ label, me, pct, value, sub, scale }) {
+    return (
+        <p className={`bm-row${me ? ' me' : ''}${scale ? ' bm-scale-row' : ''}`}>
+            <span className="fn">{label}</span>
+            <span className="bm-track"><span className={`bm-bar ${me ? 'bm-bar-g' : 'bm-bar-k'}`} style={{ '--w': `${pct}%` }} /></span>
+            <span className="fv">{value}{sub ? <i> · {sub}</i> : null}</span>
+        </p>
+    );
+}
+
+/* ── hero — the datasheet's cover: claim, conditions, contents ───── */
 
 function Hero() {
+    /* the hero's running head is visible from the start (f.js law) */
+    const [ref, seen] = useSeen({ immediate: true });
     return (
-        <section className="relative">
-            <div className="mx-auto max-w-[76rem] px-5 pb-14 pt-28 sm:px-8 sm:pb-20 sm:pt-36">
-                <p className="font-mono text-xs uppercase tracking-[0.14em] text-ink2">
-                    The numbers
-                </p>
-                {/* The h1 paints immediately (LCP); only its period performs. */}
-                <h1 className="mt-5 font-display text-[2.9rem] font-[560] leading-[1.04] tracking-[-0.015em] text-ink sm:text-[4.2rem] lg:text-[5.2rem]">
-                    Benchmarked
-                    <br />
-                    in the&nbsp;open<span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
-                    <span className="sr-only">.</span>
-                </h1>
-                <p className="mt-7 max-w-[58ch] text-pretty text-lg leading-[1.7] text-ink2">
-                    Reproducible benchmarks comparing Pyxle against popular web frameworks —
-                    every framework implements{' '}
-                    <span className="text-ink">identical endpoints</span> in its native
-                    multi-process production mode, measured from a{' '}
-                    <span className="text-ink">separate load-generator box</span> so the harness
-                    is never the ceiling. No cherry-picking, and the tests Pyxle loses are
-                    shown too.
+        <section ref={ref} className={`sec bm-hero${seen ? ' seen' : ''}`} id="top">
+            <div className="frame">
+                <Rulebar hero tab="Benchmarks · The datasheet" />
+                <div className="bm-hero-head">
+                    <h1 className="b" style={{ '--bd': '.05s' }}>Numbers we can defend.</h1>
+                    <Receipt className="b" style={{ '--bd': '.16s' }}>
+                        every figure below carries its own test conditions · measured July 2026
+                        on Pyxle 0.7.1 · not re-measured for the 0.9 line
+                    </Receipt>
+                    <nav className="bm-contents b" style={{ '--bd': '.28s' }} aria-label="Findings">
+                        {TOC.map(([href, n, v, l]) => (
+                            <a key={n} className="bm-toc" href={href}>
+                                <span className="n">{n}</span>
+                                <span className="v">{v}</span>
+                                <span className="l">{l}</span>
+                                <span className="g2">read <span className="a">→</span></span>
+                            </a>
+                        ))}
+                    </nav>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── 01 · SSR — the cross-ecosystem reference ────────────────────── */
+
+function SsrSection() {
+    const [ref, seen] = useSeen();
+    return (
+        <section ref={ref} className={`sec sec-ssr${seen ? ' seen' : ''}`} id="ssr">
+            <div className="frame">
+                <Rulebar tab="01 · SSR" href="#ssr" folio="01" />
+                <div className="sec-head rv">
+                    <h2>The SSR reference.</h2>
+                    <Receipt>the full page, re-rendered per request · per core · the JS incumbent, for scale</Receipt>
+                </div>
+                <div className="rv" style={{ '--rvd': '.08s' }}>
+                    <Plate tag="FIG 01 · dynamic SSR throughput, per core">
+                        <div className="bm-pairs">
+                            {SSR.map((s) => (
+                                <div key={s.key} className="bm-pair">
+                                    <p className="bm-pair-h">
+                                        <span className="pg">{s.page}</span>
+                                        <span className="dt">{s.detail}</span>
+                                        <span className="dx">{s.x}×</span>
+                                    </p>
+                                    <BarRow me label="pyxle" pct={100} value={`${fmt(s.p.rps)} req/s`} sub={`p50 ${fmt(s.p.p50)} ms`} />
+                                    <BarRow label="next.js" pct={Number(((s.n.rps / s.p.rps) * 100).toFixed(1))} value={`${fmt(s.n.rps)} req/s`} sub={`p50 ${fmt(s.n.p50)} ms`} />
+                                </div>
+                            ))}
+                        </div>
+                        <figcaption className="bm-cond">
+                            <b>conditions</b> — Pyxle 0.7.1 (Starlette 0.37.2) vs Next.js 16.2 (React 19.2),
+                            force-dynamic · single worker per core pass · 100 connections · {RUN} ·
+                            parity-verified DOM · roughly half the median latency at every page complexity
+                        </figcaption>
+                    </Plate>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── 02 · the field — Pyxle among the Python frameworks ──────────── */
+
+function FieldSection() {
+    const [ref, seen] = useSeen();
+    const [ep, setEp] = useState('form');
+    const [all, setAll] = useState(false);
+    const e = EP[ep];
+    const set = (all ? ALL_SET : PY_SET).slice().sort((a, b) => e.data[b] - e.data[a]);
+    const max = e.data[set[0]];
+    return (
+        <section ref={ref} className={`sec sec-field${seen ? ' seen' : ''}`} id="field">
+            <div className="frame">
+                <Rulebar tab="02 · The field" href="#field" folio="02" />
+                <div className="sec-head rv">
+                    <h2>The Python field first.</h2>
+                    <Receipt>identical endpoints, parity-verified · 8 workers · 100 connections · req/s, higher is better</Receipt>
+                </div>
+                <div className="rv" style={{ '--rvd': '.08s' }}>
+                    <Plate tag="FIG 02 · identical endpoints, side by side">
+                        <div className="bm-tabs" role="tablist" aria-label="Endpoint">
+                            {Object.entries(EP).map(([key, t]) => (
+                                <button key={key} type="button" className="bm-tab" aria-pressed={ep === key} onClick={() => setEp(key)}>
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="bm-epdesc">{e.desc}</p>
+                        <div className="bm-rows">
+                            {set.map((k) => {
+                                const v = e.data[k];
+                                return (
+                                    <BarRow
+                                        key={k}
+                                        me={k === 'pyxle'}
+                                        label={FW[k].name}
+                                        pct={Number(((v / max) * 100).toFixed(1))}
+                                        value={fmt(v)}
+                                    />
+                                );
+                            })}
+                        </div>
+                        <div className="bm-tabs" style={{ marginTop: 26, marginBottom: 0, borderBottom: 0 }} role="group" aria-label="Framework set">
+                            <button type="button" className="bm-tab" aria-pressed={!all} onClick={() => setAll(false)}>Python only</button>
+                            <button type="button" className="bm-tab" aria-pressed={all} onClick={() => setAll(true)}>+ the JS row, for scale</button>
+                        </div>
+                        <figcaption className="bm-cond">
+                            <b>the reading</b> — JSON: parity with FastAPI (±3%) · health ping: ~5% behind ·
+                            form POST and the multi-query pages: ahead · single-row read: ~10% behind —
+                            and Pyxle carries its full middleware stack (SSR · gzip · server actions) in every run ·
+                            versions in <a className="link" href="#method">the method</a> · {RUN}
+                        </figcaption>
+                    </Plate>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── 03 · scaling — one flag, every core ─────────────────────────── */
+
+function ScalingSection() {
+    const [ref, seen] = useSeen();
+    const [eight, setEight] = useState(true); /* static-complete default: 8 workers */
+    const MAX = 59766;
+    return (
+        <section ref={ref} className={`sec sec-scaling${seen ? ' seen' : ''}`} id="scaling">
+            <div className="frame">
+                <Rulebar tab="03 · Scaling" href="#scaling" folio="03" />
+                <div className="sec-head rv">
+                    <h2>One flag, every core.</h2>
+                    <Receipt>same app, same 8-core box · no load balancer, no shared state — an independent process per core</Receipt>
+                </div>
+                <div className="rv" style={{ '--rvd': '.08s' }}>
+                    <Plate tag="FIG 03 · workers 1 → 8">
+                        <div className="bm-tabs" role="group" aria-label="Worker count">
+                            <button type="button" className="bm-tab" aria-pressed={!eight} onClick={() => setEight(false)}>
+                                <span className="d" aria-hidden="true">$</span> pyxle serve --workers 1
+                            </button>
+                            <button type="button" className="bm-tab" aria-pressed={eight} onClick={() => setEight(true)}>
+                                <span className="d" aria-hidden="true">$</span> pyxle serve --workers 8
+                            </button>
+                        </div>
+                        <div className="bm-rows">
+                            {SCALE.map((d) => {
+                                const v = eight ? d.eight : d.one;
+                                return (
+                                    <BarRow
+                                        key={d.test}
+                                        me
+                                        scale
+                                        label={d.test}
+                                        pct={Number(((v / MAX) * 100).toFixed(1))}
+                                        value={fmt(v)}
+                                        sub={eight ? <span className="fx-m">{d.x}</span> : '1 worker'}
+                                    />
+                                );
+                            })}
+                        </div>
+                        <figcaption className="bm-cond">
+                            <b>the reading</b> — mean 9.0× across the six API tests; FastAPI does 7.4× on the
+                            same move · multi-query passes 8× because one worker serializes its blocking
+                            SQLite reads and eight overlap them · per core the optimized Node runtimes
+                            still lead · requires Pyxle 0.4.3+ · {RUN}
+                        </figcaption>
+                    </Plate>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── 04 · losses — a benchmark page that only shows wins is an ad ── */
+
+function LossesSection() {
+    const [ref, seen] = useSeen();
+    return (
+        <section ref={ref} className={`sec sec-losses${seen ? ' seen' : ''}`} id="losses">
+            <div className="frame">
+                <Rulebar tab="04 · Losses" href="#losses" folio="04" />
+                <div className="sec-head rv">
+                    <h2>Where Pyxle loses.</h2>
+                    <Receipt>a benchmark page that only shows wins is an ad · same boxes, same run</Receipt>
+                </div>
+                <div className="bm-losses">
+                    <div className="rv" style={{ '--rvd': '.08s' }}>
+                        <Plate tag="FIG 04 · raw JSON — nothing to render">
+                            <div className="bm-rows">
+                                <BarRow label="Hono" pct={100} value="212,528" />
+                                <BarRow label="FastAPI" pct={29.0} value="61,565" />
+                                <BarRow me label="Pyxle" pct={28.1} value="59,766" />
+                            </div>
+                            <figcaption className="bm-cond">
+                                Hono — an ultralight with no SSR — is ~3.5× ahead, and FastAPI edges Pyxle
+                                by a few percent on JSON and the bare health ping · the off-box generator
+                                is what keeps this gap visible · {RUN}
+                            </figcaption>
+                        </Plate>
+                    </div>
+                    <div className="rv" style={{ '--rvd': '.16s' }}>
+                        <Plate tag="FIG 05 · single DB read — one random row">
+                            <div className="bm-rows">
+                                <BarRow label="Hono" pct={100} value="172,870" />
+                                <BarRow label="Express" pct={27.7} value="47,937" />
+                                <BarRow label="FastAPI" pct={18.7} value="32,319" />
+                                <BarRow me label="Pyxle" pct={16.9} value="29,299" />
+                            </div>
+                            <figcaption className="bm-cond">
+                                native better-sqlite3 bindings own the single read, and FastAPI leads by
+                                ~10% · add real work and it flips: Pyxle 24,681 vs FastAPI 22,013 on the
+                                five-query page · {RUN}
+                            </figcaption>
+                        </Plate>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── 05 · bytes — the same DOM, weighed ──────────────────────────── */
+
+function BytesSection() {
+    const [ref, seen] = useSeen();
+    return (
+        <section ref={ref} className={`sec sec-bytes${seen ? ' seen' : ''}`} id="bytes">
+            <div className="frame">
+                <Rulebar tab="05 · Bytes" href="#bytes" folio="05" />
+                <div className="sec-head rv">
+                    <h2>Same DOM, fewer bytes.</h2>
+                    <Receipt>HTML per response, per-request pages only — static content caches equally on both</Receipt>
+                </div>
+                <div className="rv" style={{ '--rvd': '.08s' }}>
+                    <Plate tag="FIG 06 · bytes on the wire — lower is better">
+                        <div className="bm-pairs">
+                            {BYTES.map((b) => (
+                                <div key={b.page} className="bm-pair">
+                                    <p className="bm-pair-h">
+                                        <span className="pg">{b.page}</span>
+                                        <span className="dt">{b.detail}</span>
+                                        <span className="dx">{Math.round(b.pct)}% the bytes</span>
+                                    </p>
+                                    <BarRow me label="pyxle" pct={b.pct} value={b.pv} />
+                                    <BarRow label="next.js" pct={100} value={b.nv} sub="includes the RSC hydration payload" />
+                                </div>
+                            ))}
+                        </div>
+                        <figcaption className="bm-cond">
+                            <b>conditions</b> — equivalent SSR DOM, verified before the run · production
+                            builds · measured July 2026 · the difference is the hydration blob Pyxle
+                            never ships
+                        </figcaption>
+                    </Plate>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── 06 · method — how the numbers were made ─────────────────────── */
+
+const METHOD_ROWS = [
+    ['protocol', '12 s per test · 8 s warm-up · median of 3 reps'],
+    ['parity', 'identical JSON shape + equivalent SSR DOM, verified before every run — or the run aborts'],
+    ['database', 'SQLite (WAL) · 1,000 pre-seeded rows · persistent per-worker connection'],
+    ['per-core pass', 'a separate single-worker pass measures per-core throughput'],
+    ['correctness', '0 errors · 0 non-2xx · 0 timeouts across the suite'],
+    ['versions', 'Pyxle 0.7.1 (Starlette 0.37.2) · Hono 4.12 · Express 5.2 · Next.js 16.2 (React 19.2) · FastAPI 0.139 · Django 5.2 · Flask 3.1 · Node 22.23'],
+    ['servers', 'pyxle serve --workers 8 (full middleware) · uvicorn+uvloop · gunicorn · Node cluster · 8× next start'],
+    ['the 0.9 line', 'not re-measured — a real 0.7.1 figure, said plainly, over an estimate'],
+];
+
+function MethodSection() {
+    const [ref, seen] = useSeen();
+    return (
+        <section ref={ref} className={`sec sec-method${seen ? ' seen' : ''}`} id="method">
+            <div className="frame">
+                <Rulebar tab="06 · Method" href="#method" folio="06" />
+                <div className="sec-head rv">
+                    <h2>How the numbers were made.</h2>
+                    <Receipt>two boxes, one job each — the load generator is never the ceiling</Receipt>
+                </div>
+                <div className="bm-boxes rv" style={{ '--rvd': '.08s' }}>
+                    <div className="bm-box">
+                        <b>server box · c7i.2xlarge</b>
+                        8 vCPU · 8 workers · the framework under test, in native multi-process production mode
+                    </div>
+                    <div className="bm-wire" aria-hidden="true" />
+                    <div className="bm-box">
+                        <b>generator box · c7i.2xlarge</b>
+                        oha v1.14 · 100 connections · off-box over the private network
+                    </div>
+                </div>
+                <div className="bm-facts rv" style={{ '--rvd': '.14s' }}>
+                    {METHOD_ROWS.map(([k, v]) => (
+                        <p key={k} className="bm-fact"><span className="fk">{k}</span><span className="fv">{v}</span></p>
+                    ))}
+                    <p className="bm-fact">
+                        <span className="fk">harness</span>
+                        <span className="fv">
+                            <a className="link" href={HARNESS} target="_blank" rel="noreferrer">github.com/pyxle-dev/benchmarks <span className="a">→</span></a>
+                            {' '}— endpoint implementations, the Next.js apps, parity checks, raw runs
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+/* ── 07 · real world — this site is its own benchmark ────────────── */
+
+function RealWorldSection() {
+    const [ref, seen] = useSeen();
+    return (
+        <section ref={ref} className={`sec sec-real${seen ? ' seen' : ''}`} id="real">
+            <div className="frame">
+                <Rulebar tab="07 · Real world" href="#real" folio="07" />
+                <div className="sec-head rv">
+                    <h2>This site is the live specimen.</h2>
+                    <Receipt>pyxle.dev is a Pyxle app, server-rendered per request · Lighthouse desktop preset, production build</Receipt>
+                </div>
+                <div className="bm-lh rv" style={{ '--rvd': '.08s' }}>
+                    {LH.map(([n, l]) => (
+                        <div key={l} className="bm-lh-c"><span className="n">{n}</span><span className="l">{l}</span></div>
+                    ))}
+                </div>
+                <p className="bm-exits rv" style={{ '--rvd': '.14s' }}>
+                    <a className="link" href="https://pagespeed.web.dev/analysis?form_factor=desktop&url=https%3A%2F%2Fpyxle.dev" target="_blank" rel="noreferrer">
+                        verify on PageSpeed Insights <span className="a">→</span>
+                    </a>
                 </p>
             </div>
         </section>
     );
 }
 
-/* ── 01 · Method (a typeset spec sheet) ──────────────────────── */
+/* ── 08 · reproduce — run them yourself ──────────────────────────── */
 
-function Method() {
+function ReproduceSection() {
+    const [ref, seen] = useSeen();
     return (
-        <GpSection n="01" id="method">
-            <GpHead
-                n="01"
-                eyebrow="Method"
-                title="How the numbers were made."
-            />
-            <div className="mt-12 max-w-3xl">
-                <dl className="border-t border-rule">
-                    {METHOD_ROWS.map(([k, v], i) => (
-                        <div key={k} data-reveal className="flex items-baseline justify-between gap-6 border-b border-rule py-3.5" style={{ ['--reveal-delay']: `${i * 60}ms` }}>
-                            <dt className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">{k}</dt>
-                            <dd className="text-right font-mono text-[13px] text-ink sm:text-sm">{v}</dd>
-                        </div>
-                    ))}
-                </dl>
-                <p data-reveal className="mt-8 max-w-[68ch] text-pretty text-base leading-[1.7] text-ink2">
-                    Measured July 2026 on two dedicated EC2 instances in the same subnet: all
-                    seven frameworks on one box, the load generator on the other, over the
-                    private network. Off-box generation is the point — a generator sharing the
-                    server's cores becomes the bottleneck and clips the fastest frameworks
-                    toward each other, so the chart ends up measuring the harness instead of
-                    the server. Keeping the generator on its own hardware is what makes the
-                    spread between frameworks real.
-                </p>
-                <p data-reveal className="mt-5 max-w-[68ch] text-pretty text-base leading-[1.7] text-ink2">
-                    Every framework runs its native multi-process production mode at 8 workers:
-                    Pyxle via <code className="text-[0.9em] text-acct">pyxle serve --workers 8</code>{' '}
-                    with its full middleware stack, FastAPI and Django on uvicorn (uvloop), Flask
-                    on gunicorn, Express and Hono on Node's cluster module, and Next.js as 8
-                    clustered <code className="text-[0.9em] text-acct">next start</code> processes.
-                    Endpoint parity is verified before every run — each framework must return an
-                    identical JSON shape (and equivalent SSR DOM) or the run aborts. A separate
-                    single-worker pass measures per-core throughput. Database: SQLite (WAL),
-                    1,000 pre-seeded rows. Versions: Pyxle 0.7.1 (on Starlette 0.37.2, the release
-                    pinned by the shared benchmark environment), Hono 4.12, Express 5.2,
-                    Next.js 16.2 (React 19.2), FastAPI 0.139, Django 5.2, Flask 3.1, Node 22.23.
-                </p>
-                <p data-reveal className="mt-5 max-w-[68ch] text-pretty text-base leading-[1.7] text-ink2">
-                    These numbers have <strong className="font-medium text-ink">not</strong> been
-                    re-measured for the 0.9 line. Re-running the suite needs the two-box setup
-                    described above, and we would rather leave a figure we actually took — saying
-                    plainly which version it came from — than publish an estimate of what a newer
-                    release would do.
-                </p>
-                <p data-reveal className="mt-5 font-mono text-xs text-ink2">
-                    Harness:{' '}
-                    <a href="https://github.com/pyxle-dev/benchmarks" target="_blank" rel="noreferrer" className={noteLinkCls}>
-                        Source code (run it yourself) ↗
-                    </a>
-                </p>
-            </div>
-        </GpSection>
-    );
-}
-
-/* ── 02 · Findings (an editorial numbered list) ──────────────── */
-
-function Findings() {
-    return (
-        <GpSection n="02" id="findings">
-            <GpHead
-                n="02"
-                eyebrow="Findings"
-                title="Six numbers, before the tables."
-                lead="Every one is backed by a chart or table further down — including the one we lose."
-            />
-            <dl className="mt-14 grid gap-x-10 gap-y-11 sm:grid-cols-2 lg:grid-cols-3">
-                {SCOREBOARD.map((s, i) => (
-                    <div key={s.label} data-reveal className="border-t border-rule pt-5" style={{ ['--reveal-delay']: `${(i % 3) * 80}ms` }}>
-                        <dd className="font-display text-[3rem] font-[560] leading-[0.95] tracking-[-0.02em] text-acct tabular-nums sm:text-[3.4rem]">{s.n}</dd>
-                        <dt className="mt-3 max-w-[24ch] text-sm leading-relaxed text-ink2">{s.label}</dt>
-                    </div>
-                ))}
-            </dl>
-        </GpSection>
-    );
-}
-
-/* ── 03 · SSR ledger ─────────────────────────────────────────── */
-
-// The payload fact, drawn to scale within each pair (Next.js = full width):
-// the same DOM, in a fraction of the bytes, because Pyxle ships no RSC blob.
-const PAYLOADS = [
-    { page: "Landing page", pyxle: 5.4, next: 13.7 },
-    { page: "300-row data table", pyxle: 145, next: 332 },
-];
-
-function PayloadBars() {
-    return (
-        <div data-reveal className="mt-14 max-w-2xl">
-            <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">Bytes on the wire — same DOM, per response</p>
-            <div className="mt-6 flex flex-col gap-8">
-                {PAYLOADS.map((p, gi) => {
-                    const rows = [
-                        { name: "Pyxle", val: p.pyxle, isPyxle: true },
-                        { name: "Next.js", val: p.next, isPyxle: false },
-                    ];
-                    return (
-                        <div key={p.page}>
-                            <div className="flex items-baseline justify-between gap-3">
-                                <span className="text-sm font-medium text-ink">{p.page}</span>
-                                <span className="font-mono text-[11px] text-acct">{Math.round((p.pyxle / p.next) * 100)}% the bytes</span>
-                            </div>
-                            <div className="mt-3 flex flex-col gap-2">
-                                {rows.map((r, i) => {
-                                    const pct = Math.max(3, (r.val / p.next) * 100);
-                                    const style = { width: `${pct}%`, minWidth: '0.25rem', ['--rule-delay']: `${gi * 120 + i * 70}ms` };
-                                    if (!r.isPyxle) { style.background = 'var(--c-ink2)'; style.opacity = 0.35; }
-                                    return (
-                                        <div key={r.name} className="flex items-center gap-3">
-                                            <span className={`w-16 shrink-0 text-right font-mono text-[12px] ${r.isPyxle ? 'font-medium text-acct' : 'text-ink2'}`}>{r.name}</span>
-                                            <span className="flex-1">
-                                                <span className={`gp-rule-x gp-from-left block h-2 ${r.isPyxle ? 'bg-accent' : ''}`} style={style} />
-                                            </span>
-                                            <span className="w-16 shrink-0 whitespace-nowrap text-right font-mono text-[12px] tabular-nums text-ink">{r.val} KB</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
-
-function SsrLedger() {
-    return (
-        <GpSection n="03" id="ssr">
-            <GpHead
-                n="03"
-                eyebrow="Dynamic SSR"
-                title="Server-side rendering: faster than Next.js."
-                lead="The full page re-rendered on every request — the apples-to-apples match for Pyxle's @server loader and Next.js's force-dynamic. On equivalent pages (same data, same DOM, parity-verified), per core, Pyxle is 2.1–2.3× faster at every complexity — with roughly half the median latency everywhere."
-            />
-            <div data-reveal className="mt-12 max-w-4xl overflow-x-auto">
-                <table className="w-full min-w-[40rem] border-collapse">
-                    <thead>
-                        <tr className="border-b border-rule">
-                            <th scope="col" className="py-3 pr-4 text-left font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink2">Page rendered per request</th>
-                            <th scope="col" className="px-4 py-3 text-right font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-acct">Pyxle req/s · p50</th>
-                            <th scope="col" className="px-4 py-3 text-right font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink2">Next.js req/s · p50</th>
-                            <th scope="col" className="py-3 pl-4 text-right font-mono text-[11px] font-normal uppercase tracking-[0.14em] text-ink2">Pyxle advantage</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {SSR_COMPARISON.map((row) => {
-                            const ratio = (row.pyxle / row.nextjs).toFixed(2);
-                            return (
-                                <tr key={row.page} className="border-b border-rule">
-                                    <td className="py-4 pr-4 align-top">
-                                        <span className="text-sm font-medium text-ink">{row.page}</span>
-                                        <span className="mt-0.5 block text-xs text-ink2">{row.detail}</span>
-                                    </td>
-                                    <td className="px-4 py-4 text-right align-top font-mono text-sm tabular-nums text-acct">
-                                        {row.pyxle.toLocaleString()} <span className="text-[11px]">· {row.pyxleP50}ms</span>
-                                    </td>
-                                    <td className="px-4 py-4 text-right align-top font-mono text-sm tabular-nums text-ink2">
-                                        {row.nextjs.toLocaleString()} <span className="text-[11px]">· {row.nextjsP50}ms</span>
-                                    </td>
-                                    <td className="py-4 pl-4 text-right align-top font-mono text-sm font-semibold tabular-nums text-ink">{ratio}×</td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-            <PayloadBars />
-            <p data-reveal className="mt-10 max-w-[78ch] font-mono text-xs leading-relaxed text-ink2">
-                Per core, at 100 concurrent connections. Both frameworks render React on the
-                server — Pyxle via a persistent Node.js worker pool, Next.js via React Server
-                Components, which serialize the component tree into every response as the RSC
-                hydration data the bars above measure.{' '}
-                <strong className="font-semibold text-ink">The fair
-                caveat:</strong> this measures pages that <em>must</em> render per request
-                (personalized, authenticated, real-time). Genuinely static content is served
-                from cache by both frameworks — a different workload from the live render
-                measured here.
-            </p>
-        </GpSection>
-    );
-}
-
-/* ── 04 · API throughput (printed bars, no chrome) ───────────── */
-
-function BarChart({ data, frameworks }) {
-    const sorted = [...frameworks].sort((a, b) => (data[b.key] || 0) - (data[a.key] || 0));
-    const maxVal = Math.max(...sorted.map(f => data[f.key] || 0));
-
-    return (
-        <div className="mt-5 space-y-3">
-            {sorted.map((fw, i) => {
-                const val = data[fw.key] || 0;
-                const pct = maxVal > 0 ? Math.max((val / maxVal) * 100, 2) : 0;
-                const isPyxle = fw.key === 'pyxle';
-                const isApiOnly = fw.type === 'API framework' || fw.type === 'Micro framework' || fw.type === 'Ultralight API';
-                const barStyle = {
-                    width: `${pct}%`,
-                    minWidth: val > 0 ? '0.25rem' : '0',
-                    ['--rule-delay']: `${i * 70}ms`,
-                };
-                if (!isPyxle) {
-                    barStyle.background = 'var(--c-ink2)';
-                    barStyle.opacity = 0.35;
-                }
-                return (
-                    <div key={fw.key} className="flex items-center gap-3">
-                        <span className="w-24 shrink-0 text-right sm:w-32">
-                            <span className={`font-mono text-[12px] ${isPyxle ? 'font-medium text-acct' : 'text-ink2'}`}>{fw.name}</span>
-                            {isApiOnly && (
-                                <span className="ml-1.5 hidden font-mono text-[10px] uppercase tracking-[0.08em] text-ink2 opacity-60 sm:inline">api</span>
-                            )}
-                        </span>
-                        <span className="flex-1">
-                            <span className={`gp-rule-x gp-from-left block h-2 ${isPyxle ? 'bg-accent' : ''}`} style={barStyle} />
-                        </span>
-                        <span className="w-16 shrink-0 whitespace-nowrap text-right font-mono text-[12px] tabular-nums text-ink sm:w-20">
-                            {val.toLocaleString()}
-                        </span>
-                    </div>
-                );
-            })}
-        </div>
-    );
-}
-
-function TestBlock({ test, frameworks, i }) {
-    return (
-        <div data-reveal className="border-t border-rule py-8" style={{ ['--reveal-delay']: `${(i % 2) * 80}ms` }}>
-            <h3 className="font-display text-[1.15rem] font-[540] tracking-[-0.01em] text-ink">{test.name}</h3>
-            <p className="mt-1.5 max-w-[58ch] font-mono text-xs leading-relaxed text-ink2">{test.desc}</p>
-            <BarChart data={test.data} frameworks={frameworks} />
-        </div>
-    );
-}
-
-function Tab({ active, onClick, children }) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            aria-pressed={active}
-            className={`focus-ring -mb-px rounded-none border-b-2 pb-2 font-mono text-[13px] transition-colors ${
-                active ? 'border-accent text-ink' : 'border-transparent text-ink2 hover:text-ink'
-            }`}
-        >
-            {children}
-        </button>
-    );
-}
-
-function ApiThroughput() {
-    const [showAllFrameworks, setShowAllFrameworks] = useState(false);
-    const activeFrameworks = showAllFrameworks ? ALL_FRAMEWORKS : PYTHON_FRAMEWORKS;
-
-    return (
-        <GpSection n="04" id="api">
-            <GpHead
-                n="04"
-                eyebrow="API throughput"
-                title="Endpoint performance, side by side."
-                lead="Each framework implements identical API endpoints. Pyxle runs its full middleware stack (SSR support, GZip compression, server actions). API-only frameworks run leaner stacks by design."
-            />
-
-            <div data-reveal className="mt-12 flex items-end gap-7 border-b border-rule" role="group" aria-label="Framework comparison set">
-                <Tab active={!showAllFrameworks} onClick={() => setShowAllFrameworks(false)}>Python Only</Tab>
-                <Tab active={showAllFrameworks} onClick={() => setShowAllFrameworks(true)}>All Frameworks</Tab>
-                <span className="ml-auto hidden pb-2 font-mono text-[11px] text-ink2 sm:block">req/s · higher is better</span>
-            </div>
-
-            <div className="mt-2 grid gap-x-16 lg:grid-cols-2">
-                {Object.entries(TESTS).map(([key, test], i) => (
-                    <TestBlock key={key} test={test} frameworks={activeFrameworks} i={i} />
-                ))}
-            </div>
-
-            <p data-reveal className="mt-8 max-w-[64ch] font-mono text-xs leading-relaxed text-ink2">
-                Pyxle serves these through its full production middleware stack — ahead of
-                FastAPI on form POST and the multi-query pages, a few percent behind on the
-                trivial endpoints and about 10% on the single-row read. The Node ultralights own
-                raw JSON by an order of magnitude — that's the toggle above, shown, not hidden.
-            </p>
-        </GpSection>
-    );
-}
-
-/* ── 05 · Scaling (one flag, every core) ─────────────────────── */
-
-function Scaling() {
-    return (
-        <GpSection n="05" id="scaling">
-            <GpHead
-                n="05"
-                eyebrow="Scaling"
-                title="One flag, every core."
-                lead="The same app on the same 8-core box — the only change is the --workers flag. Pyxle runs an independent server process per core, with no load balancer and no shared state to configure."
-            />
-            <div className="mt-12 max-w-3xl">
-                <p data-reveal className="flex items-center gap-3 border-t border-rule py-4 font-mono text-[13px] text-ink sm:text-sm">
-                    <span className="select-none text-acct">$</span>
-                    <span>pyxle serve <span className="font-semibold text-acct">--workers 8</span></span>
-                    <span className="ml-auto"><CopyButton text="pyxle serve --workers 8" /></span>
-                </p>
-                <dl>
-                    {SCALING.map((row, i) => {
-                        const ratio = (row.eight / row.one).toFixed(1);
-                        return (
-                            <div key={row.test} data-reveal className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-t border-rule py-5" style={{ ['--reveal-delay']: `${i * 80}ms` }}>
-                                <dt className="text-sm text-ink2 sm:text-base">{row.test}</dt>
-                                <dd className="font-mono text-sm tabular-nums text-ink2">
-                                    {row.one.toLocaleString()} <span aria-hidden="true">→</span>{' '}
-                                    <span className="text-acct">{row.eight.toLocaleString()}</span> req/s
-                                    {' '}<span className="font-semibold text-ink">· {ratio}×</span>
-                                </dd>
-                            </div>
-                        );
-                    })}
-                </dl>
-                <p data-reveal className="border-t border-rule pt-5 font-mono text-xs leading-relaxed text-ink2">
-                    1 worker → 8 workers, 100 concurrent connections — about 5× on JSON and form,
-                    and more on the database endpoints (mean 9.0× across the six API tests, to
-                    FastAPI's 7.4× on the same move — Pyxle out-scales it on every one). The
-                    multi-query tests scale past 8× because a single worker serializes its blocking
-                    SQLite reads; eight workers overlap them. Per core, the optimized Node runtimes
-                    still lead — scaling is how Pyxle puts whole machines to work, not a claim to
-                    the per-core crown. Requires Pyxle 0.4.3+.
-                </p>
-            </div>
-        </GpSection>
-    );
-}
-
-/* ── 06 · Full disclosure (where Pyxle loses) ────────────────── */
-
-const LOSSES = [
-    {
-        title: "Raw JSON and health-check throughput",
-        numbers: <><span className="text-ink2">Hono 212,528</span>{' '}<span className="text-ink2 opacity-70">vs</span>{' '}<span className="text-acct">Pyxle 59,766</span>{' '}<span className="text-[11px] text-ink2">req/s, JSON</span></>,
-        desc: "On endpoints that do almost no work, Hono — an ultralight Node framework with no SSR — is about 3.5× faster, and FastAPI edges Pyxle by a few percent on JSON and the bare health ping too. Per core, V8's HTTP pipeline and a leaner ASGI stack lead when there's nothing to render — and an off-box harness is what keeps a gap like this visible instead of letting the generator's own ceiling flatten it. Pyxle's answer is holding level with FastAPI while carrying a full render pipeline, the ~2 ms tails, and near-linear scaling — not a claim to the raw-JSON crown.",
-    },
-    {
-        title: "Raw database reads",
-        numbers: <><span className="text-ink2">Hono 172,870 · Express 47,937 · FastAPI 32,319</span>{' '}<span className="text-ink2 opacity-70">vs</span>{' '}<span className="text-acct">Pyxle 29,299</span>{' '}<span className="text-[11px] text-ink2">req/s, single row</span></>,
-        desc: "Node's native better-sqlite3 bindings dominate single-row SQLite reads, and FastAPI's leaner stack leads Pyxle by about 10% there. Add real work and Pyxle moves back ahead of FastAPI (24,681 req/s on the five-query page to 22,013), but the single-read crown belongs to the native drivers.",
-    },
-];
-
-function Disclosure() {
-    return (
-        <GpSection n="06" id="losses">
-            <GpHead
-                n="06"
-                eyebrow="Full disclosure"
-                title="Where Pyxle loses."
-                lead="A benchmark page that only shows wins is an ad. Same boxes, same run — these are the workloads where Pyxle is not the fastest choice today."
-            />
-            <div className="mt-12 max-w-3xl">
-                {LOSSES.map((l, i) => (
-                    <div key={l.title} data-reveal className="border-t border-rule py-7 last:border-b" style={{ ['--reveal-delay']: `${i * 90}ms` }}>
-                        <h3 className="font-display text-[1.35rem] font-[540] leading-snug tracking-[-0.01em] text-ink">{l.title}</h3>
-                        <p className="mt-2 font-mono text-sm">{l.numbers}</p>
-                        <p className="mt-3 max-w-[62ch] text-pretty text-base leading-[1.7] text-ink2">{l.desc}</p>
-                    </div>
-                ))}
-            </div>
-        </GpSection>
-    );
-}
-
-/* ── 07 · Lighthouse (the trust artifact, as a figure) ───────── */
-
-function LighthouseGauge({ label, value, delay }) {
-    // Lighthouse-style color bands: >= 90 green, >= 50 orange, < 50 red.
-    const color = value >= 90 ? "#0cce6b" : value >= 50 ? "#ffa400" : "#ff4e42";
-    const RADIUS = 48;
-    return (
-        <div className="flex flex-col items-center gap-3">
-            <div className="relative h-28 w-28">
-                <svg viewBox="0 0 128 128" className="h-full w-full" aria-hidden="true">
-                    <circle cx="64" cy="64" r={RADIUS} fill="none" stroke="var(--c-rule)" strokeWidth="6" />
-                    {/* pathLength normalizes the ring so a dash of 1 covers
-                       exactly `value`% of it; gp-draw draws that arc in. */}
-                    <circle
-                        cx="64" cy="64" r={RADIUS}
-                        fill="none" stroke={color} strokeWidth="6"
-                        strokeLinecap="round"
-                        pathLength={100 / Math.max(value, 1)}
-                        strokeDasharray="1"
-                        className="gp-draw"
-                        style={{ ['--draw-dur']: '700ms', ['--draw-delay']: `${delay}ms` }}
-                        transform="rotate(-90 64 64)"
-                    />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="font-mono text-2xl tabular-nums text-ink">{value}</span>
+        <section ref={ref} className={`sec sec-reproduce${seen ? ' seen' : ''}`} id="reproduce">
+            <div className="frame">
+                <Rulebar tab="08 · Reproduce" href="#reproduce" folio="08" />
+                <div className="sec-head rv">
+                    <h2>Run them yourself.</h2>
+                    <Receipt>the harness, the apps, the parity checks — all in the repo</Receipt>
                 </div>
-            </div>
-            <span className="font-mono text-xs text-ink2">{label}</span>
-        </div>
-    );
-}
-
-function Lighthouse() {
-    return (
-        <GpSection n="07" id="lighthouse">
-            <GpHead
-                n="07"
-                eyebrow="Real-world"
-                title="pyxle.dev scores 100 on Lighthouse."
-                lead="This marketing site is a live Pyxle app — server-rendered on every request. Google's Lighthouse (desktop) rates it a perfect 100 across all four categories."
-            />
-            <figure data-reveal="none" className="mt-12 max-w-3xl">
-                <div className="grid grid-cols-2 gap-10 border-y border-rule py-10 sm:grid-cols-4 sm:gap-6">
-                    {LH_SCORES.map((s, i) => (
-                        <LighthouseGauge key={s.label} label={s.label} value={s.value} delay={i * 120} />
-                    ))}
+                <div className="bm-cmds rv" style={{ '--rvd': '.08s' }}>
+                    <CopyChip text={`git clone ${HARNESS}`} />
+                    <CopyChip text="cd benchmarks && ./bench.sh --suite=all --workers=auto" />
                 </div>
-                <figcaption className="mt-3 flex flex-col gap-3 font-mono text-xs leading-relaxed text-ink2 sm:flex-row sm:items-baseline sm:justify-between">
-                    <span>Fig. — Google Lighthouse, desktop preset, against the production build of <code className="text-ink">pyxle.dev</code>.</span>
-                    <span className="shrink-0">
-                        <EditorialLink href="https://pagespeed.web.dev/analysis?form_factor=desktop&url=https%3A%2F%2Fpyxle.dev" external>
-                            Verify on PageSpeed Insights ↗
-                        </EditorialLink>
-                    </span>
-                </figcaption>
-            </figure>
-        </GpSection>
-    );
-}
-
-/* ── 08 · Reproduce (the close) ──────────────────────────────── */
-
-const REPRO_STEPS = [
-    'git clone https://github.com/pyxle-dev/benchmarks',
-    'cd benchmarks && ./bench.sh --suite=all --workers=auto',
-];
-
-function Reproduce() {
-    return (
-        <GpSection n="08" id="reproduce">
-            <GpHead
-                n="08"
-                eyebrow="Reproduce"
-                title="Run them yourself."
-                lead="All benchmark code is open source — the endpoint implementations, the Next.js apps, the parity checks, and the SSR test pages. Two commands give you the quick run on your own hardware."
-            />
-            <div className="mt-10 max-w-3xl">
-                <ol className="border-t border-rule">
-                    {REPRO_STEPS.map((cmd, i) => (
-                        <li key={cmd} data-reveal className="flex items-baseline gap-4 border-b border-rule py-4" style={{ ['--reveal-delay']: `${i * 90}ms` }}>
-                            <span className="font-display text-lg font-[540] text-press" aria-hidden="true">{i + 1}</span>
-                            <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink sm:text-sm">{cmd}</code>
-                            <span className="shrink-0"><CopyButton text={cmd} /></span>
-                        </li>
-                    ))}
-                </ol>
-                <p data-reveal className="mt-6 font-mono text-xs leading-relaxed text-ink2">
-                    The quick run keeps the generator on your own machine — fine for relative
-                    standings, but absolute numbers read low because the generator shares the
-                    CPU. The published numbers use the two-box flow:{' '}
-                    <code className="text-ink">./bench.sh --serve-only --workers=auto</code> on the
-                    server box, <code className="text-ink">./bench.sh --generate-only
-                    --target=&lt;server-ip&gt; --suite=all</code> on the client box. The README
-                    documents it step by step.
+                <div className="bm-facts rv" style={{ marginTop: 30, '--rvd': '.14s' }}>
+                    <p className="bm-fact"><span className="fk">quick run</span><span className="fv">generator on your machine — fine for relative standings; absolute numbers read low</span></p>
+                    <p className="bm-fact"><span className="fk">published flow</span><span className="fv">two boxes: ./bench.sh --serve-only --workers=auto · ./bench.sh --generate-only --target=&lt;server-ip&gt; --suite=all</span></p>
+                    <p className="bm-fact"><span className="fk">in the repo</span><span className="fv">endpoint implementations · the Next.js apps · parity checks · SSR test pages · step-by-step README</span></p>
+                </div>
+                <p className="bm-exits rv" style={{ '--rvd': '.2s' }}>
+                    <a className="link" href={HARNESS} target="_blank" rel="noreferrer">view benchmark source <span className="a">→</span></a>
+                    <Link className="link" href="/compare">how this compares <span className="a">→</span></Link>
+                    <Link className="link" href="/docs">read the docs <span className="a">→</span></Link>
                 </p>
             </div>
-            <div data-reveal className="mt-10 flex flex-wrap items-center gap-5">
-                <InkButton href="https://github.com/pyxle-dev/benchmarks" external>View benchmark source ↗</InkButton>
-                <EditorialLink href="/docs">Read the docs →</EditorialLink>
-            </div>
-        </GpSection>
+        </section>
     );
 }
 
-/* ── page ─────────────────────────────────────────────────── */
+/* ── page ────────────────────────────────────────────────────────── */
 
-export default function BenchmarksPage({ data }) {
-    const { version } = data;
-    useScrollReveal();
-
+export default function BenchmarksPage() {
     return (
         <>
-            <Head>
-                <title>Benchmarks - Pyxle Framework</title>
-                <meta name="description" content="Honest, reproducible benchmarks with off-box load generation — Pyxle vs FastAPI, Django, Flask, Express, Hono, and Next.js. ~2.2× Next.js at dynamic SSR with 2–3× smaller payloads, on par with FastAPI and ahead on real database work, with the losses shown in full." />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <meta name="theme-color" content="#101411" />
-                <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-                <meta property="og:title" content="Pyxle Benchmarks - Framework Performance Comparison" />
-                <meta property="og:description" content="See how Pyxle performs against popular Python and Node.js frameworks." />
-                <meta property="og:image" content="https://pyxle.dev/branding/og-default.png" />
-                <meta property="og:type" content="website" />
-                <meta name="twitter:card" content="summary_large_image" />
-                <meta name="twitter:image" content="https://pyxle.dev/branding/og-default.png" />
-            </Head>
+            <PageMeta
+                title="Benchmarks"
+                description="The datasheet: Pyxle in the Python field — FastAPI, Django, Flask — plus the SSR reference against Next.js. Off-box load generation, measured July 2026 on Pyxle 0.7.1; the losses printed next to the wins."
+                path="/benchmarks"
+            />
             <main id="main">
                 <Hero />
-                <Method />
-                <Findings />
-                <SsrLedger />
-                <ApiThroughput />
-                <Scaling />
-                <Disclosure />
-                <Lighthouse />
-                <Reproduce />
+                <SsrSection />
+                <FieldSection />
+                <ScalingSection />
+                <LossesSection />
+                <BytesSection />
+                <MethodSection />
+                <RealWorldSection />
+                <ReproduceSection />
             </main>
-            <GalleyFooter version={version} />
         </>
     );
 }
