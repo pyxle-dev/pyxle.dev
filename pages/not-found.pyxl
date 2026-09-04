@@ -2,37 +2,27 @@ import React from 'react';
 import { Head } from 'pyxle/client';
 import NotFoundContent from './components/not-found-content.jsx';
 
-export const slots = {
-    'nav-extra': () => (
-        <a
-            href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/not-found.pyxl"
-            target="_blank"
-            rel="noreferrer"
-            title="View this page's source"
-            className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
-        >
-            source ↗
-        </a>
-    ),
-};
-export const createSlots = () => slots;
+/* ════════════════════════════════════════════════════════════════
+   F — THE WORKING COPY · /404 — no such file.
+   The block itself lives in components/not-found-content.jsx
+   (shared with the docs catch-all). A 404 is still a page — the
+   shared layout keeps the full nav and the EOF footer around it.
 
-/* A 404 is a dead end — no footer, no noise. The masthead is h-16
-   fixed, so the page clears it with pt-16 and centers the rest. */
+   Head is set directly (not PageMeta): a 404 is noindex and gets
+   no canonical or Open Graph tags — the layout's site-wide
+   defaults cover crawlers that ignore robots anyway.
+   ════════════════════════════════════════════════════════════════ */
+
 export default function NotFoundPage() {
     return (
         <>
             <Head>
-                <title>404 - Page Not Found | Pyxle</title>
+                <title>404 — Pyxle</title>
                 <meta name="description" content="The page you are looking for does not exist." />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <meta name="theme-color" content="#101411" />
-                <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+                <meta name="robots" content="noindex" />
             </Head>
-            <main id="main" className="flex min-h-screen flex-col pt-16">
-                <NotFoundContent
-                    sourceUrl="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/components/not-found-content.jsx"
-                />
+            <main id="main" className="lost">
+                <NotFoundContent />
             </main>
         </>
     );
