@@ -29,7 +29,7 @@ pages/                     # File-based routes
 |-- not-found.pyxl          # Custom 404 page (reusable with backHref/backLabel props)
 |-- benchmarks.pyxl         # Benchmark results page
 |-- docs/                  # Documentation section
-|   +-- [[...slug]].pyxl    # Catch-all docs route with search (@action search_docs)
+|   +-- [[...slug]].pyxl    # Landing listing + catch-all article route (⌘K quick-open)
 |-- api/                   # API routes (plain Starlette endpoints)
 |   |-- healthz.py         # Health check — GET /api/healthz
 |   |-- subscribers.py     # Admin panel — GET /api/subscribers (HTTP Basic Auth)
@@ -73,12 +73,19 @@ This site showcases Pyxle best practices:
 2. Client calls with `useAction("subscribe_newsletter")` from `pyxle/client`
 3. Returns `ActionError` for validation failures, JSON for success
 
-### Docs Search (`pages/docs/[[...slug]].pyxl`)
+### Docs (`pages/docs/[[...slug]].pyxl`)
 
-- `@action search_docs` performs server-side search across docs manifest
-- Manifest is cached in a Python global (`_manifest_cache`) for performance
-- Client uses debounced `useAction` with a `searching` loading state
-- Invalid doc slugs render the `NotFoundPage` component with "Back to docs" link
+- `/docs` is the landing (the numbered listing); `/docs/<path>` is an article.
+  Line numbers (01..NN) are computed server-side from the manifest nav order.
+- Article HTML is transformed **server-side** into the E chrome (code frames
+  with server/client badges, `.tw`-wrapped tables, heading anchors) so the SSR
+  document is complete; manifest + transformed pages are cached in Python
+  globals (rebuild docs-data ⇒ restart/redeploy to refresh).
+- The ⌘K quick-open palette (`components/docs-quick-open.jsx`) fuzzy-matches
+  **client-side** over title/category/path/keywords from the loader's payload —
+  no per-keystroke server round-trip. Deep full-text search for agents stays at
+  `GET /api/docs-search`.
+- Invalid doc slugs render `NotFoundContent` with "Back to docs" and a real 404.
 
 ### Docs are generated — NOT authored in this repo
 
@@ -89,11 +96,11 @@ The `/docs` pages are built from the **framework repo's** markdown:
 
 ### Plugins directory (`/plugins`)
 
-`pages/plugins.pyxl` renders `public/plugins-registry.json` (filtered by `tier`). To add an official plugin: add a registry entry, bump the hardcoded "N official plugins ship today" line in `plugins.pyxl`, **and** add its doc to `build-docs.mjs`'s nav.
+`pages/plugins.pyxl` renders `public/plugins-registry.json` (filtered by `tier`); the official/founding counts, card highlight rows, and version chips all come from the registry. To add an official plugin: add a registry entry (including `version` + `highlights`) **and** add its doc to `build-docs.mjs`'s nav — no page edit needed. Bump the entry's `version` field on each plugin release.
 
-### Theme System (`pages/layout.pyxl`)
+### Theme System (`pages/components/e-theme.jsx`)
 
-Root layout provides `ThemeContext` with `useTheme()` hook. Theme is stored in `localStorage`.
+`ThemeProvider` + `useTheme()` live in `components/e-theme.jsx` (the layout re-exports `useTheme` for the legacy import path). Theme is stored in `localStorage` under `pyxle-theme`; the default is **light** — F's printed working copy is the identity, dark is "the lamp copy", an explicit reader's control (system preference is deliberately not consulted, so the print holds under OS dark mode too). The layout's inline boot script stamps `html.light`/`html.dark` (plus `js`) before first paint and swaps the `theme-color` meta (`#FBFBF9` light / `#20231D` dark) — SSR markup carries no theme class, so served bytes are theme-neutral. All theming is CSS variables: the F light table on `:root`, the lamp values under `html.dark` in `styles/tailwind.css` (mirrored in `playground-sandbox.html` — edit the .html, rebuild via `scripts/build-playground-sandbox.mjs`; the `pg-theme` postMessage bridge keeps a booted sandbox in step with the toggle). No first-render markup may depend on the theme. The toggle (`components/theme-toggle.jsx`) renders in the header and the mobile bar; its glyph is CSS-gated on the html class, never a JS branch.
 
 ---
 
