@@ -1,0 +1,662 @@
+/* ═══════════════════════════════════════════════════════════════════
+   F — THE WORKING COPY · docs styles (pages/docs/[[...slug]].pyxl).
+   The /docs surface is the manual itself: the landing is the printed
+   index (ruled shelf heads, faint line numbers), an article is one
+   printed page — running head, big folio numeral, claim/receipt
+   couplet, 70ch measure, Sheet code panes with Deck heads, tables on
+   shared hairlines, printed prev/next terms, and a "find in file"
+   ⌘K pane (Sheet, ink border, scrim — no blur shadow).
+
+   Delivery: side-effect import from pages/docs/[[...slug]].pyxl (the
+   house pattern, same as f-index.css). Because page stylesheets join
+   the client router's global pool, EVERY selector here is scoped
+   under `.fdocs` (the docs page root class) — generic names like
+   .rail/.body/.term exist on other routes' E chrome and must never
+   be touched from here.
+
+   Tokens only — every colour is a var() from styles/tailwind.css, so
+   the lamp copy (html.dark) needs no second block here (the one
+   exception: the ⌘K scrim, defined for both themes below so this file
+   survives the Phase-2 deletion of the E-var bridge).
+
+   Green audit (nothing else may be green): .tk-dec decorators (job 5),
+   the copied flash on .cpb (job 2), the `$` in a bash frame's badge
+   (job 2). Rail/TOC/link accents are Ink — the current page is a
+   fact, not code that runs. Code frames carry the full --syn-* syntax
+   inks (the one sanctioned break from three-ink restraint — none of
+   the six is a green). A pyxl frame draws NOTHING at its blank line:
+   the badge alone states one-file-ness, no separation drawn.
+
+   Motion: documents don't dance. The landing prints itself once
+   (global .b boot + rulebar shade draws via useSeen); articles are
+   still at rest — only the reading dot glides and copy buttons flash.
+   Everything dies under prefers-reduced-motion.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── landing · the printed index ─────────────────────────────────── */
+.fdocs .dhead { position: relative; }
+/* the index's own folio — the extent of the manual, in ghost ink */
+.fdocs .dfolio {
+    position: absolute;
+    right: 0;
+    top: 44px;
+    font: 500 84px/1 var(--mono);
+    letter-spacing: -0.02em;
+    color: var(--folio);
+    user-select: none;
+    pointer-events: none;
+}
+.fdocs .dtab {
+    font: 500 11px/16px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--graphite);
+    margin: 40px 0 0;
+}
+.fdocs .dtitle {
+    font: 600 clamp(33px, 4.2vw, 52px)/1.06 var(--sans);
+    letter-spacing: -0.022em;
+    color: var(--ink);
+    margin: 16px 0 0;
+}
+.fdocs .dhint { display: flex; align-items: center; gap: 20px; margin-top: 30px; flex-wrap: wrap; }
+.fdocs .qbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 11px;
+    font: 400 13.5px/1 var(--mono);
+    color: var(--ink);
+    background: var(--sheet);
+    border: 1px solid var(--rule2);
+    border-radius: 6px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: border-color .15s ease;
+}
+.fdocs .qbtn:hover { border-color: var(--graphite); }
+.fdocs .qbtn .pr { color: var(--graphite); font-weight: 500; }
+.fdocs .qbtn .qk { color: var(--faint); font-size: 11px; padding-left: 11px; border-left: 1px solid var(--rule); }
+.fdocs .dhint .meta { font: 400 12px/1.5 var(--mono); color: var(--faint); }
+
+/* the shelves: ruled table of contents */
+.fdocs .shelves { padding: 56px 0 96px; display: flex; flex-direction: column; gap: 68px; }
+.fdocs .shelf .rulebar .shct {
+    position: absolute;
+    right: 0;
+    top: -17px;
+    background: var(--bond);
+    padding-left: 14px;
+    font: 400 11px/16px var(--mono);
+    letter-spacing: 0.04em;
+    color: var(--faint);
+}
+.fdocs .shgrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 64px;
+    padding-top: 18px;
+}
+
+/* one line of the index — shared by shelves, rail and overlay */
+.fdocs .ri {
+    display: flex;
+    align-items: baseline;
+    font: 400 12.5px/24px var(--mono);
+    color: var(--graphite);
+    position: relative;
+    min-width: 0;
+    transition: color .12s ease;
+}
+.fdocs .ri .no {
+    font-style: normal;
+    width: 34px;
+    flex: none;
+    text-align: right;
+    padding-right: 10px;
+    font-size: 10.5px;
+    color: var(--faint);
+    user-select: none;
+    transition: color .12s ease;
+}
+.fdocs .ri span { padding-right: 10px; min-width: 0; }
+.fdocs .ri:hover { color: var(--ink); }
+.fdocs .ri:hover .no { color: var(--graphite); }
+.fdocs .ri.kb { background: var(--deck); color: var(--ink); }
+.fdocs .ri.kb::after {
+    content: '↵';
+    position: absolute;
+    right: 8px;
+    top: 0;
+    font-size: 10px;
+    color: var(--graphite);
+}
+.fdocs .shgrid .ri { font-size: 13px; line-height: 32px; color: var(--ink); }
+.fdocs .shgrid .ri .no { width: 40px; font-size: 11px; }
+.fdocs .shgrid .ri span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fdocs .shgrid .ri:hover span {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    text-decoration-color: var(--rule2);
+}
+.fdocs .shgrid .ri:hover .no { color: var(--ink); }
+
+/* the shelf-count patch joins the rulebar's stamp-in */
+.js .fdocs .shelf .rulebar .shct { opacity: 0; transition: opacity .4s ease .25s; }
+.js .fdocs .shelf.seen .rulebar .shct { opacity: 1; }
+
+/* ── article · one printed page of the manual ────────────────────── */
+.fdocs .dgrid {
+    display: grid;
+    grid-template-columns: 216px minmax(0, 1fr) 164px;
+    gap: 40px;
+    align-items: start;
+}
+
+.fdocs .art { position: relative; padding: 30px 0 72px; min-width: 0; }
+
+/* the folio — this page's line number, printed big in the margin ink.
+   It sits at the title's level; the crumb row above keeps the corner. */
+.fdocs .artfolio {
+    position: absolute;
+    right: 0;
+    top: 62px;
+    font: 500 46px/1 var(--mono);
+    letter-spacing: -0.02em;
+    color: var(--folio);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* running head: docs / category ·· then the md/AI controls */
+.fdocs .crumb {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    font: 500 11px/16px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--graphite);
+    margin-bottom: 26px;
+    flex-wrap: wrap;
+}
+.fdocs .crumb a { color: var(--graphite); }
+.fdocs .crumb a:hover {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+}
+.fdocs .crumb .sl { color: var(--faint); font-weight: 400; }
+.fdocs .crumb .acts {
+    margin-left: auto;
+    display: flex;
+    align-items: baseline;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* copy button voice — frame heads and the crumb's md/AI cluster */
+.fdocs .cpb {
+    font: 400 11.5px/16px var(--mono);
+    color: var(--graphite);
+    background: transparent;
+    border: 0;
+    border-left: 1px solid var(--rule);
+    border-radius: 0;
+    padding: 2px 0 2px 10px;
+    margin-left: 10px;
+    cursor: pointer;
+    transition: color .15s ease;
+}
+.fdocs .cpb:hover { color: var(--ink); }
+.fdocs .cpb.did { color: var(--green); animation: cpflash .9s ease; }
+@keyframes cpflash { 0% { background: var(--tint); } 100% { background: transparent; } }
+
+/* the couplet: claim in sans, its file identity in mono beneath */
+.fdocs .atitle {
+    font: 600 clamp(26px, 2.6vw, 34px)/1.18 var(--sans);
+    letter-spacing: -0.018em;
+    color: var(--ink);
+    margin: 0;
+    padding-right: 88px;
+}
+.fdocs .arec { margin-bottom: 38px; overflow-wrap: anywhere; }
+
+/* ── the corpus — body prose is sacred, set like a printed manual ── */
+.fdocs .body { font: 400 16px/1.7 var(--sans); color: var(--ink); }
+.fdocs .body > p:first-child { font-size: 17px; color: var(--graphite); }
+.fdocs .body p { margin: 0 0 16px; max-width: 70ch; }
+.fdocs .body a {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    text-decoration-color: var(--rule2);
+    transition: text-decoration-color .15s ease;
+}
+.fdocs .body a:hover { text-decoration-thickness: 2px; text-decoration-color: var(--ink); }
+.fdocs .body strong { color: var(--ink); font-weight: 600; }
+
+/* headings: in-article rulebars — hairline, mono counter, sans claim */
+.fdocs .body h2, .fdocs .body h3, .fdocs .body h4 {
+    font-family: var(--sans);
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.014em;
+    position: relative;
+    scroll-margin-top: 88px;
+}
+.fdocs .body { counter-reset: sec; }
+.fdocs .body h2 {
+    font-size: 22px;
+    line-height: 1.3;
+    margin: 52px 0 14px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    counter-increment: sec;
+}
+.fdocs .body h2::before {
+    content: counter(sec, decimal-leading-zero);
+    display: inline-block;
+    margin-right: 11px;
+    font: 500 11.5px/1 var(--mono);
+    letter-spacing: 0.04em;
+    color: var(--faint);
+    transform: translateY(-4px);
+}
+.fdocs .body > h2:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.fdocs .body hr + h2 { border-top: 0; padding-top: 0; margin-top: 40px; }
+.fdocs .body h3 { font-size: 17.5px; margin: 36px 0 10px; }
+.fdocs .body h4 { font-size: 15px; margin: 28px 0 8px; }
+.fdocs .ha {
+    margin-left: 9px;
+    font: 400 13px/1 var(--mono);
+    color: var(--faint);
+    opacity: 0;
+    transition: opacity .15s ease;
+    text-decoration: none !important;
+}
+.fdocs h2:hover .ha, .fdocs h3:hover .ha, .fdocs h4:hover .ha { opacity: 1; }
+.fdocs .ha:hover { color: var(--ink); }
+
+/* Tailwind's preflight strips list styles — restore the printed marks */
+.fdocs .body ul, .fdocs .body ol { margin: 0 0 16px; padding-left: 24px; max-width: 70ch; }
+.fdocs .body ul { list-style: disc; }
+.fdocs .body ol { list-style: decimal; }
+.fdocs .body ul ul { list-style: circle; }
+.fdocs .body li { margin: 5px 0; }
+.fdocs .body li::marker { color: var(--faint); }
+.fdocs .body hr { border: 0; height: 1px; background: var(--rule); margin: 36px 0; }
+.fdocs .body blockquote {
+    margin: 0 0 18px;
+    padding: 13px 18px;
+    background: var(--deck);
+    border-radius: 6px;
+    color: var(--graphite);
+    max-width: 74ch;
+}
+.fdocs .body blockquote p { margin: 0 0 10px; max-width: none; }
+.fdocs .body blockquote p:last-child { margin: 0; }
+.fdocs .body input[type=checkbox] { accent-color: var(--ink); pointer-events: none; margin-right: 6px; }
+.fdocs .body img { border: 1px solid var(--rule); border-radius: 6px; }
+
+/* inline code: a quiet Deck bed in the line of text */
+.fdocs .body code {
+    font-family: var(--mono);
+    font-size: .88em;
+    color: var(--ink);
+    background: var(--deck);
+    padding: 1px 6px 2px;
+    border-radius: 0;
+    overflow-wrap: break-word;
+}
+.fdocs .body a code { color: inherit; }
+.fdocs .body pre code { background: none; border: 0; padding: 0; font-size: inherit; color: inherit; }
+
+/* ── code frames: Sheet panes with Deck heads (the pane law) ─────── */
+.fdocs .dcode.frame { max-width: none; margin-inline: 0; padding-inline: 0; }
+.fdocs .dcode {
+    margin: 6px 0 24px;
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.fdocs .dcode .fhd {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 34px;
+    padding: 0 12px;
+    background: var(--deck);
+    border-bottom: 1px solid var(--rule);
+    font: 400 12px/1 var(--mono);
+    color: var(--graphite);
+}
+.fdocs .dcode .fhd .nm { color: var(--graphite); letter-spacing: 0.02em; }
+.fdocs .dcode .fhd .where { color: var(--faint); }
+.fdocs .dcode .fhd .where b { font-weight: 500; color: var(--ink); }
+.fdocs .dcode .fhd .where .cb { font-weight: 500; color: var(--ink); }   /* one document, no client colour */
+.fdocs .dcode .fhd .where .sep { font-style: normal; color: var(--faint); }
+.fdocs .dcode[data-lang="bash"] .fhd .where b { color: var(--green); }   /* the $ prompt — green job 2 */
+.fdocs .dcode .fhd .cpb { padding-top: 9px; padding-bottom: 9px; margin-left: auto; }
+.fdocs .dcode pre {
+    margin: 0;
+    padding: 15px 18px;
+    font: 400 13.5px/22px var(--mono);
+    color: var(--ink);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+/* full syntax tokenization (highlight.py, server-side): six printer's
+   inks — the --syn-* tokens — over ink and graphite. Comments recede
+   in graphite italic; tag angle brackets stay graphite so the names
+   carry the color; the only green is tk-dec, decorators — code that
+   runs on the server (job 5). */
+.fdocs .dcode .cm { color: var(--graphite); font-style: italic; }
+.fdocs .dcode .tk-kw { color: var(--syn-kw); }
+.fdocs .dcode .tk-str { color: var(--syn-str); }
+.fdocs .dcode .tk-num,
+.fdocs .dcode .tk-cn { color: var(--syn-num); }
+.fdocs .dcode .tk-fn,
+.fdocs .dcode .tk-cp { color: var(--syn-fn); }
+.fdocs .dcode .tk-bi,
+.fdocs .dcode .tk-el { color: var(--syn-bi); }
+.fdocs .dcode .tk-at,
+.fdocs .dcode .tk-br { color: var(--syn-at); }
+.fdocs .dcode .tk-dec { color: var(--green); font-weight: 500; }
+.fdocs .dcode .tk-tag { color: var(--graphite); }
+
+/* ── tables: shared hairlines, square, Deck heads ────────────────── */
+.fdocs .tw {
+    overflow-x: auto;
+    margin: 6px 0 24px;
+    border: 1px solid var(--rule);
+    background: var(--sheet);
+}
+.fdocs .body table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0;
+}
+.fdocs .body th {
+    font: 500 11px/16px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--graphite);
+    background: var(--deck);
+    text-align: left;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--rule2);
+    white-space: nowrap;
+}
+.fdocs .body td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    color: var(--ink);
+}
+.fdocs .body tr:last-child td { border-bottom: 0; }
+.fdocs .body td code { white-space: nowrap; }
+
+/* ── prev / next: printed terms at the foot of the page ──────────── */
+.fdocs .terms { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 64px; }
+.fdocs .term {
+    display: block;
+    position: relative;
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 14px 16px 13px;
+    min-width: 0;
+    transition: border-color .15s ease;
+}
+.fdocs a.term:hover { border-color: var(--graphite); }
+.fdocs .term .tl {
+    display: block;
+    font: 500 10px/1 var(--mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-bottom: 8px;
+}
+.fdocs .term .tt {
+    display: block;
+    font: 500 14.5px/1.35 var(--sans);
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.fdocs .term .tn { position: absolute; top: 13px; font: 400 10.5px/1 var(--mono); color: var(--faint); }
+.fdocs .term.prev .tn { right: 14px; }
+.fdocs .term.next .tn { left: 14px; }
+.fdocs .term.next { text-align: right; }
+.fdocs .term.end { opacity: .55; }
+.fdocs .term.end .tt { color: var(--graphite); font-weight: 400; }
+
+/* ── left rail: the whole index in the margin ────────────────────── */
+.fdocs .rail {
+    position: sticky;
+    top: 64px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    padding: 30px 0 44px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--rule2) transparent;
+}
+.fdocs .rsearch {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    font: 400 12px/1 var(--mono);
+    color: var(--graphite);
+    text-align: left;
+    white-space: nowrap;
+    background: var(--sheet);
+    border: 1px solid var(--rule2);
+    border-radius: 6px;
+    padding: 9px 12px;
+    margin-bottom: 18px;
+    cursor: pointer;
+    transition: border-color .15s ease, color .15s ease;
+}
+.fdocs .rsearch:hover { border-color: var(--graphite); color: var(--ink); }
+.fdocs .rsearch .pr { color: var(--graphite); font-weight: 500; }
+.fdocs .railin { border-left: 1px solid var(--rule); padding: 2px 0 8px; }
+.fdocs .rcat {
+    font: 500 11px/16px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--graphite);
+    padding: 22px 0 8px 14px;
+}
+.fdocs .railin > .rcat:first-child { padding-top: 6px; }
+/* the current page is a fact: ink, and a 2px ink bar on the hairline */
+.fdocs .ri.on { color: var(--ink); font-weight: 500; box-shadow: inset 2px 0 0 var(--ink); }
+.fdocs .ri.on .no { color: var(--ink); }
+
+/* ── right rail: on this page, with the reading dot ──────────────── */
+.fdocs .tocrail {
+    position: sticky;
+    top: 64px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    padding: 34px 0 44px;
+    font-family: var(--mono);
+    scrollbar-width: thin;
+    scrollbar-color: var(--rule2) transparent;
+}
+.fdocs .tochd {
+    font: 500 11px/16px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--graphite);
+    margin-bottom: 12px;
+}
+.fdocs .toc { position: relative; border-left: 1px solid var(--rule); display: flex; flex-direction: column; }
+.fdocs .tocdot {
+    position: absolute;
+    left: -3.5px;
+    top: 6px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    transition: top .3s var(--ease);
+    opacity: 0;
+}
+.fdocs .toc.tlive .tocdot { opacity: 1; }
+.fdocs .toc a {
+    display: block;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--graphite);
+    padding: 4px 0 4px 14px;
+    transition: color .12s ease;
+}
+.fdocs .toc a.t3 { padding-left: 26px; font-size: 11.5px; }
+.fdocs .toc a:hover, .fdocs .toc a.on { color: var(--ink); }
+.fdocs .toctop { display: inline-block; margin-top: 16px; font-size: 10.5px; color: var(--faint); }
+.fdocs .toctop:hover { color: var(--ink); }
+
+/* ── ⌘K quick open: find in the manual ───────────────────────────── */
+.fdocs .qo {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 12vh 16px 0;
+    background: rgba(21, 23, 19, .45);
+}
+html.dark .fdocs .qo { background: rgba(0, 0, 0, .55); }
+/* the darkest border on the page marks the most important object */
+.fdocs .qobox {
+    width: 640px;
+    max-width: 100%;
+    background: var(--sheet);
+    border: 1px solid var(--ink);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.fdocs .qoin { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--rule); padding: 0 16px; }
+.fdocs .qoin .pr { font: 500 14px/1 var(--mono); color: var(--graphite); }
+.fdocs .qoin input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    color: var(--ink);
+    font: 400 14.5px/1 var(--mono);
+    height: 52px;
+    caret-color: var(--ink);
+    min-width: 0;
+}
+.fdocs .qoin input:focus { box-shadow: none; outline: 0; }
+.fdocs .qoin input::placeholder { color: var(--faint); }
+.fdocs .qoin .esc {
+    font: 400 10px/1 var(--mono);
+    color: var(--faint);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 3px 6px;
+}
+.fdocs .qols {
+    max-height: min(430px, 58vh);
+    overflow-y: auto;
+    padding: 6px 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--rule2) transparent;
+}
+.fdocs .qorow {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 16px;
+    font-family: var(--mono);
+    cursor: pointer;
+}
+.fdocs .qorow .qn { width: 26px; flex: none; text-align: right; font-size: 10.5px; color: var(--faint); }
+.fdocs .qorow .qt { font-size: 13.5px; color: var(--ink); }
+.fdocs .qorow .qc { margin-left: auto; padding-left: 12px; font-size: 10.5px; color: var(--graphite); white-space: nowrap; }
+.fdocs .qorow.sel { background: var(--deck); box-shadow: inset 2px 0 0 var(--ink); }
+.fdocs .qonone { padding: 18px 16px; font: 400 12.5px/1.6 var(--mono); color: var(--graphite); }
+.fdocs .qoft {
+    display: flex;
+    gap: 18px;
+    border-top: 1px solid var(--rule);
+    padding: 9px 16px;
+    font: 400 10.5px/1 var(--mono);
+    color: var(--faint);
+    background: var(--deck);
+}
+
+/* ── reduced motion: the manual holds still ──────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .fdocs .tocdot { transition: none; }
+    .fdocs .cpb.did { animation: none; }
+    .js .fdocs .shelf .rulebar .shct { opacity: 1; transition: none; }
+    .fdocs .ri, .fdocs .ri .no, .fdocs .cpb, .fdocs .qbtn, .fdocs .rsearch, .fdocs .term, .fdocs .toc a { transition: none; }
+}
+
+/* ── responsive: recompose, never shrink ─────────────────────────── */
+@media (max-width: 1180px) {
+    .fdocs .dgrid { grid-template-columns: 216px minmax(0, 1fr); }
+    .fdocs .tocrail { display: none; }
+}
+@media (max-width: 900px) {
+    .fdocs .dgrid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+    .fdocs .rail { display: none; }
+    /* the index overlay — same Bond paper, above the page, m-bar kept */
+    body.rail-open .fdocs .rail {
+        display: block;
+        position: fixed;
+        inset: 0 0 56px 0;
+        z-index: 60;
+        background: var(--bond);
+        padding: 18px 16px 30px;
+        max-height: none;
+        top: 0;
+    }
+    body.rail-open .fdocs .railin { border-left: 0; }
+    body.rail-open .fdocs .ri { font-size: 14px; line-height: 44px; }
+    body.rail-open .fdocs .ri.on { box-shadow: inset 2px 0 0 var(--ink); }
+    body.rail-open .fdocs .rsearch { font-size: 13px; padding: 13px 14px; }
+    .fdocs .shgrid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 768px) {
+    .fdocs .dtab { margin-top: 26px; }
+    .fdocs .dtitle { font-size: 30px; }
+    .fdocs .dfolio { display: none; }
+    .fdocs .shelves { padding: 44px 0 72px; gap: 52px; }
+    .fdocs .shgrid .ri { line-height: 44px; }   /* tap targets */
+    .fdocs .ri.kb::after { line-height: inherit; }
+    .fdocs .art { padding: 24px 0 56px; }
+    .fdocs .artfolio { display: none; }
+    .fdocs .atitle { padding-right: 0; }
+    .fdocs .crumb { margin-bottom: 20px; }
+    .fdocs .crumb .acts .hide-m { display: none; }
+    .fdocs .arec { margin-bottom: 30px; }
+    .fdocs .body { font-size: 15.5px; }
+    /* code frames and tables go full-bleed — the pane keeps the scroll */
+    .fdocs .dcode { margin-left: -16px; margin-right: -16px; border-radius: 0; border-left: 0; border-right: 0; }
+    .fdocs .dcode pre { font-size: 12.5px; line-height: 20px; padding: 13px 16px; }
+    .fdocs .dcode .fhd .where { display: none; }
+    /* …except on a pyxl frame: with nothing drawn at the blank line,
+       the badge is the page's only one-file marker — it stays at
+       every width. */
+    .fdocs .dcode[data-lang="pyxl"] .fhd .where { display: inline; }
+    .fdocs .tw { margin-left: -16px; margin-right: -16px; border-left: 0; border-right: 0; }
+    .fdocs .terms { grid-template-columns: 1fr; gap: 12px; margin-top: 48px; }
+    .fdocs .term.next { text-align: left; }
+    .fdocs .term.next .tn { left: auto; right: 14px; }
+    .fdocs .qo { padding-top: 8vh; }
+}

@@ -20,16 +20,14 @@ Pyxle is a Python-first full-stack web framework that brings the Next.js develop
 
 A `.pyxl` file colocates a Python `@server` loader (and `@action` mutations) with the React component that renders its data. The compiler splits them apart at build time, so the Python runs on the server and the JSX runs in the browser — but you author them as one unit, because they describe one thing: a single route.
 
-```python
+```pyxl
 # pages/index.pyxl
 from pyxle.runtime import server
 
 @server
 async def load(request):
     return {"message": "Hello from Python"}
-```
 
-```jsx
 export default function Home({ data }) {
     return <h1>{data.message}</h1>;
 }
@@ -469,7 +467,7 @@ A `.pyxl` file combines Python server logic with a React component. The scaffold
 - React JSX for the UI
 - The `<Head>` component from `pyxle/client` for document `<head>` elements
 
-```python
+```pyxl
 # Python section
 from datetime import datetime, timezone
 from pyxle import __version__
@@ -482,9 +480,7 @@ async def load_home(request):
         "time": now.strftime("%H:%M:%S UTC"),
         "message": "You're ready to build with Pyxle.",
     }
-```
 
-```jsx
 // JSX section -- receives loader data as props
 import React from 'react';
 import { Head } from 'pyxle/client';
@@ -586,16 +582,14 @@ A `.pyxl` file is the fundamental building block of a Pyxle application. It comb
 
 A `.pyxl` file has two sections:
 
-```python
+```pyxl
 # 1. Python section -- runs on the server
 from datetime import datetime
 
 @server
 async def load_page(request):
     return {"now": datetime.now().isoformat()}
-```
 
-```jsx
 // 2. JSX section -- runs on both server (SSR) and client
 import { Head } from 'pyxle/client';
 
@@ -731,14 +725,13 @@ export default function AboutPage({ data }) {
 
 Anything inside `<Head>` is extracted during SSR and inlined into the document `<head>`. It supports dynamic values via normal JSX interpolation:
 
-```jsx
-import { Head } from 'pyxle/client';
-
+```pyxl
 @server
 async def load_post(request):
     post = await fetch_post(request.path_params["slug"])
     return {"post": post}
 
+import { Head } from 'pyxle/client';
 
 export default function BlogPost({ data }) {
   return (
@@ -762,7 +755,7 @@ Head values are automatically sanitised to prevent XSS injection -- angle bracke
 
 ## A complete example
 
-```python
+```pyxl
 from datetime import datetime, timezone
 
 @server
@@ -775,9 +768,7 @@ async def load_home(request):
     else:
         greeting = "Good evening"
     return {"greeting": greeting}
-```
 
-```jsx
 import { Head } from 'pyxle/client';
 
 export default function HomePage({ data }) {
@@ -851,15 +842,13 @@ Wrap a filename segment in square brackets to create a dynamic route parameter:
 
 Access dynamic parameters in your loader via `request.path_params`:
 
-```python
+```pyxl
 @server
 async def load_post(request):
     slug = request.path_params["slug"]
     post = await fetch_post(slug)
     return {"post": post}
-```
 
-```jsx
 export default function BlogPost({ data }) {
   return <h1>{data.post.title}</h1>;
 }
@@ -974,13 +963,11 @@ Pyxle uses `@server` decorated functions to load data on the server before rende
 
 ## Basic loader
 
-```python
+```pyxl
 @server
 async def load_page(request):
     return {"message": "Hello from the server!"}
-```
 
-```jsx
 export default function MyPage({ data }) {
   return <h1>{data.message}</h1>;
 }
@@ -1092,7 +1079,7 @@ See [Error Handling](https://pyxle.dev/docs/guides/error-handling.md) for full d
 
 Loaders can call any Python code -- databases, APIs, file systems:
 
-```python
+```pyxl
 import httpx
 
 @server
@@ -1101,9 +1088,7 @@ async def load_posts(request):
         resp = await client.get("https://jsonplaceholder.typicode.com/posts")
         resp.raise_for_status()
     return {"posts": resp.json()[:10]}
-```
 
-```jsx
 export default function PostsPage({ data }) {
   return (
     <ul>
@@ -1235,14 +1220,12 @@ Multiple actions can exist in the same `.pyxl` file alongside a `@server` loader
 
 The simplest way to call an action from a form. `<Form>` collects the inputs, posts them to the action, and exposes `onSuccess` / `onError` callbacks:
 
-```python
+```pyxl
 @action
 async def create_post(request):
     body = await request.json()
     return {"id": 1, "title": body["title"]}
-```
 
-```jsx
 import { Form } from 'pyxle/client';
 
 export default function NewPostPage() {
@@ -1775,16 +1758,14 @@ Templates are useful for authentication flows, wizards, or any section where you
 
 A layout (or template) can declare its own `@server` loader, just like a page. This is the clean way to load data the layout itself needs on **every** page it wraps -- a nav bar, a signed-in user/session banner, the current theme, the framework version, etc. -- without repeating it in every page's loader.
 
-```python
+```pyxl
 # pages/layout.pyxl
 from pyxle import __version__
 
 @server
 async def load(request):
     return {"version": __version__, "year": 2026}
-```
 
-```jsx
 export default function RootLayout({ children, data }) {
     return (
         <>
@@ -1812,14 +1793,13 @@ navigation, its stylesheet, its analytics tag, or the cost of its layout loader.
 
 A layout **or a template** can declare itself the root of its own chain:
 
-```python
+```pyxl
 @server
 async def load(request):
     return {}
 
 
 STANDALONE = True
-
 
 import React from 'react';
 
@@ -2069,7 +2049,7 @@ In Pyxle, a route is a single `.pyxl` file with two halves:
 
 Mutations are a third piece — an `@action` function — instead of a second POST view.
 
-```python
+```pyxl
 # pages/posts/[id].pyxl
 
 @server
@@ -2077,7 +2057,6 @@ async def load(request):
     post = await get_post(request.path_params["id"])
     return {"post": post}          # <-- the loader's return value IS the data prop
 
-# --- the component (JSX) ---
 import React from 'react';
 
 export default function Post({ data }) {
@@ -2518,20 +2497,20 @@ import { formatDate } from '@/lib/format';
 A `@server` loader returns a dict; a third-party React component renders it.
 Nothing sits in between — no API route, no `fetch`, no serializer:
 
-```python
-@server
-async def load(request):
-    days = await asyncio.to_thread(summarize, LOG)   # plain Python
-    return {"days": days}
-```
-
 > **Install Recharts as `recharts@^2.15`.** Version 3.x brings in a CommonJS-only
 > dependency that calls `require('react')`, so a page importing it fails to
 > server-render with the error described under
 > [CommonJS packages and SSR](#commonjs-packages-and-ssr) above. Pin 2.x, or keep
 > 3.x and render the chart inside a `<ClientOnly>` boundary.
 
-```jsx
+```pyxl
+import asyncio
+
+@server
+async def load(request):
+    days = await asyncio.to_thread(summarize, LOG)   # plain Python
+    return {"days": days}
+
 import { ComposedChart, Bar, Line, XAxis, YAxis } from 'recharts';
 
 export default function Latency({ data }) {
@@ -3210,7 +3189,7 @@ Return a `{"data": ..., "revalidate": <seconds>}` envelope from your loader
 instead of a plain dict. `data` is the props your component receives (exactly
 as before); `revalidate` is how many seconds the cached render stays fresh.
 
-```python
+```pyxl
 @server
 async def load_post(request):
     post = await fetch_post(request.path_params["slug"])
@@ -3218,9 +3197,7 @@ async def load_post(request):
         "data": {"post": post},
         "revalidate": 60,   # cache this render for 60 seconds
     }
-```
 
-```jsx
 export default function Post({ data }) {
   return <article>{data.post.body}</article>;   // `data` is the inner dict
 }
@@ -3245,11 +3222,9 @@ The envelope is recognised only in its exact two-key shape (`data` **and**
 A page with no `@server` loader can still opt into caching with a module-level
 `CACHE` directive in its Python section:
 
-```python
+```pyxl
 CACHE = {"revalidate": 3600}   # cache this static page for an hour
-```
 
-```jsx
 export default function About() {
   return <main><h1>About Us</h1></main>;
 }
@@ -3815,7 +3790,7 @@ A Pyxle page can serve a **WebSocket** alongside its HTML. Add a module-level
 WebSocket route at the page's path — the same file serves both the rendered page
 over HTTP and a live connection over WS.
 
-```python
+```pyxl
 # pages/chat/[room].pyxl
 
 from pyxle.realtime import channel
@@ -3832,9 +3807,6 @@ async def websocket(ws):
     async with channel(ws, f"room:{room}") as live:
         async for message in ws.iter_text():
             await live.publish(message)
-
-
-# --- JavaScript/PSX (Client + Server) ---
 
 import React from 'react';
 import { useWebSocket } from 'pyxle/client';
@@ -8505,7 +8477,7 @@ properly than nail a half-answer to a page.
 
 *Illustrative — this is the target ergonomics, not current syntax.*
 
-```python
+```pyxl
 # posts/[slug].pyxl
 
 class Post(BaseModel):
@@ -8516,10 +8488,8 @@ class Post(BaseModel):
 @server
 async def load(request) -> Post:          # Python defines the shape, once
     return await db.get_post(request.path_params["slug"])
-```
 
-```tsx
-// same file, client half — the type comes from the loader, for free
+// the type comes from the loader, for free
 export default function PostPage({ data }: { data: Post }) {
   //                                          ^^^^ derived from the Python above
   return <article><h1>{data.title}</h1>{/* data.tital → caught before render */}</article>
@@ -8597,7 +8567,7 @@ Now watch what the same feature looks like in Pyxle.
 
 Here's the entire "list users and delete them" feature in Pyxle:
 
-```python
+```pyxl
 # pages/users.pyxl
 from myapp.db import fetch_users, delete_user
 
@@ -8611,7 +8581,6 @@ async def remove(request):
     body = await request.json()
     await delete_user(body["id"])
     return {"ok": True}
-
 
 import React from 'react';
 import { Head, useAction } from 'pyxle/client';
@@ -8930,7 +8899,7 @@ verify the edits across files.
 
 The agent creates **one file**:
 
-```python
+```pyxl
 # pages/posts/[id].pyxl
 from myapp.db import get_post, delete_post
 
@@ -8948,7 +8917,6 @@ async def remove(request):
     body = await request.json()
     await delete_post(int(body["id"]))
     return {"ok": True}
-
 
 import React from 'react';
 import { Head, useAction, navigate } from 'pyxle/client';
@@ -13374,7 +13342,7 @@ Pyxle"* heading.
 
 Here's the file we're going to render, simplified slightly:
 
-```python
+```pyxl
 # pages/index.pyxl
 from datetime import datetime, timezone
 
@@ -13384,7 +13352,6 @@ async def load_home(request):
         "version": "0.1.7",
         "now": datetime.now(timezone.utc).strftime("%H:%M:%S UTC"),
     }
-
 
 import React from 'react';
 import { Head } from 'pyxle/client';
@@ -13866,7 +13833,7 @@ Let's start with the simplest one and grow it.
 
 ### A pure-JSX page
 
-```python
+```pyxl
 # pages/about.pyxl
 import React from 'react';
 
@@ -13890,14 +13857,13 @@ empty, the route is registered but has no `@server` function.
 
 ### A page with a server loader
 
-```python
+```pyxl
 # pages/status.pyxl
 import time
 
 @server
 async def load(request):
     return {"now": time.time(), "version": "0.1.7"}
-
 
 import React from 'react';
 
@@ -13929,7 +13895,7 @@ A few things to notice in this example:
 
 Here's a more interesting pattern: alternating Python and JSX blocks.
 
-```python
+```pyxl
 # pages/dashboard.pyxl
 from datetime import datetime
 
@@ -13995,14 +13961,13 @@ syntax. The boundaries are detected by parsing — see [The parser](https://pyxl
 Use the `<Head>` component from `pyxle/client` to control what ends up in
 the document head. It's the recommended approach for nearly every page:
 
-```python
+```pyxl
 # pages/blog/[slug].pyxl
 @server
 async def load_post(request):
     slug = request.path_params["slug"]
     post = await fetch_post(slug)
     return {"post": post}
-
 
 import React from 'react';
 import { Head } from 'pyxle/client';
@@ -14253,7 +14218,7 @@ Python parser, and it's still wrong.
 
 ### Approach 2: explicit fence markers
 
-```python
+```pyxl
 # --- server ---
 @server
 async def loader(request):
@@ -14515,7 +14480,7 @@ Source: `compiler/parser.py:261-345`.
 With the walker and the helpers in place, here's what happens for a
 real four-section file:
 
-```python
+```pyxl
 # pages/dashboard.pyxl
 from datetime import datetime         # ─┐
                                       #  │ Python segment 1:
@@ -14803,7 +14768,7 @@ Two specific cases the parser defends against:
 
 A `.pyxl` file containing 200 levels of nested list literals:
 
-```python
+```pyxl
 @server
 async def loader(request):
     return [[[[[[[[[[ ... 200 levels ... ]]]]]]]]]]
@@ -15154,14 +15119,13 @@ actually `import` and call.
 
 Here's a real example. Source `.pyxl`:
 
-```python
+```pyxl
 # pages/index.pyxl
 import time
 
 @server
 async def load_home(request):
     return {"now": time.time()}
-
 
 import React from 'react';
 
@@ -15936,12 +15900,11 @@ A `layout.pyxl` looks like a regular page, but its component receives
 a `children` prop, and a layout loader's data arrives on a separate
 `layoutData` prop (so it never collides with the page's own `data`):
 
-```python
+```pyxl
 # pages/layout.pyxl
 @server
 async def load_root_layout(request):
     return {"appName": "MyApp"}
-
 
 import React from 'react';
 
@@ -20028,6 +19991,10 @@ Source: https://pyxle.dev/docs/changelog.md
 # Changelog
 
 Release notes for Pyxle. While we're in beta (`0.x`), minor versions may include breaking changes — those are called out explicitly. To upgrade, run `pip install --upgrade pyxle-framework`.
+
+## 0.9.4
+
+- **Docs: a whole-file `.pyxl` example is now one `pyxl` code block instead of a `python` fence stacked on a `jsx` fence** — one file in the docs the way it is one file on disk.
 
 ## 0.9.3
 
