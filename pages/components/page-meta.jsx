@@ -1,8 +1,8 @@
-/* ═══ E-META — one head helper, every page ═══════════════════════════
+/* ═══ PAGE-META — one head helper, every page ════════════════════════
  *
  * Usage (every page, first child of the page component):
  *
- *   import { PageMeta } from './components/e-meta.jsx';
+ *   import { PageMeta } from './components/page-meta.jsx';
  *   <PageMeta
  *       title="Benchmarks"                     // → "Benchmarks — Pyxle"
  *       description="Measured SSR throughput …"

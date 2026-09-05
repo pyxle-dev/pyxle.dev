@@ -1,6 +1,6 @@
 /* ═══ THEME TOGGLE — the light/dark instrument control ═══════════════
  *
- * The pre-redesign app's control, redrawn in E's voice: one chromeless
+ * The pre-redesign app's control, redrawn in the house voice: one chromeless
  * mono button (`.tgl`, styles/tailwind.css §2), one currentColor glyph.
  * Half-moon fills in dark, a small solid dot in light — the two halves
  * are CSS-gated on the html theme class (`html.dark .tgl .moon` etc.),
@@ -9,12 +9,12 @@
  * aria-label, title — is byte-identical in both themes and on the
  * server. `html:not(.js) .tgl` hides the control when it cannot work.
  *
- * Mounted by e-chrome.jsx: desktop header (.hd-extra, last item on the
+ * Mounted by chrome.jsx: desktop header (.hd-extra, last item on the
  * right — where the original app kept it) and the mobile bar.
  */
 
 import React from 'react';
-import { useTheme } from './e-theme.jsx';
+import { useTheme } from './theme.jsx';
 
 function ThemeGlyph() {
     return (

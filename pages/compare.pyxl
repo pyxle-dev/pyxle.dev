@@ -4,14 +4,14 @@ async def load_compare(request):
     return {"version": __version__}
 
 
-import './styles/f-compare.css';
+import './styles/compare.css';
 import React from 'react';
 import { Link } from 'pyxle/client';
-import { PageMeta } from './components/e-meta.jsx';
-import { Rulebar, Receipt, CopyChip, useSeen } from './components/f-kit.jsx';
+import { PageMeta } from './components/page-meta.jsx';
+import { Rulebar, Receipt, CopyChip, useSeen } from './components/kit.jsx';
 
 /* ════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · /compare — the printed spec sheet.
+   THE WORKING COPY · /compare — the printed spec sheet.
 
    One ruled table per rival — Next.js + FastAPI, Reflex, Django —
    with shared hairline cells, every value in mono, and a couplet

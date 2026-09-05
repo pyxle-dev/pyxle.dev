@@ -4,13 +4,13 @@ import os
 import re
 from pathlib import Path
 
-# ═══ /docs — F "The Working Copy": the manual ════════════════════════
+# ═══ /docs — The Working Copy: the manual ═══════════════════════════
 # The docs are the manual of the working copy, one numbered listing
 # (lines 01..NN). `/docs` is the landing — the printed index; a
 # `/docs/<path>` article is one printed page (running head, folio
 # numeral = its line number, claim/receipt couplet). Article HTML
 # comes from the generated public/docs-data JSON and is transformed
-# HERE, server-side, into the F chrome (Sheet code panes with Deck
+# HERE, server-side, into the house chrome (Sheet code panes with Deck
 # heads and the server/client badges, wrapped tables, heading
 # anchors) — so the SSR document already carries the finished article
 # and the client only hydrates behaviour on top. Body prose is
@@ -88,7 +88,7 @@ def _listing():
     return _listing_cache
 
 
-# ── the body transform: F frames around code, wrapped tables, anchors ─
+# ── the body transform: code frames, wrapped tables, anchors ─────────
 # It operates on the already-escaped generated HTML. Real syntax
 # highlighting lives in highlight.py (app root): Python through the
 # stdlib tokenizer, JS/JSX through a stateful scanner, JSON, and the
@@ -261,10 +261,10 @@ async def load_docs(request):
     return {**base, "landing": False, "page": page}
 
 
-import '../styles/f-docs.css';
+import '../styles/docs.css';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, navigate } from 'pyxle/client';
-import { PageMeta } from '../components/e-meta.jsx';
+import { PageMeta } from '../components/page-meta.jsx';
 import {
     NN, DocsMobileBarActions, DocsRail, DocsShelves, DocsTerms, DocsToc,
 } from '../components/docs-chrome.jsx';
@@ -464,7 +464,7 @@ export default function DocsPage({ data }) {
     const closeQo = useCallback(() => setQoOpen(false), []);
 
     return (
-        <div id="top" className="fdocs">
+        <div id="top" className="docs-page">
             {notFound ? (
                 <PageMeta title="Page not found" description={LANDING_DESC} path="/docs" />
             ) : landing ? (

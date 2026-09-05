@@ -39,20 +39,20 @@ async def react_emoji(request):
     return {"ok": True, "emoji": emoji, "count": new_count}
 
 
-import './styles/f-playground.css';
+import './styles/playground.css';
 import React, { useCallback, useRef, useState } from 'react';
 import { Link, useAction } from 'pyxle/client';
-import { PageMeta } from './components/e-meta.jsx';
-import { Rulebar, Receipt, CopyChip, useSeen } from './components/f-kit.jsx';
-import { GITHUB } from './components/f-chrome.jsx';
+import { PageMeta } from './components/page-meta.jsx';
+import { Rulebar, Receipt, CopyChip, useSeen } from './components/kit.jsx';
+import { GITHUB } from './components/chrome.jsx';
 import { tokenizeBlock } from './components/code-highlighter.jsx';
 import { LivePlayground, DEFAULT_SOURCE } from './components/live-playground.jsx';
 
 /* ════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · /playground — the copy, powered on.
+   THE WORKING COPY · /playground — the copy, powered on.
 
    The sandbox machinery (live-playground.jsx + the opaque-origin
-   Pyodide iframe) is UNCHANGED — only the shell wears F: the editor
+   Pyodide iframe) is UNCHANGED — only the shell is redrawn: the editor
    pane is the specimen (the page's one Ink border), example files
    sit as tabs ON a rule, and beneath the bench a quoted Terminal
    log prints only what actually happened — an engine boot, a
@@ -291,7 +291,7 @@ const EXAMPLES = [
 ];
 
 /* ── the log row — one quoted line, written by real events only ────
-   Same classes as f-kit's <LogLine> (the Terminal-bed idiom), plus
+   Same classes as kit.jsx's <LogLine> (the Terminal-bed idiom), plus
    this page's one extension: the sandbox reports `ok`, not an HTTP
    200 — and a run that really completed earns the same green
    (job 3). `err` stays dim: code that failed never ran. */
@@ -403,7 +403,7 @@ function SandboxSection() {
                     <span className="extab-note">{ex.blurb}</span>
                 </div>
 
-                {/* the bench — machinery intact, F skin */}
+                {/* the bench — machinery intact, restyled shell */}
                 <div className="pane pane-bench b b-flat" style={{ '--bd': '.5s' }}>
                     <LivePlayground
                         initialSource={ex.source}

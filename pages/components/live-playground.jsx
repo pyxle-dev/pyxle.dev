@@ -139,7 +139,7 @@ function fetchVendorFiles() {
 }
 
 function currentTheme() {
-    // F is light-first: anything that isn't an explicit dark class reads
+    // The design is light-first: anything that isn't an explicit dark class reads
     // as the printed (light) copy — the same default the layout boot
     // script applies.
     if (typeof document === 'undefined') return 'light';
@@ -444,7 +444,7 @@ export function LivePlayground({
         if (!startedRef.current && DefaultComp == null) startEngine();
     }, [DefaultComp, startEngine]);
 
-    // Honest states, F voice: before any edit the pane is a plain-JS
+    // Honest states, house voice: before any edit the pane is a plain-JS
     // mirror (and says so); green appears only once the sandbox is
     // genuinely rendering the visitor's code.
     const statusText =

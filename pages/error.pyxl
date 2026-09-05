@@ -1,9 +1,9 @@
-import './styles/f-error.css';
+import './styles/error.css';
 import React from 'react';
 import { Head, Link } from 'pyxle/client';
 
 /* ════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · the error boundary — the fault, quoted.
+   THE WORKING COPY · the error boundary — the fault, quoted.
    error.pyxl is the nearest boundary for any loader or render
    fault: the server renders it when a page throws, and (since
    framework 0.5) the same file is the *client* React error

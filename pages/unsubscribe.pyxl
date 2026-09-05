@@ -91,12 +91,12 @@ async def submit_feedback(request):
     return {"ok": True}
 
 
-import './styles/f-unsubscribe.css';
+import './styles/unsubscribe.css';
 import React, { useState } from 'react';
 import { useAction, Head, Link } from 'pyxle/client';
 
 /* ════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · /unsubscribe — the receipt.
+   THE WORKING COPY · /unsubscribe — the receipt.
    One ruled block. Unsubscribe is one click; once the action has
    really run, its mono log line prints the genuine 200 (green
    job 3 — the only green on this page). The feedback that follows

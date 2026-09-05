@@ -77,7 +77,7 @@ This site showcases Pyxle best practices:
 
 - `/docs` is the landing (the numbered listing); `/docs/<path>` is an article.
   Line numbers (01..NN) are computed server-side from the manifest nav order.
-- Article HTML is transformed **server-side** into the E chrome (code frames
+- Article HTML is transformed **server-side** into the site's code chrome (code frames
   with server/client badges, `.tw`-wrapped tables, heading anchors) so the SSR
   document is complete; manifest + transformed pages are cached in Python
   globals (rebuild docs-data ⇒ restart/redeploy to refresh).
@@ -98,9 +98,9 @@ The `/docs` pages are built from the **framework repo's** markdown:
 
 `pages/plugins.pyxl` renders `public/plugins-registry.json` (filtered by `tier`); the official/founding counts, card highlight rows, and version chips all come from the registry. To add an official plugin: add a registry entry (including `version` + `highlights`) **and** add its doc to `build-docs.mjs`'s nav — no page edit needed. Bump the entry's `version` field on each plugin release.
 
-### Theme System (`pages/components/e-theme.jsx`)
+### Theme System (`pages/components/theme.jsx`)
 
-`ThemeProvider` + `useTheme()` live in `components/e-theme.jsx` (the layout re-exports `useTheme` for the legacy import path). Theme is stored in `localStorage` under `pyxle-theme`; the default is **light** — F's printed working copy is the identity, dark is "the lamp copy", an explicit reader's control (system preference is deliberately not consulted, so the print holds under OS dark mode too). The layout's inline boot script stamps `html.light`/`html.dark` (plus `js`) before first paint and swaps the `theme-color` meta (`#FBFBF9` light / `#20231D` dark) — SSR markup carries no theme class, so served bytes are theme-neutral. All theming is CSS variables: the F light table on `:root`, the lamp values under `html.dark` in `styles/tailwind.css` (mirrored in `playground-sandbox.html` — edit the .html, rebuild via `scripts/build-playground-sandbox.mjs`; the `pg-theme` postMessage bridge keeps a booted sandbox in step with the toggle). No first-render markup may depend on the theme. The toggle (`components/theme-toggle.jsx`) renders in the header and the mobile bar; its glyph is CSS-gated on the html class, never a JS branch.
+`ThemeProvider` + `useTheme()` live in `components/theme.jsx` (the layout re-exports `useTheme` for the legacy import path). Theme is stored in `localStorage` under `pyxle-theme`; the default is **light** — the printed working copy is the identity, dark is "the lamp copy", an explicit reader's control (system preference is deliberately not consulted, so the print holds under OS dark mode too). The layout's inline boot script stamps `html.light`/`html.dark` (plus `js`) before first paint and swaps the `theme-color` meta (`#FBFBF9` light / `#20231D` dark) — SSR markup carries no theme class, so served bytes are theme-neutral. All theming is CSS variables: the light token table on `:root`, the lamp values under `html.dark` in `styles/tailwind.css` (mirrored in `playground-sandbox.html` — edit the .html, rebuild via `scripts/build-playground-sandbox.mjs`; the `pg-theme` postMessage bridge keeps a booted sandbox in step with the toggle). No first-render markup may depend on the theme. The toggle (`components/theme-toggle.jsx`) renders in the header and the mobile bar; its glyph is CSS-gated on the html class, never a JS branch.
 
 ---
 

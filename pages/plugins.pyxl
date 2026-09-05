@@ -11,16 +11,16 @@ async def load_plugins_page(request):
     return {"version": __version__, "registry": registry}
 
 
-import './styles/f-plugins.css';
+import './styles/plugins.css';
 import React from 'react';
 import { Link } from 'pyxle/client';
-import { PageMeta } from './components/e-meta.jsx';
-import { Rulebar, Receipt, CopyChip, Pane, PaneHead, useSeen } from './components/f-kit.jsx';
+import { PageMeta } from './components/page-meta.jsx';
+import { Rulebar, Receipt, CopyChip, Pane, PaneHead, useSeen } from './components/kit.jsx';
 
 /* ════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · /plugins — the directory.
+   THE WORKING COPY · /plugins — the directory.
 
-   F3's ruled table grown into a registry: one plugin per hairline
+   The homepage's framework table grown into a registry: one plugin per hairline
    cell — mono tab + the released version straight from
    public/plugins-registry.json, a real four-line usage specimen on
    a Deck bed, the registry's own spec lines, and docs → with its

@@ -1,9 +1,9 @@
-/* ═══ F-KIT — shared Working Copy primitives ═════════════════════════
+/* ═══ KIT — shared Working Copy primitives ═══════════════════════════
  *
- * Small, foundation-owned pieces every F page composes: the running
+ * Small, foundation-owned pieces every page composes: the running
  * head (Rulebar), the couplet receipt, panes, the copy chip, log lines,
- * and the `useSeen` reveal hook. Lanes request additions here rather
- * than editing — each page owns its styles; shared tokens live here.
+ * and the `useSeen` reveal hook. Additions land here rather than in
+ * page copies — each page owns its styles; shared tokens live here.
  *
  * Hydration law, upheld by construction: `useSeen` state starts false
  * on the server AND the first client render (SSR markup carries no
@@ -17,7 +17,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'pyxle/client';
 import { track } from './analytics.jsx';
 
-export { useReducedMotionSafe } from './e-motion.jsx';
+export { useReducedMotionSafe } from './motion.jsx';
 
 /** IntersectionObserver → `seen` flag for the reveal machinery.
  *  Usage: const [ref, seen] = useSeen();

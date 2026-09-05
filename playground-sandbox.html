@@ -34,7 +34,7 @@
       contained to the sandbox.
 -->
 <style>
-  /* ══ F — THE WORKING COPY · sandbox document ═════════════════════
+  /* ══ THE WORKING COPY · sandbox document ═════════════════════════
      Token values mirrored from pages/styles/tailwind.css (the sandbox
      is an opaque origin and self-hosts nothing, so fonts are fallback
      stacks matching the outer page). One radius (6px), zero shadows,
@@ -60,7 +60,7 @@
     --ease: cubic-bezier(.2, .6, .2, 1);
     color-scheme: light;
   }
-  /* F DARK — "the lamp copy", mirrored from the host's html.dark block. */
+  /* DARK — "the lamp copy", mirrored from the host's html.dark block. */
   html.dark {
     color-scheme: dark;
     --bond: #1B1D18;
@@ -107,7 +107,7 @@
   .preview-scope input::placeholder { color: var(--faint); }
   .preview-scope input:focus { border-color: var(--ink); }
 
-  /* ── Error panel — the printed-errata register (F has no red: the
+  /* ── Error panel — the printed-errata register (the design has no red: the
         fault is marked by the darkest border on the sheet + a mono
         kicker, the way a proofreader flags a line) ── */
   .pg-error { border-radius: 6px; border: 1px solid var(--ink); background: var(--deck); padding: 1rem 1.1rem; font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
@@ -293,7 +293,7 @@
   function setStatus(s) { toParent({ type: 'pg-status', status: s }); }
 
   function applyTheme(theme) {
-    // F is light-first: anything that isn't an explicit 'dark' reads as
+    // The design is light-first: anything that isn't an explicit 'dark' reads as
     // the printed (light) copy — same default as the host boot script.
     document.documentElement.classList.remove('dark', 'light');
     document.documentElement.classList.add(theme === 'dark' ? 'dark' : 'light');

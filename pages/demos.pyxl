@@ -57,17 +57,18 @@ async def load(request):
     return {"version": __version__, "status": _status_cache["data"]}
 
 
-import './styles/f-demos.css';
+import './styles/demos.css';
 import React from 'react';
 import { Link } from 'pyxle/client';
-import { PageMeta } from './components/e-meta.jsx';
-import { GITHUB } from './components/f-chrome.jsx';
-import { Rulebar, Receipt, CopyChip, useSeen } from './components/f-kit.jsx';
+import { PageMeta } from './components/page-meta.jsx';
+import { GITHUB } from './components/chrome.jsx';
+import { Rulebar, Receipt, CopyChip, useSeen } from './components/kit.jsx';
 
 /* ════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · /demos — demos, really deployed.
+   THE WORKING COPY · /demos — demos, really deployed.
 
-   F5 grown to a page. The three apps we run in production lead —
+   The homepage's production section grown to a page. The three
+   apps we run in production lead —
    this site itself double-wide (the strongest dogfood there is) with
    measured uptime printed as mono receipts (the loader above pulls
    them from our monitor's public API; when the fetch fails the page

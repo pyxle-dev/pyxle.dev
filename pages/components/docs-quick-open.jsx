@@ -1,7 +1,7 @@
 /* ═══ DOCS-QUICK-OPEN — ⌘K "find in the manual" ══════════════════════
  *
- * The find-in-file pane over the whole listing (F chrome lives in
- * styles/f-docs.css: Sheet pane, 1px ink border, scrim, no shadow). A
+ * The find-in-file pane over the whole listing (its chrome lives in
+ * styles/docs.css: Sheet pane, 1px ink border, scrim, no shadow). A
  * client component in the strict sense: it renders nothing until the
  * user opens it (so it has zero SSR/hydration surface), and its index
  * is the docs manifest the page loader already shipped — no server

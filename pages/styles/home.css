@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · homepage-only styles (pages/index.pyxl).
+   THE WORKING COPY · homepage-only styles (pages/index.pyxl).
    Shared apparatus (tokens, rulebar, pane, chip, boot/reveal, chrome)
-   lives in styles/tailwind.css — this file owns F1–F6's furniture.
+   lives in styles/tailwind.css — this file owns the six homepage
+   sections' furniture.
    Ported from the approved design prototype; selectors are
    scoped to their sections so nothing leaks into other routes through
    the client router's global stylesheet pool.
@@ -20,7 +21,7 @@
 .rulebar-hero { border-top: none; height: 0; }
 .rulebar-hero .tab { top: -8px; }
 
-/* ============================ F1 · HERO =========================== */
+/* ============================ 01 · HERO =========================== */
 .hero-head { position: relative; margin-top: 72px; margin-bottom: 44px; }
 
 /* the stamp — the working copy's own inked plate (drawn furniture) */
@@ -363,7 +364,7 @@ html.dark .pane-log { border-color: var(--rule2); }  /* the quote reads by appar
 .cta-receipt { margin: 6px 0 0; font: 400 12.5px/1.5 var(--mono); color: var(--graphite); }
 .cta-receipt span { white-space: nowrap; }
 
-/* ============================ F2 · FIG ============================ */
+/* ============================ 02 · FIG ============================ */
 /* the figure sits on a printed plate — the page's one recessed band */
 .plate {
     background: var(--deck);
@@ -524,7 +525,7 @@ html.dark .pane-log { border-color: var(--rule2); }  /* the quote reads by appar
     30% { background: var(--tint); border-color: var(--green); }
 }
 
-/* ============================ F3 · CELLS ============================ */
+/* ============================ 03 · CELLS ============================ */
 .cells {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -593,7 +594,7 @@ html.dark .pane-log { border-color: var(--rule2); }  /* the quote reads by appar
     border-radius: 6px;
 }
 
-/* ============================ F4 · TILES ============================ */
+/* ============================ 04 · TILES ============================ */
 .tiles {
     display: grid;
     grid-template-columns: 1.7fr 1fr 1fr 1fr;   /* the measured number leads */
@@ -626,7 +627,7 @@ html.dark .pane-log { border-color: var(--rule2); }  /* the quote reads by appar
 .js .seen .bar-k { animation-delay: .15s; }
 @keyframes barin { to { transform: scaleX(1); } }
 
-/* ============================ F5 · DEMOS ============================ */
+/* ============================ 05 · DEMOS ============================ */
 .demos {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -713,7 +714,7 @@ html.dark .pane-log { border-color: var(--rule2); }  /* the quote reads by appar
 .stance p { margin: 14px 0 0; color: var(--graphite); }
 .stance-gh { font: 400 13px/1.6 var(--mono); }
 
-/* ============================ F6 · START ============================ */
+/* ============================ 06 · START ============================ */
 .start-grid {
     display: grid;
     grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);

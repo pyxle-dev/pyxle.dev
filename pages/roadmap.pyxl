@@ -4,14 +4,14 @@ async def load_roadmap(request):
     return {"version": __version__}
 
 
-import './styles/f-roadmap.css';
+import './styles/roadmap.css';
 import React from 'react';
 import { Link } from 'pyxle/client';
-import { PageMeta } from './components/e-meta.jsx';
-import { Rulebar, Receipt, CopyChip, useSeen } from './components/f-kit.jsx';
+import { PageMeta } from './components/page-meta.jsx';
+import { Rulebar, Receipt, CopyChip, useSeen } from './components/kit.jsx';
 
 /* ════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · /roadmap — the ledger.
+   THE WORKING COPY · /roadmap — the ledger.
 
    One left rule runs the page; every release is a station on it —
    mono version tag in the margin, claim in sans, what actually

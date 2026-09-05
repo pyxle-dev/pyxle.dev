@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · pyxle.dev design system
+   THE WORKING COPY · pyxle.dev design system
    Ported from the approved design prototype (the pixel
    truth). Physics: an annotated printed file — light, ruled,
    line-numbered, dense at rest; it animates only when the visitor
@@ -59,7 +59,7 @@
         size-adjust: 100%;
     }
 
-    /* ── 0 · tokens — F light (f.css :root, verbatim values) ────── */
+    /* ── 0 · tokens — light (the design prototype's :root values) ── */
     :root {
         --bond: #FBFBF9;      /* the page */
         --sheet: #FFFFFF;     /* paper-on-paper (panes) */
@@ -81,7 +81,7 @@
         --term-dim: #8B958C;
         --term-green: #3FA871;
 
-        /* ── syntax inks (docs code frames only, .fdocs .dcode) ─────
+        /* ── syntax inks (docs code frames only, .docs-page .dcode) ─────
            Six printer's inks for full tokenization — Run Green stays
            reserved for decorators (code that runs on the server).
            All ratios ≥ 4.5:1 on Sheet, script-checked. */
@@ -94,11 +94,11 @@
 
         --mono: 'IBM Plex Mono', 'PlexMonoFallback', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         --sans: 'IBM Plex Sans Variable', 'IBM Plex Sans', 'PlexSansFallback', 'Helvetica Neue', Arial, sans-serif;
-        --ease: cubic-bezier(.2, .6, .2, 1); /* the F house ease */
+        --ease: cubic-bezier(.2, .6, .2, 1); /* the house ease */
         color-scheme: light;
     }
 
-    /* ── 0b · F dark — "the lamp copy" ─────────────────────────────
+    /* ── 0b · dark — "the lamp copy" ───────────────────────────────
        The same document under a low desk lamp: warm green-black paper,
        bone ink, Run Green lifted one step. Quoted terminals keep a
        still-darker bed, separated from the page by border + their mono
@@ -171,7 +171,7 @@
 .cv { content-visibility: auto; contain-intrinsic-size: 900px; }
 .mono-inline { font-family: var(--mono); font-size: .88em; }
 
-/* the measure: F sets at 1140px */
+/* the measure: the page sets at 1140px */
 .frame { max-width: 1140px; margin-inline: auto; padding-inline: 24px; }
 
 /* links: Ink with underlines; hover = the underline thickens. NEVER
@@ -510,7 +510,7 @@ html:not(.js) .tgl { display: none; }
 
 /* ── 9 · REVEAL — apparatus stamps in on scroll ────────────────────
    One quick pass per section; rules draw, tabs and folios stamp,
-   content rises 14px. All gated on .js + .seen (useSeen, f-kit). */
+   content rises 14px. All gated on .js + .seen (useSeen, kit.jsx). */
 .js .rv { opacity: 0; transform: translateY(14px); transition: opacity .5s ease var(--rvd, 0s), transform .5s var(--ease) var(--rvd, 0s); }
 .js .seen .rv { opacity: 1; transform: none; }
 .js .rulebar .shade {
@@ -530,8 +530,8 @@ html:not(.js) .shade { display: none; }
 /* ── 10 · code-highlighter tokens (components/code-highlighter.jsx)
    The three-ink law: code is Ink, comments/punctuation/strings recede
    to Graphite, and the ONLY coloured scope is the decorators — the
-   anatomy that runs on the server (green job 5). No client colour: F
-   prints one document, not two stacks. */
+   anatomy that runs on the server (green job 5). No client colour: the
+   site prints one document, not two stacks. */
 .sh-kw   { color: var(--ink); font-weight: 500; }
 .sh-str  { color: var(--graphite); }
 .sh-cmt  { color: var(--graphite); font-style: italic; }
@@ -550,9 +550,9 @@ html:not(.js) .shade { display: none; }
 
 /* ── 11 · INTERIM docs code-frame readability ─────────────────────
    The docs surface server-emits .dcode.frame / .fhd / .cm / .dec /
-   .tg — Lane B owns the full F restyle (docs-chrome.jsx). Until it
-   lands, these keep all 64 articles reading in F law. DELETE at
-   Phase 2 if Lane B has replaced them. */
+   .tg — the full docs restyle lives in docs-chrome.jsx + docs.css.
+   Until that fully replaces these, they keep all 64 articles
+   reading in the house style. DELETE once replaced. */
 .dcode.frame { max-width: none; margin-inline: 0; padding-inline: 0;
     background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; }
 .dcode .fhd { background: var(--deck); border-bottom: 1px solid var(--rule);
@@ -562,8 +562,9 @@ html:not(.js) .shade { display: none; }
 .dec { color: var(--green); font-weight: 500; }
 .tg { color: var(--ink); }
 
-/* ── 12 · playground preview scope (Lane E retunes) ──────────────
-   The sandbox's rendered-output pane in F law: quiet ruled lists, a
+/* ── 12 · playground preview scope ───────────────────────────────
+   The sandbox's rendered-output pane in the house style: quiet
+   ruled lists, a
    green tag chip only where the loader ran. */
 .preview-scope { color: var(--ink); }
 .preview-scope h1, .preview-scope .preview-h1 { font-family: var(--mono); font-size: 1.7rem; font-weight: 500; letter-spacing: -0.01em; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--ink); }

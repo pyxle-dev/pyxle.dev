@@ -21,15 +21,15 @@ import '@fontsource/ibm-plex-mono/600.css';
 import React from 'react';
 import { Head } from 'pyxle/client';
 import Analytics from './components/analytics.jsx';
-import { MotionRoot } from './components/e-motion.jsx';
-import { ThemeProvider } from './components/e-theme.jsx';
-import { FHeader, FFooter, MobileBar } from './components/f-chrome.jsx';
+import { MotionRoot } from './components/motion.jsx';
+import { ThemeProvider } from './components/theme.jsx';
+import { SiteHeader, SiteFooter, MobileBar } from './components/chrome.jsx';
 import {
     DEFAULT_TITLE, DEFAULT_DESCRIPTION, DEFAULT_OG_IMAGE, SITE_URL,
-} from './components/e-meta.jsx';
+} from './components/page-meta.jsx';
 
 /* ════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · the site chrome.
+   THE WORKING COPY · the site chrome.
 
    One 64px running head on a rule2 hairline (it does not hide on
    scroll — running heads don't dodge), the page, then the EOF
@@ -42,17 +42,17 @@ import {
    code audit at cleanup), font-display: swap with metric fallbacks —
    the loading strategy that holds the Lighthouse 100. No CDN fonts.
 
-   F is LIGHT-first: the printed copy is the identity (localStorage
+   The design is LIGHT-first: the printed copy is the identity (localStorage
    `pyxle-theme`, default light — system preference deliberately never
    consulted, so the print holds under OS dark mode too). Dark is "the
-   lamp copy", an explicit reader's control — components/e-theme.jsx
-   owns the context, the toggle renders in f-chrome.jsx.
+   lamp copy", an explicit reader's control — components/theme.jsx
+   owns the context, the toggle renders in chrome.jsx.
 
    Colour carries ONE meaning in both themes: Run Green = code that
    runs (seam · prompts/copied · LIVE/200s · Install · decorator
    tokens · execution). Links are never green.
 
-   NAVIGATION DECISIONS (unchanged from the E port): no cross-document
+   NAVIGATION DECISIONS (carried over from the previous design): no cross-document
    View Transitions and no hover-prefetch shim — Pyxle's <Link>
    already navigates in-document and prefetches loader data + module
    on hover/viewport-entry.
@@ -63,9 +63,9 @@ import {
    the first child inside #root, so the parser executes it ahead of any
    painted markup. Default is LIGHT, never system-pref: anything other
    than a stored 'light'/'dark' falls through to light (a stored 'dark'
-   from the E era is respected — the visitor chose the lamp). A stored
+   from the previous design is respected — the visitor chose the lamp). A stored
    dark theme retints <meta name="theme-color"> pre-paint (the React
-   effect in e-theme.jsx keeps it in sync after). Try/caught: storage
+   effect in theme.jsx keeps it in sync after). Try/caught: storage
    denial still paints a coherent light page. */
 const BOOT = `(function(){try{`
     + `var c=document.documentElement.classList;c.add('js');`
@@ -78,9 +78,9 @@ const BOOT = `(function(){try{`
     + `document.documentElement.classList.add('js');}})();`;
 
 /** The theme hook — state + toggle + persistence live in
- *  components/e-theme.jsx; this re-export keeps the original app's
+ *  components/theme.jsx; this re-export keeps the original app's
  *  import path working: `import { useTheme } from '../layout.jsx'`. */
-export { useTheme } from './components/e-theme.jsx';
+export { useTheme } from './components/theme.jsx';
 
 export default function RootLayout({ children, data }) {
     const version = data && data.version;
@@ -93,7 +93,7 @@ export default function RootLayout({ children, data }) {
                 <script dangerouslySetInnerHTML={{ __html: BOOT }} />
                 <Analytics />
                 {/* Site-wide head defaults. Pages override these through
-                   <PageMeta> (components/e-meta.jsx) — Pyxle's head dedup
+                   <PageMeta> (components/page-meta.jsx) — Pyxle's head dedup
                    gives the page's tags precedence — so any page that
                    forgets still ships a complete, truthful head. The
                    theme-color content is the LIGHT bond: SSR is
@@ -115,9 +115,9 @@ export default function RootLayout({ children, data }) {
                     <meta name="twitter:image" content={DEFAULT_OG_IMAGE} />
                 </Head>
                 <div className="min-h-screen">
-                    <FHeader />
+                    <SiteHeader />
                     {children}
-                    <FFooter version={version} />
+                    <SiteFooter version={version} />
                     <MobileBar />
                 </div>
             </ThemeProvider>

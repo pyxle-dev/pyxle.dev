@@ -38,8 +38,8 @@ back to a segment walker driven by the same boundary shapes; a block
 with no boundary at all is a single-domain excerpt and is tokenized
 whole.
 
-Token classes are styled in pages/styles/f-docs.css, scoped there under
-``.fdocs .dcode`` — the homepage hero specimen and the playground keep
+Token classes are styled in pages/styles/docs.css, scoped there under
+``.docs-page .dcode`` — the homepage hero specimen and the playground keep
 their own bespoke coloring.
 """
 

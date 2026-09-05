@@ -1,4 +1,4 @@
-/* ═══ F — THE WORKING COPY · /playground ═════════════════════════════
+/* ═══ THE WORKING COPY · /playground ═════════════════════════════════
    The working copy, powered on: the editor pane IS the specimen
    (Sheet, the page's one Ink border — the most-important-object law —
    line numbers, three-ink colour), the result pane beside it, and a
@@ -7,8 +7,8 @@
    @action, its log printing real HTTP 200s (green job 3).
 
    House tokens/idioms come from styles/tailwind.css. Log-line column
-   classes (.log-line/.lg-*) are the ones f-kit's <LogLine> emits —
-   mirrored from f-index.css and scoped under .pg-log so the two pages
+   classes (.log-line/.lg-*) are the ones kit.jsx's <LogLine> emits —
+   mirrored from home.css and scoped under .pg-log so the two pages
    can never restyle each other. Motion here is diegetic only: rows
    land when real events fire, the result pane flashes when a run
    actually completes, the LIVE dot breathes only while the sandbox is
@@ -200,7 +200,7 @@ html.dark .pane-bench { border-color: var(--rule2); }
 .pg-boot-dot.pulse { animation: pgbreathe 1.2s ease-in-out infinite; }
 .pg-default { position: absolute; inset: 0; overflow: auto; padding: 24px 28px; }
 
-/* ── the sandbox log — quoted Terminal bed (mirrors f-index idiom) ── */
+/* ── the sandbox log — quoted Terminal bed (mirrors the homepage idiom) ── */
 .pane.pane-log, .pane .pane-log { background: var(--term); border-color: var(--term); }
 .pane.pane-log { margin-top: 22px; }
 html.dark .pane.pane-log, html.dark .pane .pane-log { border-color: var(--rule2); }  /* the quote reads by apparatus, not luminance */

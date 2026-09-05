@@ -1,11 +1,11 @@
-/* ═══ F-CHROME — the shared header / footer / newsletter for pyxle.dev ═══
+/* ═══ CHROME — the shared header / footer / newsletter for pyxle.dev ═══
  *
  * Rendered by pages/layout.pyxl on every page. Ported from the approved
  * design prototype onto the app's real
  * primitives: Pyxle <Link> navigation, the layout loader's live
  * pyxle.__version__, and the REAL subscribe_newsletter @action.
  *
- * Chrome laws (F):
+ * Chrome laws:
  *  · every page carries every nav link + GitHub — zero 404s
  *  · active page = 2px ink underline — never green (green means "code
  *    that runs"; the current page is a fact)
@@ -21,7 +21,7 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link, Slot, useAction, usePathname } from 'pyxle/client';
 import { ThemeToggle } from './theme-toggle.jsx';
-import { CopyChip, Rulebar, copyText, useSeen } from './f-kit.jsx';
+import { CopyChip, Rulebar, copyText, useSeen } from './kit.jsx';
 import { track } from './analytics.jsx';
 
 export const INSTALL = 'pip install pyxle-framework';
@@ -62,8 +62,8 @@ export function sourceFor(pathname) {
     return 'https://github.com/pyxle-dev/pyxle.dev';
 }
 
-/* The install chip under its F name — kept as `CopyCmd` too so pages
-   migrating off e-chrome keep a familiar import. */
+/* The install chip — kept as `CopyCmd` too so pages migrating off
+   the previous chrome keep a familiar import. */
 export function CopyCmd({ text = INSTALL, className = '' }) {
     return <CopyChip text={text} className={className} />;
 }
@@ -84,7 +84,7 @@ export function StarIcon() {
  * 64px, Bond, one rule2 hairline, sticky — and it stays. SSR'd
  * complete and crawlable; no scroll listeners at all. */
 
-export function FHeader() {
+export function SiteHeader() {
     const path = usePathname() || '/';
     const isActive = (href) => path === href || path.startsWith(`${href}/`);
     return (
@@ -196,7 +196,7 @@ export function MobileBar() {
  * Turnstile is armed lazily on first focus (the script never loads for
  * visitors who ignore the form); a submit that beats the token waits
  * for it and auto-fires; tokens are single-use, so a failure resets
- * the widget. Ported behaviour-for-behaviour from the E terminal —
+ * the widget. Ported behaviour-for-behaviour from the previous design's terminal —
  * only the wire visuals are gone.
  */
 
@@ -351,7 +351,7 @@ export function NewsletterLine() {
 
 /* ── footer — the document's EOF ──────────────────────────────────── */
 
-export function FFooter({ version }) {
+export function SiteFooter({ version }) {
     const path = usePathname() || '/';
     const [ref, seen] = useSeen({ rootMargin: '0px', threshold: 0.01 });
     const ver = version ? `v${version}` : 'pre-1.0';

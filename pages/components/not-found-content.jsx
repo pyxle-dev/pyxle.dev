@@ -1,9 +1,9 @@
-import '../styles/f-not-found.css';
+import '../styles/not-found.css';
 import React, { useEffect, useState } from 'react';
 import { Link } from 'pyxle/client';
 
 /* ════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · the 404, printed.
+   THE WORKING COPY · the 404, printed.
    Rulebar `?? · NOT FOUND` with the status as the folio numeral,
    the couplet stating the miss, and the exits as a short ruled
    list of real routes. Headless — renders the 404 body without

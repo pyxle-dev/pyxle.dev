@@ -21,7 +21,7 @@ _T0 = _time.time()
 # in-process queue — ``request.state.background`` exists only in actions,
 # and the refresh must NEVER be awaited in the request path, so loader
 # TTFB is unaffected), errors swallowed so a GitHub outage costs the site
-# nothing but the number. The repo is the f-chrome GITHUB constant's,
+# nothing but the number. The repo is the chrome.jsx GITHUB constant's,
 # kept in lockstep by hand.
 _STARS = {"n": None, "at": 0.0, "inflight": False}
 _STARS_TTL = 3600.0
@@ -50,7 +50,7 @@ async def _fetch_stars() -> None:
         _STARS["inflight"] = False
 
 
-# The docs-page count for F3's receipt and F4's tile — computed from the
+# The docs-page count for section 03's receipt and section 04's tile — computed from the
 # generated docs manifest, never typed (honest-numbers law). Cached for
 # the process lifetime, same trade the docs surface makes.
 _DOCS_COUNT = {"n": None, "tried": False}
@@ -131,7 +131,7 @@ class Entry(BaseModel):
     """The printed specimen's model — line 4 of the hero file — with the
     production guard rails (strip + length caps) the page's view-source
     link discloses. A missing field fails with the framework's real 422
-    before ``sign`` ever runs; F3's validated-actions cell prints that
+    before ``sign`` ever runs; section 03's validated-actions cell prints that
     exact response."""
 
     name: str = Field(min_length=1, max_length=40)
@@ -327,16 +327,16 @@ async def _subscriber_row(email: str):
     return row.asdict() if row else None
 
 
-import './styles/f-index.css';
+import './styles/home.css';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useAction } from 'pyxle/client';
-import { Rulebar, Receipt, CopyChip, useSeen } from './components/f-kit.jsx';
-import { GITHUB, INSTALL, StarIcon } from './components/f-chrome.jsx';
-import { PageMeta, DEFAULT_TITLE, DEFAULT_DESCRIPTION } from './components/e-meta.jsx';
+import { Rulebar, Receipt, CopyChip, useSeen } from './components/kit.jsx';
+import { GITHUB, INSTALL, StarIcon } from './components/chrome.jsx';
+import { PageMeta, DEFAULT_TITLE, DEFAULT_DESCRIPTION } from './components/page-meta.jsx';
 import { track } from './components/analytics.jsx';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · the homepage.
+   THE WORKING COPY · the homepage.
 
    An annotated printed file. Light, ruled, dense at rest; it animates
    only when the visitor acts. Ported from the approved prototype
@@ -421,7 +421,7 @@ const ANNS = [
     { target: 'L19', y: 468, n: '4·', text: 'the button calls Python in the same file' },
 ];
 
-/* The F6 terminal — REAL output of pyxle 0.9.3, captured 2026-09-03 on
+/* The START terminal — REAL output of pyxle 0.9.3, captured 2026-09-03 on
    this machine (venv). Lines are verbatim; machine-local noise (a Vite
    port-clash warning, the Vite/Routes info lines, pip's full package
    list) is OMITTED, never altered — "output abridged" in the caption is
@@ -487,7 +487,7 @@ function ensureVisitorId() {
 const reducedNow = () => typeof window !== 'undefined'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/* ═══ F1 · 01 FILE — the hero: specimen + the file, running ═════════ */
+/* ═══ 01 FILE — the hero: specimen + the file, running ══════════════ */
 
 function HeroSection({ data }) {
     const version = data && data.version;
@@ -870,7 +870,7 @@ function HeroSection({ data }) {
     );
 }
 
-/* ═══ F2 · 02 REQUEST — FIG 01 draws itself, then the request runs ══ */
+/* ═══ 02 REQUEST — FIG 01 draws itself, then the request runs ═══════ */
 
 function RequestSection() {
     const [ref, seen] = useSeen();
@@ -970,7 +970,7 @@ function RequestSection() {
     );
 }
 
-/* ═══ F3 · 03 FRAMEWORK — six ruled cells, every one linked ═════════ */
+/* ═══ 03 FRAMEWORK — six ruled cells, every one linked ══════════════ */
 
 function Cell({ tab, ver, children, note, href, path, delay }) {
     return (
@@ -1054,7 +1054,7 @@ function FrameworkSection({ docsCount }) {
     );
 }
 
-/* ═══ F4 · 04 NUMBERS — every figure carries its own conditions ═════ */
+/* ═══ 04 NUMBERS — every figure carries its own conditions ══════════ */
 
 function NumbersSection({ docsCount }) {
     const [ref, seen] = useSeen();
@@ -1098,7 +1098,7 @@ function NumbersSection({ docsCount }) {
     );
 }
 
-/* ═══ F5 · 05 PRODUCTION — demos, really deployed ═══════════════════ */
+/* ═══ 05 PRODUCTION — demos, really deployed ════════════════════════ */
 
 function ProductionSection({ stars, docsCount }) {
     const [ref, seen] = useSeen();
@@ -1165,7 +1165,7 @@ function ProductionSection({ stars, docsCount }) {
     );
 }
 
-/* ═══ F6 · 06 START — three commands; the terminal replays a real
+/* ═══ 06 START — three commands; the terminal replays a real
        captured session, and the typing lights each step ═════════════ */
 
 function QuickTerminal({ onStep }) {

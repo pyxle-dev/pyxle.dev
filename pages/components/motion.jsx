@@ -1,11 +1,11 @@
-/* ═══ E-MOTION — the motion foundation for the E "Program Counter" design ═══
+/* ═══ MOTION — the site's shared motion foundation ═══════════════════
  *
  * One import for every page team:
  *
  *   import { MotionRoot, m, EASE, T, HOUSE_SPRING,
- *            useScrollSpring, useEMotion, useFontsReady } from './components/e-motion.jsx';
+ *            useScrollSpring, useReveal, useFontsReady } from './components/motion.jsx';
  *
- * Laws this file enforces (from the E concept + framer-motion manual):
+ * Laws this file enforces (house motion rules + the framer-motion manual):
  *
  *  · LazyMotion `strict` — import `m` from HERE, never `motion` from
  *    'framer-motion'. A stray `motion.div` throws at runtime by design,
@@ -26,7 +26,7 @@
  *  · Hover: 200ms in, 450ms out — the house ease pair.
  *  · Reveals travel 2px, stagger 60ms, below-the-fold only, and are
  *    armed at runtime so the server-rendered page is always complete
- *    (the first-paint law). That is what useEMotion() does.
+ *    (the first-paint law). That is what useReveal() does.
  */
 
 import React, { useEffect, useLayoutEffect, useState } from 'react';
@@ -109,22 +109,22 @@ export function useScrollSpring(value, config = {}) {
     return spring;
 }
 
-/* ── useEMotion — the standard below-the-fold reveal ──────────────
- * React port of the prototype's eMotion() (serve-e/e-chrome.js §10).
- * Mark elements with `data-e-reveal`; mark a common parent with
- * `data-e-stagger` to stagger its marked children 60ms apart.
+/* ── useReveal — the standard below-the-fold reveal ───────────────
+ * React port of the design prototype's reveal routine.
+ * Mark elements with `data-reveal`; mark a common parent with
+ * `data-stagger` to stagger its marked children 60ms apart.
  * Call the hook ONCE per page component.
  *
  * Laws it enforces so pages don't have to:
  *  · static complete first paint — SSR HTML carries no hidden state;
  *    anything already inside the viewport when the hook runs is left
  *    exactly as painted, never re-revealed
- *  · travel is 2px, opacity 0→1, house ease (CSS .e-reveal classes)
+ *  · travel is 2px, opacity 0→1, house ease (CSS .reveal classes)
  *  · prefers-reduced-motion ⇒ no-op (content is already visible)
  * Runs entirely post-mount (class toggling only) — zero hydration
  * surface, exactly rule 9 of the third-party-packages guide. */
 
-export function useEMotion() {
+export function useReveal() {
     useEffect(() => {
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
 
@@ -132,11 +132,11 @@ export function useEMotion() {
         const below = (el) => el.getBoundingClientRect().top > vh * 0.92;
         const groups = []; /* [[el, el, …], …] — one animation unit each */
         const seen = new Set();
-        document.querySelectorAll('[data-e-stagger]').forEach((g) => {
-            const kids = [...g.querySelectorAll('[data-e-reveal]')].filter(below);
+        document.querySelectorAll('[data-stagger]').forEach((g) => {
+            const kids = [...g.querySelectorAll('[data-reveal]')].filter(below);
             if (kids.length) { groups.push(kids); kids.forEach((k) => seen.add(k)); }
         });
-        document.querySelectorAll('[data-e-reveal]').forEach((el) => {
+        document.querySelectorAll('[data-reveal]').forEach((el) => {
             if (!seen.has(el) && below(el)) groups.push([el]);
         });
         if (!groups.length) return undefined;
@@ -145,7 +145,7 @@ export function useEMotion() {
         const io = new IntersectionObserver((entries) => {
             entries.forEach((entry) => {
                 if (!entry.isIntersecting) return;
-                const kids = entry.target.__eKids || [entry.target];
+                const kids = entry.target.__revealKids || [entry.target];
                 kids.forEach((el, i) => timers.push(setTimeout(() => {
                     el.classList.remove('is-out');
                     el.classList.add('is-in');
@@ -155,9 +155,9 @@ export function useEMotion() {
         }, { threshold: 0.2 });
 
         for (const kids of groups) {
-            kids.forEach((el) => el.classList.add('e-reveal', 'is-out'));
+            kids.forEach((el) => el.classList.add('reveal', 'is-out'));
             const target = kids[0].parentElement || kids[0];
-            target.__eKids = kids;
+            target.__revealKids = kids;
             io.observe(target);
         }
 

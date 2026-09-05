@@ -1,10 +1,10 @@
-/* ═══ E-THEME — the light/dark theme context ═════════════════════════
+/* ═══ THEME — the light/dark theme context ═══════════════════════════
  *
  * The switcher's mechanics replicate the pre-redesign app exactly
  * (pages/layout.pyxl @ a2c2084, the behavioural spec):
  *
  *  · persistence — localStorage key `pyxle-theme`, values 'light'/'dark'
- *  · default — LIGHT (F: the printed copy is the identity; dark is the
+ *  · default — LIGHT (the printed copy is the identity; dark is the
  *    reader's lamp). Anything unset/invalid falls through to light, and
  *    prefers-color-scheme is deliberately never consulted
  *  · no-FOUC — the inline boot script in layout.pyxl stamps
@@ -17,7 +17,7 @@
  * in an effect, post-mount. Anything whose RENDERED OUTPUT depends on
  * the theme (the stage's framer color-interpolation endpoints) re-renders
  * in that second pass, so SSR and the first client render stay
- * byte-identical in both themes; anything CSS-var-driven (95% of E)
+ * byte-identical in both themes; anything CSS-var-driven (95% of the site)
  * was already painted correctly by the boot class. Markup must never
  * branch on `theme` in a way SSR can't reproduce — the toggle glyph is
  * CSS-gated for exactly this reason (components/theme-toggle.jsx).

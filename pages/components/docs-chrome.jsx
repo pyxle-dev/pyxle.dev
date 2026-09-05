@@ -1,4 +1,4 @@
-/* ═══ DOCS-CHROME — F "The Working Copy" chrome for the /docs surface ═
+/* ═══ DOCS-CHROME — The Working Copy chrome for the /docs surface ════
  *
  * The docs are the manual of the working copy: the landing is its
  * printed index (ruled shelf heads with mono tabs, faint line
@@ -7,22 +7,22 @@
  * the generated docs-data corpus — body prose is sacred and renders
  * the transformed HTML faithfully (pages/docs/[[...slug]].pyxl).
  *
- * The stylesheet lives in styles/f-docs.css (this lane's file),
+ * The stylesheet lives in styles/docs.css,
  * imported by the docs page itself; every selector there is scoped
- * under the page's `.fdocs` root class, so nothing leaks into other
+ * under the page's `.docs-page` root class, so nothing leaks into other
  * pages through the client router's stylesheet pool.
  *
  * Hydration law: every component renders deterministically from
  * props. Measurement (rail centring, TOC spy) happens in post-mount
  * effects; `useSeen` starts false on server AND first client render.
  * Motion: documents don't dance — the landing's shelf rules draw once
- * on entry (the same apparatus stamp-in every F section uses), the
+ * on entry (the same apparatus stamp-in every section uses), the
  * reading dot glides, copy buttons flash. Articles are still at rest.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'pyxle/client';
-import { useSeen } from './f-kit.jsx';
+import { useSeen } from './kit.jsx';
 
 /** Line numbers wear leading zeros — 01..64, like the listing they are. */
 export const NN = (n) => String(n == null ? 0 : n).padStart(2, '0');
@@ -177,7 +177,7 @@ export function DocsToc({ toc, slug }) {
 /* ── landing: the printed index ───────────────────────────────────
  * Each shelf head is a running head — a ruled line with its mono tab
  * and page count sitting ON the rule. The rules draw once as they
- * enter (the F apparatus stamp-in, via useSeen + the global .seen
+ * enter (the house apparatus stamp-in, via useSeen + the global .seen
  * machinery); no cursors, no spines — an index holds still. */
 
 function Shelf({ cat, index, kbPath }) {

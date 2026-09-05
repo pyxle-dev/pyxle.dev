@@ -3,7 +3,7 @@ import { Head } from 'pyxle/client';
 import NotFoundContent from './components/not-found-content.jsx';
 
 /* ════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · /404 — no such file.
+   THE WORKING COPY · /404 — no such file.
    The block itself lives in components/not-found-content.jsx
    (shared with the docs catch-all). A 404 is still a page — the
    shared layout keeps the full nav and the EOF footer around it.

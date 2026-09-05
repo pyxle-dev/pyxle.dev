@@ -8,14 +8,14 @@ module.exports = {
     theme: {
         extend: {
             fontFamily: {
-                // F "Working Copy" pairing. IBM Plex Sans carries the claims
+                // The "Working Copy" pairing. IBM Plex Sans carries the claims
                 // (H1/H2, notes); IBM Plex Mono carries the evidence — code,
                 // numerals, captions, logs, commands, tabs. Both are cuts of
                 // one Plex family: the claim and the receipt share bones.
                 sans: ['"IBM Plex Sans Variable"', '"IBM Plex Sans"', 'PlexSansFallback', '"Helvetica Neue"', 'Arial', 'sans-serif'],
                 mono: ['"IBM Plex Mono"', 'PlexMonoFallback', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
             },
-            // ── F "Working Copy" palette ─────────────────────────────
+            // ── The "Working Copy" palette ─────────────────────────────
             // Every value lives as a CSS variable in styles/tailwind.css
             // (light on :root, the lamp copy under html.dark). ONE accent:
             // Run Green, and its every appearance means "code that runs"

@@ -1,13 +1,13 @@
-import './styles/f-benchmarks.css';
+import './styles/benchmarks.css';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'pyxle/client';
-import { PageMeta } from './components/e-meta.jsx';
-import { Rulebar, Receipt, CopyChip, useSeen } from './components/f-kit.jsx';
+import { PageMeta } from './components/page-meta.jsx';
+import { Rulebar, Receipt, CopyChip, useSeen } from './components/kit.jsx';
 
 /* ════════════════════════════════════════════════════════════════
-   F — THE WORKING COPY · /benchmarks — the full datasheet.
+   THE WORKING COPY · /benchmarks — the full datasheet.
 
-   The homepage's F4 ("Numbers we can defend.") grown into a page:
+   The homepage's numbers section ("Numbers we can defend.") grown into a page:
    every benchmark is a FIG on a Deck plate, green bars are Pyxle's
    own measured runs, Faint bars are everyone else — including the
    figures we lose — and the test conditions are printed INSIDE each
