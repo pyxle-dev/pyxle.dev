@@ -4,243 +4,123 @@ from pyxle.runtime import server
 
 @server
 async def load(request):
-    """Provide the framework version to the shared masthead (layout loader)."""
+    """Provide the framework version to the shared chrome (layout loader).
+
+    The footer's fact row reads this — the version is pulled live from
+    ``pyxle.__version__``, never hardcoded.
+    """
     return {"version": __version__}
 
 
 import './styles/tailwind.css';
-import '@fontsource-variable/fraunces/opsz.css';
-import '@fontsource-variable/schibsted-grotesk';
-import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
-import { Link, usePathname, Slot } from 'pyxle/client';
+import '@fontsource-variable/ibm-plex-sans';
+import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/ibm-plex-mono/400-italic.css';
+import '@fontsource/ibm-plex-mono/500.css';
+import '@fontsource/ibm-plex-mono/600.css';
+import React from 'react';
+import { Head } from 'pyxle/client';
 import Analytics from './components/analytics.jsx';
+import { MotionRoot } from './components/motion.jsx';
+import { ThemeProvider } from './components/theme.jsx';
+import { SiteHeader, SiteFooter, MobileBar } from './components/chrome.jsx';
+import {
+    DEFAULT_TITLE, DEFAULT_DESCRIPTION, DEFAULT_OG_IMAGE, SITE_URL,
+} from './components/page-meta.jsx';
 
-const ThemeContext = createContext({ theme: 'dark', toggle: () => {} });
+/* ════════════════════════════════════════════════════════════════
+   THE WORKING COPY · the site chrome.
 
-export function useTheme() {
-    return useContext(ThemeContext);
-}
+   One 64px running head on a rule2 hairline (it does not hide on
+   scroll — running heads don't dodge), the page, then the EOF
+   footer: one newsletter line wired to the REAL subscribe action,
+   justified fact/link rows, and "⟨/⟩ view source" pointing at this
+   page's actual file on GitHub.
 
-const THEME_BOOT = `(function(){try{var c=document.documentElement.classList;c.add('js');var t=localStorage.getItem('pyxle-theme');if(t!=='light'&&t!=='dark')t='dark';c.remove('light','dark');c.add(t);}catch(e){document.documentElement.classList.add('dark');document.documentElement.classList.add('js');}})();`;
+   Fonts self-hosted via @fontsource (IBM Plex Sans variable wght +
+   IBM Plex Mono 400/400i/500/600 — the 600 pending a docs bold-in-
+   code audit at cleanup), font-display: swap with metric fallbacks —
+   the loading strategy that holds the Lighthouse 100. No CDN fonts.
 
-function readInitialTheme() {
-    if (typeof document === 'undefined') return 'dark';
-    return document.documentElement.classList.contains('light') ? 'light' : 'dark';
-}
+   The design is LIGHT-first: the printed copy is the identity (localStorage
+   `pyxle-theme`, default light — system preference deliberately never
+   consulted, so the print holds under OS dark mode too). Dark is "the
+   lamp copy", an explicit reader's control — components/theme.jsx
+   owns the context, the toggle renders in chrome.jsx.
 
-// Single source of truth for the top-level site navigation. Lives in the
-// layout so every page renders the exact same masthead — no per-page copies.
-const NAV_LINKS = [
-    { href: '/docs', label: 'Docs', match: '/docs' },
-    { href: '/compare', label: 'Compare', match: '/compare' },
-    { href: '/playground', label: 'Playground', match: '/playground' },
-    { href: '/plugins', label: 'Plugins', match: '/plugins' },
-    { href: '/benchmarks', label: 'Benchmarks', match: '/benchmarks' },
-    { href: '/roadmap', label: 'Roadmap', match: '/roadmap' },
-];
+   Colour carries ONE meaning in both themes: Run Green = code that
+   runs (seam · prompts/copied · LIVE/200s · Install · decorator
+   tokens · execution). Links are never green.
 
-/* Half-moon theme toggle — a circle whose left half fills in dark mode.
-   One glyph, both themes, drawn in the current text color. */
-function ThemeGlyph() {
-    return (
-        <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <circle cx="10" cy="10" r="7.25" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M10 2.75 a7.25 7.25 0 0 0 0 14.5 Z" fill="currentColor" className="hidden dark:block" />
-            <circle cx="10" cy="10" r="3" fill="currentColor" className="block dark:hidden" />
-        </svg>
-    );
-}
+   NAVIGATION DECISIONS (carried over from the previous design): no cross-document
+   View Transitions and no hover-prefetch shim — Pyxle's <Link>
+   already navigates in-document and prefetches loader data + module
+   on hover/viewport-entry.
+   ════════════════════════════════════════════════════════════════ */
 
-function GitHubGlyph({ className = 'h-4 w-4' }) {
-    return (
-        <svg className={className} fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 .3a12 12 0 00-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.8 2.8 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 016 0C17.3 4.7 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0012 .3" />
-        </svg>
-    );
-}
+/* Boot: mark JS availability + stamp the stored theme class before
+   first paint (no-FOUC — the original app's exact recipe). Rendered as
+   the first child inside #root, so the parser executes it ahead of any
+   painted markup. Default is LIGHT, never system-pref: anything other
+   than a stored 'light'/'dark' falls through to light (a stored 'dark'
+   from the previous design is respected — the visitor chose the lamp). A stored
+   dark theme retints <meta name="theme-color"> pre-paint (the React
+   effect in theme.jsx keeps it in sync after). Try/caught: storage
+   denial still paints a coherent light page. */
+const BOOT = `(function(){try{`
+    + `var c=document.documentElement.classList;c.add('js');`
+    + `var t=localStorage.getItem('pyxle-theme');`
+    + `if(t!=='light'&&t!=='dark')t='light';`
+    + `c.remove('light','dark');c.add(t);`
+    + `if(t==='dark'){var m=document.querySelector('meta[name="theme-color"]');`
+    + `if(m)m.setAttribute('content','#20231D');}`
+    + `}catch(e){document.documentElement.classList.add('light');`
+    + `document.documentElement.classList.add('js');}})();`;
 
-function SiteNav({ version }) {
-    const { toggle } = useTheme();
-    const path = usePathname() || '/';
-    const [hidden, setHidden] = useState(false);
-    const [open, setOpen] = useState(false);
-    const lastY = useRef(0);
-    const menuBtnRef = useRef(null);
-
-    // While the mobile menu is open: lock body scroll and close on Escape,
-    // returning focus to the Menu button so keyboard users keep their place.
-    useEffect(() => {
-        if (!open) return;
-        const prevOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        const onKey = (e) => {
-            if (e.key === 'Escape') {
-                setOpen(false);
-                menuBtnRef.current && menuBtnRef.current.focus();
-            }
-        };
-        window.addEventListener('keydown', onKey);
-        return () => {
-            document.body.style.overflow = prevOverflow;
-            window.removeEventListener('keydown', onKey);
-        };
-    }, [open]);
-
-    // Editorial masthead: solid paper, no blur. It steps aside while you
-    // read down and returns the moment you scroll up.
-    useEffect(() => {
-        const onScroll = () => {
-            const y = window.scrollY;
-            if (y < 80) setHidden(false);
-            else if (y > lastY.current + 4) setHidden(true);
-            else if (y < lastY.current - 4) setHidden(false);
-            lastY.current = y;
-        };
-        onScroll();
-        window.addEventListener('scroll', onScroll, { passive: true });
-        return () => window.removeEventListener('scroll', onScroll);
-    }, []);
-
-    // Close the mobile menu whenever the route changes.
-    useEffect(() => { setOpen(false); }, [path]);
-
-    const isActive = (m) => path === m || path.startsWith(m + '/');
-    const linkCls = (m) => `font-mono text-[13px] transition-colors ${
-        isActive(m) ? 'text-ink underline decoration-accent decoration-2 underline-offset-[6px]' : 'text-ink2 hover:text-ink'
-    }`;
-
-    return (
-        <header
-            className={`gp-masthead fixed inset-x-0 top-0 z-50 border-b border-rule bg-paper ${hidden && !open ? 'gp-hidden' : ''}`}
-        >
-            {/* Three fixed zones (grid, not justify-between) so nothing moves
-               between pages: the center links are pinned to viewport-center by
-               the 1fr columns, and the page-specific Slot sits LEFTMOST in the
-               right zone — version/GitHub/theme keep their exact right-anchored
-               positions whether or not a page contributes extra controls.
-               Explicit col-start is required: the center zone is display:none
-               on mobile and would otherwise shift the auto-placed columns. */}
-            <nav className="mx-auto grid h-16 max-w-[80rem] grid-cols-[1fr_auto_1fr] items-center px-5 sm:px-8">
-                <div className="col-start-1 flex items-center">
-                    <Link href="/" aria-label="Pyxle home" className="focus-ring flex items-center gap-2.5 rounded">
-                        <img src="/branding/pyxle-mark.svg" alt="" width="28" height="28" className="h-7 w-7" />
-                        <span className="font-display text-[1.2rem] font-[550] tracking-tight text-ink">Pyxle</span>
-                    </Link>
-                </div>
-
-                <div className="col-start-2 hidden items-center gap-6 md:flex">
-                    {NAV_LINKS.map((l) => (
-                        <Link key={l.href} href={l.href} className={`focus-ring rounded ${linkCls(l.match)}`}>{l.label}</Link>
-                    ))}
-                </div>
-
-                <div className="col-start-3 flex items-center justify-end">
-                    <div className="hidden items-center gap-5 md:flex">
-                        <Slot name="nav-extra" fallback={null} />
-                        {version ? (
-                            <a
-                                href="https://github.com/pyxle-dev/pyxle/releases"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
-                                aria-label={`Version ${version} — release notes`}
-                            >v{version}</a>
-                        ) : null}
-                        <a
-                            href="https://github.com/pyxle-dev/pyxle"
-                            target="_blank"
-                            rel="noreferrer"
-                            aria-label="Pyxle on GitHub"
-                            className="focus-ring rounded text-ink2 transition-colors hover:text-ink"
-                        >
-                            <GitHubGlyph />
-                        </a>
-                        <button
-                            type="button"
-                            onClick={toggle}
-                            className="focus-ring rounded p-1 text-ink2 transition-colors hover:text-ink"
-                            aria-label="Toggle light and dark theme"
-                            title="Toggle theme"
-                        >
-                            <ThemeGlyph />
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-4 md:hidden">
-                        {/* Pages contribute controls here (e.g. docs search) — on
-                           phones too, or docs visitors lose search and sections. */}
-                        <Slot name="nav-extra" fallback={null} />
-                        <button
-                            type="button"
-                            onClick={toggle}
-                            className="focus-ring rounded p-1 text-ink2"
-                            aria-label="Toggle light and dark theme"
-                        >
-                            <ThemeGlyph />
-                        </button>
-                        <button
-                            ref={menuBtnRef}
-                            type="button"
-                            onClick={() => setOpen(v => !v)}
-                            aria-expanded={open}
-                            className="focus-ring rounded font-mono text-[13px] text-ink"
-                        >
-                            {open ? 'Close' : 'Menu'}
-                        </button>
-                    </div>
-                </div>
-            </nav>
-
-            {open && (
-                <div className="fixed inset-x-0 bottom-0 top-16 z-40 overflow-y-auto bg-paper md:hidden">
-                    <div className="flex flex-col gap-2 px-6 py-10">
-                        {NAV_LINKS.map((l) => (
-                            <Link
-                                key={l.href}
-                                href={l.href}
-                                className="focus-ring rounded font-display border-b border-rule py-4 text-[2rem] font-[550] tracking-tight text-ink"
-                            >
-                                {l.label}
-                            </Link>
-                        ))}
-                        <a
-                            href="https://github.com/pyxle-dev/pyxle"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="focus-ring rounded font-display flex items-center gap-3 border-b border-rule py-4 text-[2rem] font-[550] tracking-tight text-ink"
-                        >
-                            GitHub <GitHubGlyph className="h-6 w-6" />
-                        </a>
-                        {version ? (
-                            <p className="pt-6 font-mono text-xs text-ink2">Pyxle v{version} · MIT · open source</p>
-                        ) : null}
-                    </div>
-                </div>
-            )}
-        </header>
-    );
-}
+/** The theme hook — state + toggle + persistence live in
+ *  components/theme.jsx; this re-export keeps the original app's
+ *  import path working: `import { useTheme } from '../layout.jsx'`. */
+export { useTheme } from './components/theme.jsx';
 
 export default function RootLayout({ children, data }) {
-    const [theme, setTheme] = useState(readInitialTheme);
-
-    useEffect(() => {
-        const c = document.documentElement.classList;
-        c.remove('light', 'dark');
-        c.add(theme);
-        try { localStorage.setItem('pyxle-theme', theme); } catch(e) {}
-    }, [theme]);
-
-    const toggle = () => setTheme(t => (t === 'dark' ? 'light' : 'dark'));
-
+    const version = data && data.version;
     return (
-        <ThemeContext.Provider value={{ theme, toggle }}>
-            <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
-            <Analytics />
-            <div className="min-h-screen overflow-x-clip bg-paper text-ink antialiased transition-colors duration-300">
-                <SiteNav version={data && data.version} />
-                {children}
-            </div>
-        </ThemeContext.Provider>
+        <MotionRoot>
+            <ThemeProvider>
+                {/* The theme boot MUST stay the first painted-order child:
+                   it stamps html.light/html.dark (and `js`) before any
+                   following markup paints — the no-FOUC contract. */}
+                <script dangerouslySetInnerHTML={{ __html: BOOT }} />
+                <Analytics />
+                {/* Site-wide head defaults. Pages override these through
+                   <PageMeta> (components/page-meta.jsx) — Pyxle's head dedup
+                   gives the page's tags precedence — so any page that
+                   forgets still ships a complete, truthful head. The
+                   theme-color content is the LIGHT bond: SSR is
+                   theme-blind, so the boot script + theme effect retint
+                   it for a stored dark theme. */}
+                <Head>
+                    <title>{DEFAULT_TITLE}</title>
+                    <meta name="description" content={DEFAULT_DESCRIPTION} />
+                    <meta name="theme-color" content="#FBFBF9" />
+                    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+                    <link rel="alternate icon" href="/favicon.ico" />
+                    <meta property="og:title" content={DEFAULT_TITLE} />
+                    <meta property="og:description" content={DEFAULT_DESCRIPTION} />
+                    <meta property="og:type" content="website" />
+                    <meta property="og:url" content={SITE_URL} />
+                    <meta property="og:image" content={DEFAULT_OG_IMAGE} />
+                    <meta property="og:site_name" content="Pyxle" />
+                    <meta name="twitter:card" content="summary_large_image" />
+                    <meta name="twitter:image" content={DEFAULT_OG_IMAGE} />
+                </Head>
+                <div className="min-h-screen">
+                    <SiteHeader />
+                    {children}
+                    <SiteFooter version={version} />
+                    <MobileBar />
+                </div>
+            </ThemeProvider>
+        </MotionRoot>
     );
 }

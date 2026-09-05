@@ -1,0 +1,163 @@
+/* ═══════════════════════════════════════════════════════════════════
+   THE WORKING COPY · /compare — "the printed spec sheet".
+   One ruled table per rival, shared hairline cells, every value in
+   mono and checkable against that framework's own docs. Zero cards,
+   zero icons, zero score-dots — facts in cells. The one dark bed on
+   the page quotes a real terminal (the grep transcript), because
+   dark appears only where a real terminal is being quoted. The
+   honest "what Pyxle doesn't do" list is set as plain ruled rows —
+   receipts, not trash talk. Page-owned classes are cmp-*.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rulebar-hero { border-top: none; height: 0; }
+.rulebar-hero .tab { top: -8px; }
+
+/* ── cadence ────────────────────────────────────────────────────── */
+.cmp-hero { padding-top: 0; padding-bottom: 76px; }
+.cmp-hero-head { margin-top: 64px; }
+.sec-rival .rulebar { margin-bottom: 84px; }
+.sec-rival { padding-bottom: 92px; }
+.sec-proof .rulebar { margin-bottom: 96px; }
+.sec-proof { padding-bottom: 104px; }
+.sec-nots .rulebar { margin-bottom: 72px; }
+.sec-nots { padding-bottom: 88px; }
+
+/* ── the spec table — shared hairline cells, mono values ────────── */
+.cmp-table {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr) minmax(0, 1.25fr);
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+}
+.cmp-c { background: var(--sheet); padding: 13px 16px; min-width: 0; }
+.cmp-h {
+    background: var(--deck);
+    font: 500 11px/16px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--graphite);
+}
+.cmp-h.us { color: var(--ink); }
+.cmp-l { font: 400 12px/1.6 var(--mono); color: var(--graphite); }
+.cmp-a { font: 400 12.5px/1.65 var(--mono); color: var(--graphite); overflow-wrap: break-word; }
+.cmp-b { font: 400 12.5px/1.65 var(--mono); color: var(--ink); overflow-wrap: break-word; }
+.cmp-b .g { color: var(--green); font-weight: 500; }   /* @server / useAction — job 5 */
+.cmp-c .link { color: inherit; }
+/* the journey chains read as printed station lists */
+.cmp-a .st, .cmp-b .st { white-space: nowrap; }
+/* the mobile column captions — hidden on the desktop table */
+.cmp-who { display: none; }
+
+/* ── the proof — a quoted terminal beside ruled facts ───────────── */
+.cmp-proof {
+    display: grid;
+    grid-template-columns: minmax(0, 11fr) minmax(0, 9fr);
+    gap: 40px;
+    align-items: start;
+}
+.cmp-term {
+    background: var(--term);
+    border: 1px solid var(--term);
+    border-radius: 6px;
+    overflow: hidden;
+}
+html.dark .cmp-term { border-color: var(--rule2); }  /* the quote reads by apparatus */
+.cmp-term-head {
+    display: flex;
+    justify-content: space-between;
+    padding: 9px 14px 8px;
+    font: 500 10.5px/1 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--term-dim);
+    border-bottom: 1px solid rgba(217, 226, 219, 0.12);
+}
+.cmp-term-body {
+    margin: 0;
+    padding: 14px 16px 16px;
+    font: 400 12.5px/1.75 var(--mono);
+    color: var(--term-text);
+    overflow-x: auto;
+}
+.cmp-term-body .d { color: var(--term-green); }      /* $ — green job 2 */
+.cmp-term-body .c { color: var(--term-dim); }
+.cmp-term-body .big {
+    font-size: 30px;
+    line-height: 1.35;
+    font-weight: 500;
+    color: var(--term-text);
+}
+.cmp-term-cap {
+    margin: 10px 2px 0;
+    font: italic 400 12px/1.5 var(--mono);
+    color: var(--graphite);
+}
+
+.cmp-facts { border-top: 1px solid var(--rule); }
+.cmp-fact {
+    display: grid;
+    grid-template-columns: 172px minmax(0, 1fr);
+    gap: 18px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+}
+.cmp-fact .fk { font: 400 12px/1.65 var(--mono); color: var(--graphite); }
+.cmp-fact .fv { font: 400 13px/1.65 var(--mono); color: var(--ink); min-width: 0; overflow-wrap: break-word; }
+
+/* ── what Pyxle doesn't do — plain ruled rows ───────────────────── */
+.cmp-nots { border-top: 1px solid var(--rule); max-width: 860px; }
+.cmp-not {
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 18px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+}
+.cmp-not .k { font: 500 13px/1.6 var(--mono); color: var(--ink); }
+.cmp-not .v { font: 400 14.5px/1.6 var(--sans); color: var(--graphite); min-width: 0; }
+
+.cmp-close { margin-top: 44px; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.cmp-close .chip-wrap { max-width: 420px; flex: 1 1 300px; }
+.cmp-close-meta { font: 400 12.5px/1.6 var(--mono); color: var(--graphite); margin: 0; }
+
+/* ── responsive — the spec sheet linearizes, never shrinks ──────── */
+@media (max-width: 860px) {
+    .cmp-hero-head { margin-top: 44px; }
+    .sec-rival .rulebar { margin-bottom: 60px; }
+    .sec-proof .rulebar { margin-bottom: 64px; }
+    .sec-nots .rulebar { margin-bottom: 52px; }
+    .cmp-table { grid-template-columns: minmax(0, 1fr); }
+    .cmp-h { display: none; }
+    .cmp-c { padding: 12px 14px; }
+    .cmp-l {
+        background: var(--deck);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 8px 14px;
+    }
+    .cmp-who {
+        display: block;
+        font: 500 10.5px/1 var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--faint);
+        margin-bottom: 5px;
+    }
+    .cmp-b .cmp-who { color: var(--graphite); }
+    .cmp-a { border-bottom: 0; }
+    .cmp-proof { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    /* the real grep line is 46ch — 11.5px mono seats it without a scroll */
+    .cmp-term-body { font-size: 11.5px; }
+    .cmp-fact { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 13px 0; }
+    .cmp-not { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+    .cmp-close .link { display: inline-block; padding-block: 11px; margin-block: -6px; }
+}
+
+/* ── motion discipline ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .cmp-c, .cmp-toc { transition: none !important; }
+}

@@ -91,52 +91,37 @@ async def submit_feedback(request):
     return {"ok": True}
 
 
+import './styles/unsubscribe.css';
 import React, { useState } from 'react';
-import { useAction, Head } from 'pyxle/client';
-import { PMark, InkButton, EditorialLink, GalleyFooter, useScrollReveal } from './components/galley.jsx';
+import { useAction, Head, Link } from 'pyxle/client';
 
 /* ════════════════════════════════════════════════════════════════
-   GALLEY PROOF — /unsubscribe, a quiet system slip. One centred card,
-   the mark for letterhead. Unsubscribe is one click; the feedback that
-   follows is optional and never blocks leaving. Resubscribe is always
-   one click away.
+   THE WORKING COPY · /unsubscribe — the receipt.
+   One ruled block. Unsubscribe is one click; once the action has
+   really run, its mono log line prints the genuine 200 (green
+   job 3 — the only green on this page). The feedback that follows
+   is optional and never blocks leaving; resubscribe stays one
+   click away. The three @actions and the HMAC-signed link flow
+   above are untouched — this file only rewrites the print.
    ════════════════════════════════════════════════════════════════ */
-
-function Card({ children }) {
-    return (
-        <div className="mx-auto max-w-[34rem] rounded-[12px] border border-rule bg-paper p-8 sm:p-10">
-            {children}
-        </div>
-    );
-}
-
-function Heading({ children }) {
-    return <h1 className="font-display text-[2rem] font-[560] leading-[1.12] tracking-[-0.01em] text-ink">{children}</h1>;
-}
 
 function FeedbackForm({ reasons, onSubmit, pending }) {
     const [reason, setReason] = useState(null);
     const [text, setText] = useState('');
     return (
         <form
-            className="mt-8 border-t border-rule pt-6"
+            className="un-fb"
             onSubmit={(e) => { e.preventDefault(); onSubmit(reason, text); }}
         >
-            <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">
-                Mind telling us why? — optional
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <p className="un-fb-label">Mind telling us why? — optional</p>
+            <div className="un-reasons">
                 {reasons.map((r) => (
                     <button
                         key={r.value}
                         type="button"
                         aria-pressed={reason === r.value}
                         onClick={() => setReason(reason === r.value ? null : r.value)}
-                        className={`focus-ring cursor-pointer rounded-[6px] border px-3 py-1.5 font-mono text-[12px] transition-colors ${
-                            reason === r.value
-                                ? 'border-ink bg-ink text-paper'
-                                : 'border-rule text-ink2 hover:border-ink2 hover:text-ink'
-                        }`}
+                        className={`un-reason${reason === r.value ? ' on' : ''}`}
                     >
                         {r.label}
                     </button>
@@ -148,48 +133,44 @@ function FeedbackForm({ reasons, onSubmit, pending }) {
                 rows={3}
                 maxLength={1000}
                 placeholder="Anything else? (optional)"
-                className="focus-ring mt-3 w-full resize-none rounded-[6px] border border-rule bg-transparent px-3 py-2 font-sans text-[14px] text-ink placeholder:text-press"
             />
-            <div className="mt-4">
-                <button
-                    type="submit"
-                    disabled={pending || (!reason && !text.trim())}
-                    className="focus-ring cursor-pointer rounded-[6px] bg-ink px-5 py-2.5 font-mono text-[13px] text-paper transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                    {pending ? 'Sending…' : 'Send feedback'}
-                </button>
-            </div>
+            <button type="submit" className="un-btn" disabled={pending || (!reason && !text.trim())}>
+                {pending ? 'Sending…' : 'Send feedback'}
+            </button>
         </form>
     );
 }
 
 export default function UnsubscribePage({ data }) {
-    const { valid, status: initialStatus, maskedEmail, id, token, reasons, version } = data;
+    const { valid, status: initialStatus, maskedEmail, id, token, reasons } = data;
 
     const unsub = useAction('do_unsubscribe');
     const resub = useAction('do_resubscribe');
     const feedback = useAction('submit_feedback');
 
-    // Run the site's scroll-reveal so the footer's drawn mark (a [data-reveal]
-    // target) animates in — this page otherwise has no reveal host of its own.
-    useScrollReveal();
-
     // view: 'subscribed' | 'unsubscribed' | 'feedback_sent' | 'resubscribed'
     const [view, setView] = useState(initialStatus);
     const [justUnsubscribed, setJustUnsubscribed] = useState(false);
+    const [receipt, setReceipt] = useState(null);   // { line, note } — printed only for an action that RAN
     const [error, setError] = useState('');
 
     const onUnsubscribe = async () => {
         setError('');
         const r = await unsub({ id, token });
-        if (r.ok) { setView('unsubscribed'); setJustUnsubscribed(true); }
-        else setError(r.error || 'Something went wrong.');
+        if (r.ok) {
+            setView('unsubscribed');
+            setJustUnsubscribed(true);
+            setReceipt({ line: 'POST do_unsubscribe → 200', note: 'you’re off the list' });
+        } else setError(r.error || 'Something went wrong.');
     };
     const onResubscribe = async () => {
         setError('');
         const r = await resub({ id, token });
-        if (r.ok) { setView('resubscribed'); setJustUnsubscribed(false); }
-        else setError(r.error || 'Something went wrong.');
+        if (r.ok) {
+            setView('resubscribed');
+            setJustUnsubscribed(false);
+            setReceipt({ line: 'POST do_resubscribe → 200', note: 'welcome back' });
+        } else setError(r.error || 'Something went wrong.');
     };
     const onFeedback = async (reason, text) => {
         const r = await feedback({ id, token, reason: reason || '', feedback: text });
@@ -197,73 +178,68 @@ export default function UnsubscribePage({ data }) {
         else setError(r.error || 'Something went wrong.');
     };
 
+    let heading;
     let body;
     if (!valid) {
+        heading = 'This link isn’t valid.';
         body = (
-            <Card>
-                <Heading>This link isn't valid.</Heading>
-                <p className="mt-4 text-[15px] leading-[1.7] text-ink2">
-                    The unsubscribe link is malformed or has expired. If you keep
-                    getting emails you didn't ask for, reply to one and we'll sort it out.
+            <>
+                <p className="un-body">
+                    The unsubscribe link is malformed or has expired. If you keep getting
+                    emails you didn&rsquo;t ask for, reply to one and we&rsquo;ll sort it out.
                 </p>
-                <div className="mt-7"><InkButton href="/">Back to pyxle.dev</InkButton></div>
-            </Card>
+                <div className="un-row">
+                    <Link className="link" href="/">back to pyxle.dev <span className="a">→</span></Link>
+                </div>
+            </>
         );
     } else if (view === 'subscribed') {
+        heading = 'Unsubscribe?';
         body = (
-            <Card>
-                <Heading>Unsubscribe?</Heading>
-                <p className="mt-4 text-[15px] leading-[1.7] text-ink2">
-                    We'll stop sending Pyxle updates to{' '}
-                    <span className="font-mono text-[14px] text-ink">{maskedEmail}</span>.
+            <>
+                <p className="un-body">
+                    We&rsquo;ll stop sending Pyxle updates to{' '}
+                    <span className="mono-inline">{maskedEmail}</span>. One click, no questions.
                 </p>
-                <div className="mt-7 flex flex-wrap items-center gap-5">
-                    <button
-                        type="button"
-                        onClick={onUnsubscribe}
-                        disabled={unsub.pending}
-                        className="focus-ring cursor-pointer rounded-[6px] bg-ink px-6 py-3 font-mono text-[13px] text-paper transition-opacity hover:opacity-85 disabled:opacity-40"
-                    >
+                <div className="un-row">
+                    <button type="button" className="un-btn" onClick={onUnsubscribe} disabled={unsub.pending}>
                         {unsub.pending ? 'Unsubscribing…' : 'Unsubscribe'}
                     </button>
-                    <EditorialLink href="/">Keep me subscribed</EditorialLink>
+                    <Link className="link" href="/">keep me subscribed</Link>
                 </div>
-            </Card>
+            </>
         );
     } else if (view === 'resubscribed') {
+        heading = 'You’re back on the list.';
         body = (
-            <Card>
-                <Heading>You're back on the list.</Heading>
-                <p className="mt-4 text-[15px] leading-[1.7] text-ink2">
-                    Welcome back — we'll keep <span className="font-mono text-[14px] text-ink">{maskedEmail}</span> posted.
+            <>
+                <p className="un-body">
+                    Welcome back — we&rsquo;ll keep{' '}
+                    <span className="mono-inline">{maskedEmail}</span> posted.
                 </p>
-                <div className="mt-7"><InkButton href="/">Back to pyxle.dev</InkButton></div>
-            </Card>
+                <div className="un-row">
+                    <Link className="link" href="/">back to pyxle.dev <span className="a">→</span></Link>
+                </div>
+            </>
         );
     } else {
         // 'unsubscribed' or 'feedback_sent'
+        heading = 'You’re unsubscribed.';
         body = (
-            <Card>
-                <Heading>You're unsubscribed.</Heading>
-                <p className="mt-4 text-[15px] leading-[1.7] text-ink2">
-                    {maskedEmail} won't receive any more Pyxle emails. Changed your mind?{' '}
-                    <button
-                        type="button"
-                        onClick={onResubscribe}
-                        disabled={resub.pending}
-                        className="focus-ring cursor-pointer rounded font-mono text-[14px] text-ink underline decoration-rule decoration-2 underline-offset-[5px] transition-colors hover:decoration-accent disabled:opacity-50"
-                    >
-                        Resubscribe
+            <>
+                <p className="un-body">
+                    <span className="mono-inline">{maskedEmail}</span> won&rsquo;t receive any
+                    more Pyxle emails. Changed your mind?{' '}
+                    <button type="button" className="link-btn" onClick={onResubscribe} disabled={resub.pending}>
+                        resubscribe
                     </button>.
                 </p>
                 {view === 'feedback_sent' ? (
-                    <p className="mt-8 border-t border-rule pt-6 font-mono text-[13px] text-ink2">
-                        Thanks — that genuinely helps us.
-                    </p>
+                    <p className="un-thanks">noted — thank you. it genuinely helps.</p>
                 ) : justUnsubscribed ? (
                     <FeedbackForm reasons={reasons} onSubmit={onFeedback} pending={feedback.pending} />
                 ) : null}
-            </Card>
+            </>
         );
     }
 
@@ -276,20 +252,27 @@ export default function UnsubscribePage({ data }) {
                 <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
             </Head>
-            <main id="main">
-                <section className="relative">
-                    <div className="mx-auto max-w-[76rem] px-5 pb-16 pt-24 sm:px-8 sm:pt-32">
-                        <div className="mb-10 flex justify-center"><PMark load size={48} id="unsub" /></div>
-                        {error && (
-                            <p role="alert" className="mx-auto mb-5 max-w-[34rem] rounded-[6px] border border-rule bg-paper px-4 py-2.5 font-mono text-[12px] text-ink2">
-                                {error}
+            <main id="main" className="un-main">
+                <div className="un-wrap">
+                    <div className="un-box seen">
+                        <div className="rulebar">
+                            <span className="tab">@ · Unsubscribe</span>
+                        </div>
+                        <h1>{heading}</h1>
+                        {receipt ? (
+                            <p className="un-log"><span className="ok">{receipt.line}</span> · {receipt.note}</p>
+                        ) : (
+                            <p className="receipt">
+                                {valid
+                                    ? 'a signed one-click link · verified server-side on every action'
+                                    : 'the signed token didn’t verify'}
                             </p>
                         )}
+                        {error ? <p className="un-err" role="alert">POST → err · {error}</p> : null}
                         {body}
                     </div>
-                </section>
+                </div>
             </main>
-            <GalleyFooter version={version} />
         </>
     );
 }

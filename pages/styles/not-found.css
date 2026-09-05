@@ -1,0 +1,45 @@
+/* ═══ THE WORKING COPY · 404 — the missing page, in apparatus ════════
+   One quiet ruled block: the running head says what happened
+   (`?? · NOT FOUND`, folio 404 — the status IS this page's printed
+   numeral), the couplet states it dryly, and the exits are a short
+   ruled list of real routes. No jokes — the wink budget lives on the
+   homepage seam. `.lost` sizes the standalone page; `.nf-wrap`
+   centers the block wherever it is embedded (the docs catch-all
+   renders the same component inside its own container). */
+
+.lost { min-height: calc(100vh - 65px); display: flex; }
+.nf-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 56px 24px;
+    width: 100%;
+}
+.nf-box { width: 100%; max-width: 620px; }
+.nf-box .rulebar { margin-bottom: 46px; }
+.nf-box h1 { font-size: clamp(40px, 5vw, 56px); }
+
+.nf-exits {
+    list-style: none;
+    margin: 40px 0 0;
+    padding: 0;
+    border-top: 1px solid var(--rule);
+}
+.nf-exits li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 12px 2px;
+    border-bottom: 1px solid var(--rule);
+    font: 400 13.5px/1.5 var(--mono);
+    color: var(--graphite);
+}
+.nf-exits .link { color: var(--ink); }
+
+.nf-back { margin: 30px 0 0; font: 500 15px/1.4 var(--sans); }
+
+@media (max-width: 480px) {
+    .nf-wrap { padding: 40px 16px; }
+    .nf-box .rulebar { margin-bottom: 36px; }
+}

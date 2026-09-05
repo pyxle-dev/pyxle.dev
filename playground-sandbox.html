@@ -34,47 +34,84 @@
       contained to the sandbox.
 -->
 <style>
-  :root { color-scheme: light dark; }
+  /* ══ THE WORKING COPY · sandbox document ═════════════════════════
+     Token values mirrored from pages/styles/tailwind.css (the sandbox
+     is an opaque origin and self-hosts nothing, so fonts are fallback
+     stacks matching the outer page). One radius (6px), zero shadows,
+     one accent: Run Green — here it marks only the loader's tag chip
+     and the ran-list dots, i.e. code that ran. LIGHT is the default
+     (`:root` — the printed copy); the lamp copy lives under
+     `html.dark` — the host posts the theme in (`pg-init` carries it,
+     `pg-theme` re-sends on every toggle; applyTheme() below stamps
+     the class), so the sandbox flips in lockstep with the page. */
+  :root {
+    --bond: #FBFBF9;
+    --sheet: #FFFFFF;
+    --deck: #F3F4F1;
+    --rule: #E4E6E1;
+    --rule2: #C9CCC5;
+    --ink: #151713;
+    --graphite: #5D625A;
+    --faint: #9AA096;
+    --green: #087443;
+    --tint: #E7F2EB;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+    --ease: cubic-bezier(.2, .6, .2, 1);
+    color-scheme: light;
+  }
+  /* DARK — "the lamp copy", mirrored from the host's html.dark block. */
+  html.dark {
+    color-scheme: dark;
+    --bond: #1B1D18;
+    --sheet: #22251E;
+    --deck: #282B23;
+    --rule: #353A31;
+    --rule2: #4C5246;
+    --ink: #E7EAE0;
+    --graphite: #A9B1A0;
+    --faint: #798171;
+    --green: #55BD82;
+    --tint: #22382C;
+  }
   html, body { margin: 0; height: 100%; }
   body {
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    background: #ffffff;
-    color: #18181b;
+    font-family: var(--sans);
+    background: var(--sheet);   /* matches the host's result pane bed */
+    color: var(--ink);
     -webkit-font-smoothing: antialiased;
   }
-  html.dark body { background: #0a0a0b; color: #fafafa; }
-  #root { box-sizing: border-box; min-height: 100%; padding: 24px; overflow: auto; }
+  #root { box-sizing: border-box; min-height: 100%; padding: 24px 28px; overflow: auto; }
 
-  code, pre { font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace; }
+  code, pre { font-family: var(--mono); }
+  ::selection { background: var(--tint); }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
-  /* ── Preview-scope styles (ported from the host tailwind.css so the
-        user's output looks identical whether host- or sandbox-rendered) ── */
-  .preview-scope h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; margin: 0; }
-  .preview-scope h2 { font-size: 1.25rem; font-weight: 650; letter-spacing: -0.01em; }
-  .preview-scope h3 { font-size: 1.05rem; font-weight: 650; }
-  .preview-scope p  { margin-top: 0.5rem; color: #52525b; line-height: 1.6; }
-  html.dark .preview-scope p { color: #a1a1aa; }
-  .preview-scope a  { color: #059669; text-decoration: underline; text-underline-offset: 2px; }
-  html.dark .preview-scope a { color: #34d399; }
-  .preview-scope ul { margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.4rem; padding: 0; list-style: none; }
-  .preview-scope li { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.75rem; border-radius: 0.55rem; background: rgba(9,9,11,0.04); font-size: 0.9rem; }
-  html.dark .preview-scope li { background: rgba(255,255,255,0.05); }
-  .preview-scope li::before { content: ""; width: 6px; height: 6px; border-radius: 9999px; background: linear-gradient(135deg, #34d399, #22d3ee); flex: 0 0 auto; }
-  .preview-scope .card { border: 1px solid rgba(9,9,11,0.08); border-radius: 1rem; padding: 1.5rem; background: rgba(9,9,11,0.015); }
-  html.dark .preview-scope .card { border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); }
-  .preview-scope .tag { display: inline-block; margin-bottom: 0.75rem; padding: 0.15rem 0.6rem; border-radius: 9999px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.7rem; color: #047857; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); }
-  html.dark .preview-scope .tag { color: #6ee7b7; }
-  .preview-scope button { margin-top: 1rem; padding: 0.5rem 1rem; border-radius: 0.6rem; font-size: 0.85rem; font-weight: 600; color: #052e1a; background: #34d399; cursor: pointer; border: 0; transition: background-color 0.15s; }
-  .preview-scope button:hover { background: #6ee7b7; }
-  .preview-scope button:disabled { opacity: 0.6; cursor: default; }
-  .preview-scope input { margin-top: 0.5rem; width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border-radius: 0.6rem; border: 1px solid rgba(9,9,11,0.12); background: transparent; font-size: 0.9rem; color: inherit; outline: none; }
-  html.dark .preview-scope input { border-color: rgba(255,255,255,0.12); }
-  .preview-scope input:focus { border-color: rgba(16,185,129,0.5); }
+  /* ── Preview-scope styles (mirrored from the host tailwind.css §12 so
+        the user's output looks identical whether host- or sandbox-rendered) ── */
+  .preview-scope h1, .preview-scope .preview-h1 { font-family: var(--mono); font-size: 1.7rem; font-weight: 500; letter-spacing: -0.01em; line-height: 1.15; margin: 0; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .preview-scope h2 { font-family: var(--mono); font-size: 1.2rem; font-weight: 500; letter-spacing: -0.01em; }
+  .preview-scope h3 { font-family: var(--mono); font-size: 1rem; font-weight: 500; }
+  .preview-scope p  { margin-top: 0.6rem; color: var(--graphite); line-height: 1.6; font-size: 0.9rem; }
+  .preview-scope a  { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+  .preview-scope ul { margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0; padding: 0; list-style: none; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  .preview-scope li { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.75rem; background: var(--sheet); font-family: var(--mono); font-size: 0.8rem; color: var(--graphite); }
+  .preview-scope li + li { border-top: 1px solid var(--rule); }
+  .preview-scope li::before { content: ""; width: 5px; height: 5px; border-radius: 6px; background: var(--green); flex: 0 0 auto; }
+  .preview-scope .card { margin-top: 0; padding: 1rem 1.1rem; border-radius: 6px; border: 1px solid var(--rule); background: var(--sheet); }
+  .preview-scope .tag { display: inline-flex; align-items: center; padding: 0.25rem 0.55rem; margin-bottom: 0.75rem; border-radius: 6px; font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--green); background: var(--tint); border: 0; }
+  .preview-scope button { margin-top: 0.9rem; padding: 0.6rem 1.1rem; border-radius: 6px; border: 1px solid var(--rule2); background: var(--sheet); color: var(--ink); font-family: var(--mono); font-weight: 400; font-size: 0.8rem; cursor: pointer; transition: border-color .15s ease; }
+  .preview-scope button:hover { border-color: var(--graphite); }
+  .preview-scope button:disabled { cursor: default; color: var(--graphite); border-color: var(--rule); }
+  .preview-scope input { margin-top: 0.9rem; width: 100%; max-width: 20rem; box-sizing: border-box; padding: 0.55rem 0.8rem; border-radius: 6px; border: 1px solid var(--rule2); background: var(--sheet); font-family: var(--mono); font-size: 0.8rem; color: var(--ink); outline: none; transition: border-color .15s ease; }
+  .preview-scope input::placeholder { color: var(--faint); }
+  .preview-scope input:focus { border-color: var(--ink); }
 
-  /* ── Error panel ── */
-  .pg-error { border-radius: 0.5rem; border: 1px solid rgba(239,68,68,0.3); background: rgba(239,68,68,0.05); padding: 1rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.6; color: #dc2626; white-space: pre-wrap; word-break: break-word; }
-  html.dark .pg-error { color: #f87171; }
-  .pg-error .pg-kind { margin-bottom: 0.25rem; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.7; }
+  /* ── Error panel — the printed-errata register (the design has no red: the
+        fault is marked by the darkest border on the sheet + a mono
+        kicker, the way a proofreader flags a line) ── */
+  .pg-error { border-radius: 6px; border: 1px solid var(--ink); background: var(--deck); padding: 1rem 1.1rem; font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+  .pg-error .pg-kind { margin-bottom: 0.35rem; font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.16em; color: var(--graphite); }
 </style>
 </head>
 <body>
@@ -256,8 +293,10 @@
   function setStatus(s) { toParent({ type: 'pg-status', status: s }); }
 
   function applyTheme(theme) {
+    // The design is light-first: anything that isn't an explicit 'dark' reads as
+    // the printed (light) copy — same default as the host boot script.
     document.documentElement.classList.remove('dark', 'light');
-    document.documentElement.classList.add(theme === 'light' ? 'light' : 'dark');
+    document.documentElement.classList.add(theme === 'dark' ? 'dark' : 'light');
   }
 
   function loadSucrase() {

@@ -11,298 +11,258 @@ async def load_plugins_page(request):
     return {"version": __version__, "registry": registry}
 
 
+import './styles/plugins.css';
 import React from 'react';
-import { Head } from 'pyxle/client';
-import {
-    useScrollReveal, CopyButton, CodeBlock, Plate, InkButton, EditorialLink,
-    GpSection, GpHead, GalleyFooter,
-} from './components/galley.jsx';
+import { Link } from 'pyxle/client';
+import { PageMeta } from './components/page-meta.jsx';
+import { Rulebar, Receipt, CopyChip, Pane, PaneHead, useSeen } from './components/kit.jsx';
 
 /* ════════════════════════════════════════════════════════════════
-   GALLEY PROOF — /plugins, set as a printer's specimen book: the
-   official plates first, then five reserved pages for the founding
-   authors. The empty slots ARE the page — scarcity, typeset.
-   ════════════════════════════════════════════════════════════════ */
+   THE WORKING COPY · /plugins — the directory.
 
-export const slots = {
-    'nav-extra': () => (
-        <a
-            href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/plugins.pyxl"
-            target="_blank"
-            rel="noreferrer"
-            title="View this page's source"
-            className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
-        >
-            source ↗
-        </a>
-    ),
-};
-export const createSlots = () => slots;
+   The homepage's framework table grown into a registry: one plugin per hairline
+   cell — mono tab + the released version straight from
+   public/plugins-registry.json, a real four-line usage specimen on
+   a Deck bed, the registry's own spec lines, and docs → with its
+   path ghost. Everything still renders from the registry (cards,
+   versions, spec rows, slot counts), so new community plugins
+   appear with no page rewrite; the specimen map below is keyed by
+   name and simply absent for plugins it doesn't know.
+
+   The founding cohort is a printed slot ledger — ruled rows, NOT a
+   fake terminal (dark beds are reserved for real terminal quotes).
+   Counts in every receipt are computed from the registry, never
+   typed. Specimens are real API: pyxle-db and pyxle-mail lines are
+   lifted from this site's own db.py / index.pyxl, the useAuth lines
+   from the pyxle-auth docs.
+   ════════════════════════════════════════════════════════════════ */
 
 const SUBMIT_URL = 'https://github.com/pyxle-dev/pyxle-plugins/issues/new?template=submit-plugin.yml';
 
-/* ── Hero ────────────────────────────────────────────────────── */
+/* real usage, four lines each — keyed by name; unknown plugins simply
+   render without a specimen (registry-driven law: no page edit needed) */
+const SPECIMENS = {
+    'pyxle-db': (
+        <pre className="pl-art"><code>
+            {'from pyxle_db import get_database\n\n'}
+            {'db = get_database'}<span className="c">()</span>{'\n'}
+            {'row = await db.fetchone'}<span className="c">(</span>{'"SELECT …"'}<span className="c">)</span>
+        </code></pre>
+    ),
+    'pyxle-auth': (
+        <pre className="pl-art"><code>
+            {'const '}<span className="c">{'{'}</span>{' user, isAuthenticated,'}{'\n'}
+            {'        logout '}<span className="c">{'}'}</span>{' = useAuth'}<span className="c">()</span>{'\n'}
+            {'if '}<span className="c">(!</span>{'isAuthenticated'}<span className="c">)</span>{'\n'}
+            {'  return '}<span className="c">&lt;</span>{'a href'}<span className="c">="/login"&gt;</span>{'Sign in'}<span className="c">&lt;/</span>{'a'}<span className="c">&gt;</span>
+        </code></pre>
+    ),
+    'pyxle-mail': (
+        <pre className="pl-art"><code>
+            {'mail = get_mail_service'}<span className="c">()</span>{'\n\n'}
+            {'await mail.send'}<span className="c">(</span>{'to=email,\n'}
+            {'    subject=subject, html=html'}<span className="c">)</span>
+        </code></pre>
+    ),
+};
 
-// Show the claim, don't just make it: a plugin is one line in the config,
-// and it wires itself at startup. Margin tags name what each line turns on.
-const PLUGIN_CONFIG = `{
-  "plugins": [
-    "pyxle-db",
-    "pyxle-auth",
-    "pyxle-mail"
-  ]
-}`;
-
-const WIRING_TAGS = [
-    { top: '34%', label: 'request.state.db' },
-    { top: '45%', label: 'session middleware' },
-    { top: '57%', label: 'send_email()' },
-];
-
-function Hero() {
+function PluginCell({ plugin, delay }) {
+    const spec = SPECIMENS[plugin.name] || null;
     return (
-        <section className="relative">
-            <div className="mx-auto max-w-[76rem] px-5 pb-14 pt-28 sm:px-8 sm:pb-20 sm:pt-36">
-                <div className="grid items-center gap-x-12 gap-y-12 lg:grid-cols-12">
-                    <div className="lg:col-span-6">
-                        <p className="font-mono text-xs uppercase tracking-[0.14em] text-ink2">
-                            The ecosystem
-                        </p>
-                        <h1 className="mt-5 font-display text-[2.7rem] font-[560] leading-[1.05] tracking-[-0.015em] text-ink sm:text-[3.6rem] lg:text-[4rem]">
-                            Built to be
-                            <br />
-                            built&nbsp;on<span className="gp-dot-load ml-[0.08em] inline-block h-[0.12em] w-[0.12em] rounded-full bg-accent" style={{ ['--dot-delay']: '700ms' }} aria-hidden="true" />
-                            <span className="sr-only">.</span>
-                        </h1>
-                        <p className="mt-6 max-w-[46ch] text-pretty text-lg leading-[1.7] text-ink2">
-                            A plugin is one line of config. Declare it, and it wires itself at
-                            startup — a request-scoped database, session middleware, a mailer.
-                            Three ship today; <span className="text-ink">five founding slots</span> are
-                            open to the community.
-                        </p>
-                    </div>
-                    <div className="min-w-0 lg:col-span-6">
-                        <Plate label="pyxle.config.json" meta="declare · wired" caption={<>Each line turns a service on at startup — no glue code between the config and the request.</>}>
-                            <div className="duotone relative">
-                                <CodeBlock code={PLUGIN_CONFIG} lang="json" className="p-5 text-[13px]" />
-                                {WIRING_TAGS.map((m) => (
-                                    <span key={m.label} className="absolute right-3 hidden items-center gap-2 lg:flex" style={{ top: m.top }} aria-hidden="true">
-                                        <span className="h-px w-5" style={{ background: 'var(--c-press)', opacity: 0.6 }} />
-                                        <span className="font-mono text-[11px] italic text-press">{m.label}</span>
-                                    </span>
-                                ))}
-                            </div>
-                        </Plate>
-                    </div>
+        <div className="pl-cell rv" style={{ '--rvd': delay }}>
+            <h3 className="pl-tab">
+                {plugin.name}
+                {plugin.version ? <span className="pl-ver">{plugin.version}</span> : null}
+                <span className="pl-cat">{(plugin.category || plugin.tier || '').toLowerCase()}</span>
+            </h3>
+            {spec}
+            <ul className="pl-hls">
+                {(plugin.highlights || [plugin.description]).map((r) => <li key={r}>{r}</li>)}
+            </ul>
+            <CopyChip text={`pip install ${plugin.name}`} />
+            <p className="pl-links">
+                <Link className="link" href={plugin.docs}>docs <span className="a">→</span></Link>
+                <a className="link" href={plugin.pypi} target="_blank" rel="noreferrer">pypi</a>
+                <a className="link" href={plugin.repo} target="_blank" rel="noreferrer">source</a>
+                <span className="pl-path">{plugin.docs}</span>
+            </p>
+        </div>
+    );
+}
+
+/* ── 01 · the official registry ──────────────────────────────────── */
+
+function OfficialSection({ officials }) {
+    const [ref, seen] = useSeen();
+    return (
+        <section ref={ref} className={`sec sec-official${seen ? ' seen' : ''}`} id="official">
+            <div className="frame">
+                <Rulebar tab="01 · Official" href="#official" folio="01" />
+                <div className="sec-head rv">
+                    <h2>The plugins Pyxle ships.</h2>
+                    <Receipt>
+                        {officials.length} official, on PyPI · CI against live PostgreSQL and MySQL ·
+                        fail-secure by default · core-team built, same bar as everyone
+                    </Receipt>
+                </div>
+                <div className="pl-cells">
+                    {officials.map((p, i) => (
+                        <PluginCell key={p.name} plugin={p} delay={`${0.05 + i * 0.07}s`} />
+                    ))}
                 </div>
             </div>
         </section>
     );
 }
 
-/* ── 01 · Official plugins ───────────────────────────────────── */
+/* ── 02 · the founding cohort — a printed slot ledger ────────────── */
 
-function PluginCard({ plugin, badge, delay }) {
+function FoundingSection({ open, total, slots }) {
+    const [ref, seen] = useSeen();
     return (
-        <div
-            data-reveal
-            style={{ ['--reveal-delay']: `${delay}ms` }}
-            className="flex h-full flex-col rounded-[10px] border border-rule bg-paper p-6"
-        >
-            <div className="flex items-baseline justify-between gap-4">
-                <h3 className="font-mono text-[15px] font-semibold text-ink">{plugin.name}</h3>
-                <span className="rounded-full border border-rule px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink2">{badge}</span>
-            </div>
-            <div className="flex-1">
-                <p className="mt-3 text-pretty text-[15px] leading-[1.65] text-ink2">{plugin.description}</p>
-                {plugin.tags && plugin.tags.length > 0 && (
-                    <ul className="mt-4 flex flex-wrap gap-1.5">
-                        {plugin.tags.slice(0, 5).map((t) => (
-                            <li key={t} className="rounded-full border border-rule px-2 py-0.5 font-mono text-[10.5px] tracking-[0.02em] text-ink2">{t}</li>
+        <section ref={ref} className={`sec sec-founding${seen ? ' seen' : ''}`} id="founding">
+            <div className="frame">
+                <Rulebar tab="02 · Founding" href="#founding" folio="02" />
+                <div className="sec-head rv">
+                    <h2>Be one of the first five.</h2>
+                    <Receipt>a launch program, not a club · {open} of {total} slots open — the ledger below is the live count</Receipt>
+                </div>
+                <div className="pl-founding">
+                    <div className="pl-slots rv" style={{ '--rvd': '.06s' }}>
+                        {slots.map((entry, i) => (
+                            <p key={entry ? entry.name : `slot-${i}`} className={`pl-slot${entry ? ' claimed' : ''}`}>
+                                <span className="sn">slot {String(i + 1).padStart(2, '0')}</span>
+                                <span className="sp">{entry ? `${entry.name} — ${(entry.category || 'community').toLowerCase()}` : 'open — could be yours'}</span>
+                                <span className="ss">{entry ? 'claimed' : 'unclaimed'}</span>
+                            </p>
                         ))}
-                    </ul>
-                )}
-            </div>
-            <div className="mt-5 flex items-center justify-between gap-3 rounded-[6px] bg-plate px-3.5 py-2.5">
-                <code className="truncate font-mono text-[12.5px] text-[#D7DCD4]">pip install {plugin.name}</code>
-                <CopyButton text={`pip install ${plugin.name}`} />
-            </div>
-            <div className="mt-4 flex gap-5">
-                <EditorialLink href={plugin.docs}>Docs</EditorialLink>
-                <EditorialLink href={plugin.pypi} external>PyPI</EditorialLink>
-                <EditorialLink href={plugin.repo} external>Source</EditorialLink>
-            </div>
-        </div>
-    );
-}
-
-function Official({ registry }) {
-    return (
-        <GpSection n="01" id="official">
-            <GpHead
-                n="01"
-                eyebrow="Official"
-                title="The plugins Pyxle ships."
-                lead="Built and maintained by the core team, held to the same standards we ask of everyone — tested against real PostgreSQL and MySQL servers in CI, fail-secure by default, honest about scope."
-            />
-            <div className="mt-12 grid gap-6 md:grid-cols-2">
-                {registry.plugins.filter((p) => p.tier === 'official').map((p, i) => (
-                    <PluginCard key={p.name} plugin={p} badge={p.category} delay={i * 80} />
-                ))}
-            </div>
-        </GpSection>
-    );
-}
-
-/* ── 02 · The founding cohort ────────────────────────────────── */
-
-const OFFER_ROWS = [
-    ['Pioneer recognition', 'A permanent place among the plugins that started the ecosystem — recognition that grows in value as Pyxle does, not a gate on anyone after you'],
-    ['The spotlight', 'A featured slot on this page and a launch write-up from the official account'],
-    ['The review', 'Direct code review and pairing from the core team while you build'],
-    ['The seat', 'Co-design input on Phase B — the plugin pages & routes API — before it ships'],
-];
-
-function FoundingSlot({ entry, index }) {
-    if (entry) {
-        return (
-            <div data-reveal className="rounded-[10px] border border-rule bg-paper p-6" style={{ ['--reveal-delay']: `${index * 60}ms` }}>
-                <div className="flex items-baseline justify-between gap-4">
-                    <h3 className="font-mono text-[15px] font-semibold text-ink">{entry.name}</h3>
-                    <span className="rounded-full border border-accent px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-acct">founding</span>
+                    </div>
+                    <div className="pl-grants rv" style={{ '--rvd': '.14s' }}>
+                        <p className="pl-grant"><span className="fk">recognition</span><span className="fv">a permanent place among the plugins that started the ecosystem</span></p>
+                        <p className="pl-grant"><span className="fk">spotlight</span><span className="fv">a featured slot here + a launch write-up from the official account</span></p>
+                        <p className="pl-grant"><span className="fk">review</span><span className="fv">core-team code review and pairing while you build</span></p>
+                        <p className="pl-grant"><span className="fk">seat</span><span className="fv">co-design input on Phase B — plugin pages &amp; routes — before it ships</span></p>
+                    </div>
                 </div>
-                <p className="mt-3 text-[15px] leading-[1.65] text-ink2">{entry.description}</p>
-                <div className="mt-4 flex gap-5">
-                    {entry.docs && <EditorialLink href={entry.docs} external={entry.docs.startsWith('http')}>Docs</EditorialLink>}
-                    {entry.pypi && <EditorialLink href={entry.pypi} external>PyPI</EditorialLink>}
-                    {entry.repo && <EditorialLink href={entry.repo} external>Source</EditorialLink>}
+                <Receipt className="rv" style={{ marginTop: 24, '--rvd': '.18s' }}>
+                    ship under your own name — pyxle-* stays official · community plugins aren&rsquo;t
+                    security-audited by the core team · after the cohort, the directory stays open to everyone
+                </Receipt>
+            </div>
+        </section>
+    );
+}
+
+/* ── 03 · build one — three printed steps ────────────────────────── */
+
+function BuildSection({ version }) {
+    const [ref, seen] = useSeen();
+    return (
+        <section ref={ref} className={`sec sec-build${seen ? ' seen' : ''}`} id="build">
+            <div className="frame">
+                <Rulebar tab="03 · Build one" href="#build" folio="03" />
+                <div className="sec-head rv">
+                    <h2>Three steps to a founding slot.</h2>
+                    <Receipt>services and middleware today — pages next, co-designed in the open</Receipt>
                 </div>
-            </div>
-        );
-    }
-    return (
-        <div
-            data-reveal
-            style={{ ['--reveal-delay']: `${index * 60}ms` }}
-            className="flex min-h-[150px] flex-col justify-between rounded-[10px] border border-dashed border-rule p-6"
-        >
-            <span className="font-mono text-xs uppercase tracking-[0.14em] text-press">
-                Founding slot {String(index + 1).padStart(2, '0')}
-            </span>
-            <p className="font-mono text-[13px] text-ink2">
-                Reserved<span className="text-acct">.</span> Could be yours.
-            </p>
-        </div>
-    );
-}
-
-function Founding({ registry }) {
-    const total = registry.founding?.slots_total ?? 5;
-    const community = registry.plugins.filter((p) => p.tier !== 'official');
-    const slotEntries = Array.from({ length: total }, (_, i) => community[i] ?? null);
-    const taken = community.length;
-
-    return (
-        <GpSection n="02" id="founding">
-            <GpHead
-                n="02"
-                eyebrow="The founding cohort"
-                title="Be one of the first five."
-                lead={`A launch program, not a permanent club: the first ${total} community plugins to meet the published standards are recognised as ecosystem pioneers — and get the spotlight, review, and roadmap seat below while they build. ${taken === 0 ? 'All five spots are open.' : `${total - taken} of ${total} spots remain.`} After the cohort, the directory stays open to everyone, organised by capability.`}
-            />
-            <div className="mt-12 max-w-3xl">
-                <dl className="border-t border-rule">
-                    {OFFER_ROWS.map(([k, v], i) => (
-                        <div key={k} data-reveal className="flex flex-col gap-1 border-b border-rule py-3.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6" style={{ ['--reveal-delay']: `${i * 60}ms` }}>
-                            <dt className="shrink-0 font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">{k}</dt>
-                            <dd className="text-[14px] leading-relaxed text-ink sm:text-right">{v}</dd>
+                <div className="pl-steps">
+                    <div className="pl-step rv" style={{ '--rvd': '.04s' }}>
+                        <span className="n" aria-hidden="true">01</span>
+                        <span className="t">Pick a quest</span>
+                        <div className="b2">
+                            <p className="l">the ideas page lists what the ecosystem needs — each with its contract and an honest size estimate</p>
+                            <p className="go"><Link className="link" href="/docs/plugins/ideas">browse the ideas <span className="a">→</span></Link></p>
                         </div>
-                    ))}
-                </dl>
-            </div>
-            <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {slotEntries.map((entry, i) => (
-                    <FoundingSlot key={i} entry={entry} index={i} />
-                ))}
-            </div>
-            <p className="mt-6 max-w-[64ch] font-mono text-xs leading-relaxed text-ink2">
-                Ship under your own package name — <span className="text-ink">pyxle-*</span> is
-                reserved for official plugins. Community plugins aren't security-audited by the
-                Pyxle team; the bar is public and reviews are honest.
-            </p>
-        </GpSection>
-    );
-}
-
-/* ── 03 · Build one ──────────────────────────────────────────── */
-
-const STEPS = [
-    ['Pick a quest', 'The ideas page lists plugins the ecosystem needs, scoped to what the plugin API supports today — each with the contract it builds against and an honest size estimate.', '/docs/plugins/ideas', 'Browse plugin ideas'],
-    ['Clear the bar', 'The standards are published and finite: packaging, behaviour, testing, security, maintenance. The official plugins are the reference implementation of every rule.', '/docs/plugins/standards', 'Read the standards'],
-    ['Submit it', 'Open a submission issue — early is better, so the slot is visibly claimed and review can happen while you build instead of after.', SUBMIT_URL, 'Open a submission'],
-];
-
-function BuildOne() {
-    return (
-        <GpSection n="03" id="build">
-            <GpHead
-                n="03"
-                eyebrow="Build one"
-                title="Three steps to a founding slot."
-                lead="Today plugins contribute services and middleware — database layers, mailers, storage, observability. Pages and routes are next: the Phase B RFC is open, and founding authors help design it."
-            />
-            <ol className="mt-12 max-w-3xl space-y-0 border-t border-rule">
-                {STEPS.map(([title, body, href, label], i) => (
-                    <li key={title} data-reveal className="border-b border-rule py-7" style={{ ['--reveal-delay']: `${i * 70}ms` }}>
-                        <div className="flex items-baseline gap-5">
-                            <span className="font-mono text-sm text-press">{String(i + 1).padStart(2, '0')}</span>
-                            <div>
-                                <h3 className="font-display text-xl font-[540] text-ink">{title}</h3>
-                                <p className="mt-2 max-w-[56ch] text-[15px] leading-[1.7] text-ink2">{body}</p>
-                                <div className="mt-3">
-                                    <EditorialLink href={href} external={href.startsWith('http')}>{label} →</EditorialLink>
-                                </div>
-                            </div>
+                    </div>
+                    <div className="pl-step rv" style={{ '--rvd': '.1s' }}>
+                        <span className="n" aria-hidden="true">02</span>
+                        <span className="t">Clear the bar</span>
+                        <div className="b2">
+                            <p className="l">published, finite standards — packaging, behaviour, testing, security, maintenance · the official plugins are the reference implementation</p>
+                            <p className="go"><Link className="link" href="/docs/plugins/standards">read the standards <span className="a">→</span></Link></p>
                         </div>
-                    </li>
-                ))}
-            </ol>
-            <div className="mt-12 flex flex-wrap items-center gap-5">
-                <InkButton href={SUBMIT_URL} external>Claim a founding slot</InkButton>
-                <EditorialLink href="/docs/plugins/rfc-plugin-pages">Read the Phase B RFC</EditorialLink>
+                    </div>
+                    <div className="pl-step rv" style={{ '--rvd': '.16s' }}>
+                        <span className="n" aria-hidden="true">03</span>
+                        <span className="t">Submit early</span>
+                        <div className="b2">
+                            <p className="l">open the submission issue while you build — the slot is visibly claimed, review happens alongside</p>
+                            <p className="go"><a className="link" href={SUBMIT_URL} target="_blank" rel="noreferrer">open a submission <span className="a">→</span></a></p>
+                        </div>
+                    </div>
+                </div>
+                <div className="pl-close rv" style={{ '--rvd': '.14s' }}>
+                    <CopyChip text="pip install pyxle-framework" />
+                    <Link className="link" href="/docs/plugins/rfc-plugin-pages">read the Phase B RFC <span className="a">→</span></Link>
+                </div>
+                <Receipt className="rv" style={{ marginTop: 20, '--rvd': '.18s' }}>
+                    MIT · {version ? `v${version}` : 'pre-1.0'} · Python 3.10+ · pre-1.0
+                </Receipt>
             </div>
-        </GpSection>
+        </section>
     );
 }
 
-/* ── Page ────────────────────────────────────────────────────── */
+/* ── page ────────────────────────────────────────────────────────── */
 
 export default function PluginsPage({ data }) {
     const { version, registry } = data;
-    useScrollReveal();
+    const officials = registry.plugins.filter((p) => p.tier === 'official');
+    const community = registry.plugins.filter((p) => p.tier !== 'official');
+    const total = (registry.founding && registry.founding.slots_total) || 5;
+    const open = Math.max(0, total - community.length);
+    const slots = Array.from({ length: total }, (_, i) => community[i] || null);
+    /* the hero's running head is visible from the start (f.js law) */
+    const [heroRef, heroSeen] = useSeen({ immediate: true });
 
     return (
         <>
-            <Head>
-                <title>Plugins - Pyxle Framework</title>
-                <meta name="description" content="The Pyxle plugin directory: official plugins (pyxle-db, pyxle-auth, pyxle-mail) and five reserved founding slots for the community. Build a plugin that meets the published standards and claim one — permanently." />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <meta name="theme-color" content="#101411" />
-                <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-                <meta property="og:title" content="Pyxle Plugins - The Founding Five" />
-                <meta property="og:description" content="Five founding slots in the official plugin directory, reserved for the first community plugins that meet the bar." />
-                <meta property="og:image" content="https://pyxle.dev/branding/og-default.png" />
-                <meta property="og:type" content="website" />
-                <meta name="twitter:card" content="summary_large_image" />
-                <meta name="twitter:image" content="https://pyxle.dev/branding/og-default.png" />
-            </Head>
+            <PageMeta
+                title="Plugins"
+                description={`A plugin is one line of config. ${officials.length} official plugins ship today — ${officials.map((p) => p.name).join(', ')} — and ${open} founding slots are open to the community.`}
+                path="/plugins"
+            />
             <main id="main">
-                <Hero />
-                <Official registry={registry} />
-                <Founding registry={registry} />
-                <BuildOne />
+                <section ref={heroRef} className={`sec pl-hero${heroSeen ? ' seen' : ''}`} id="top">
+                    <div className="frame">
+                        <Rulebar hero tab="Plugins · The directory" />
+                        <div className="pl-hero-head">
+                            <h1 className="b" style={{ '--bd': '.05s' }}>Built to be built on.</h1>
+                            <Receipt className="b" style={{ '--bd': '.16s' }}>
+                                a plugin is one line of config · {officials.length} official on PyPI ·
+                                {' '}{open} of {total} founding slots open
+                            </Receipt>
+                        </div>
+                        <div className="pl-claim b" style={{ '--bd': '.28s' }}>
+                            <Pane>
+                                <PaneHead>
+                                    <span>pyxle.config.json</span>
+                                    <span>wired at startup</span>
+                                </PaneHead>
+                                {/* valid JSON, kept honest: annotations live in the
+                                    caption, not as comments JSON can't carry */}
+                                <pre className="pl-code"><code>
+                                    <span className="row"><span className="n">1</span><span className="c">{'{'}</span></span>
+                                    <span className="row"><span className="n">2</span>{'  "plugins"'}<span className="c">{': ['}</span></span>
+                                    <span className="row"><span className="n">3</span>{'    "pyxle-db"'}<span className="c">,</span></span>
+                                    <span className="row"><span className="n">4</span>{'    "pyxle-auth"'}<span className="c">,</span></span>
+                                    <span className="row"><span className="n">5</span>{'    "pyxle-mail"'}</span>
+                                    <span className="row"><span className="n">6</span><span className="c">{'  ]'}</span></span>
+                                    <span className="row"><span className="n">7</span><span className="c">{'}'}</span></span>
+                                </code></pre>
+                            </Pane>
+                            <p className="pl-cap">
+                                each line turns a service on at startup — <b>no glue code</b> between config
+                                and request: pyxle-db → request.state.db · pyxle-auth → session middleware ·
+                                pyxle-mail → get_mail_service()
+                            </p>
+                        </div>
+                    </div>
+                </section>
+                <OfficialSection officials={officials} />
+                <FoundingSection open={open} total={total} slots={slots} />
+                <BuildSection version={version} />
             </main>
-            <GalleyFooter version={version} />
         </>
     );
 }

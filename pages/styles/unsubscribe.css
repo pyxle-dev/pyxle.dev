@@ -1,0 +1,141 @@
+/* ═══ THE WORKING COPY · /unsubscribe — the receipt ══════════════════
+   A mail action, printed like everything else: rulebar, couplet,
+   and — once an action really ran — its mono log line with the
+   genuine 200 (green job 3). The optional feedback form is a quiet
+   ruled block; a chosen reason is stamped in ink. No red anywhere:
+   an error prints as a dim mono line. */
+
+.un-main { min-height: calc(100vh - 65px); display: flex; }
+.un-wrap {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 88px 24px 72px;
+    width: 100%;
+}
+.un-box { width: 100%; max-width: 620px; }
+.un-box .rulebar { margin-bottom: 46px; }
+.un-box h1 { font-size: clamp(36px, 4.6vw, 52px); }
+
+/* the action's receipt — a real 200, printed */
+.un-log {
+    margin: 18px 0 0;
+    font: 400 13px/1.7 var(--mono);
+    color: var(--graphite);
+}
+.un-log .ok { color: var(--green); }   /* the 200 ran — green job 3 */
+
+/* an error, printed dim — a failed action never earns colour */
+.un-err {
+    margin: 18px 0 0;
+    font: 400 12.5px/1.7 var(--mono);
+    color: var(--graphite);
+    border-left: 2px solid var(--ink);
+    padding-left: 12px;
+}
+
+.un-body { margin: 22px 0 0; font: 400 16px/1.65 var(--sans); color: var(--graphite); max-width: 54ch; }
+.un-body .mono-inline { color: var(--ink); }
+
+.un-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 22px;
+    margin-top: 30px;
+}
+.un-btn {
+    font: 500 14px/1 var(--sans);
+    color: var(--ink);
+    background: var(--sheet);
+    border: 1px solid var(--rule2);
+    border-radius: 6px;
+    padding: 11px 16px;
+    cursor: pointer;
+    transition: border-color .15s ease, background-color .15s ease;
+}
+.un-btn:hover { border-color: var(--ink); }
+.un-btn:active { background: var(--deck); }
+.un-btn:disabled { cursor: default; color: var(--graphite); border-color: var(--rule); }
+.un-row .link, .un-body .link-btn { font: inherit; }
+
+/* resubscribe — a plain link that happens to be a button */
+.link-btn {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    text-decoration-color: var(--rule2);
+    cursor: pointer;
+    transition: text-decoration-color .15s ease;
+}
+.link-btn:hover { text-decoration-thickness: 2px; text-decoration-color: var(--ink); }
+.link-btn:disabled { color: var(--graphite); cursor: default; }
+
+/* ── the optional feedback form — a quiet ruled block ───────────── */
+.un-fb { margin-top: 44px; border-top: 1px solid var(--rule); padding-top: 24px; }
+.un-fb-label {
+    margin: 0;
+    font: 500 11px/16px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--graphite);
+}
+.un-reasons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.un-reason {
+    font: 400 12.5px/1 var(--mono);
+    color: var(--graphite);
+    background: var(--sheet);
+    border: 1px solid var(--rule2);
+    border-radius: 6px;
+    padding: 9px 12px;
+    cursor: pointer;
+    transition: border-color .15s ease, color .15s ease;
+}
+.un-reason:hover { border-color: var(--graphite); color: var(--ink); }
+.un-reason.on {
+    color: var(--bond);
+    background: var(--ink);
+    border-color: var(--ink);
+}
+.un-fb textarea {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    resize: vertical;
+    min-height: 76px;
+    font: 400 14px/1.6 var(--sans);
+    color: var(--ink);
+    background: var(--sheet);
+    border: 1px solid var(--rule2);
+    border-radius: 6px;
+    padding: 10px 12px;
+    transition: border-color .15s ease;
+}
+.un-fb textarea::placeholder { color: var(--faint); }
+.un-fb textarea:focus { outline: none; border-color: var(--ink); }
+.un-fb .un-btn { margin-top: 14px; }
+
+.un-thanks {
+    margin: 44px 0 0;
+    border-top: 1px solid var(--rule);
+    padding-top: 22px;
+    font: 400 13px/1.7 var(--mono);
+    color: var(--graphite);
+}
+
+@media (max-width: 768px) {
+    /* tap-target law: controls reach 44px on touch layouts */
+    .un-btn { padding: 14px 18px; }
+    .un-reason { padding: 13px 14px; }
+    .un-fb textarea { font-size: 16px; }  /* no iOS focus zoom */
+}
+@media (max-width: 480px) {
+    .un-wrap { padding: 56px 16px 56px; }
+    .un-box .rulebar { margin-bottom: 36px; }
+}

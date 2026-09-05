@@ -139,8 +139,11 @@ function fetchVendorFiles() {
 }
 
 function currentTheme() {
-    if (typeof document === 'undefined') return 'dark';
-    return document.documentElement.classList.contains('light') ? 'light' : 'dark';
+    // The design is light-first: anything that isn't an explicit dark class reads
+    // as the printed (light) copy — the same default the layout boot
+    // script applies.
+    if (typeof document === 'undefined') return 'light';
+    return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 }
 
 /* ── Editor (textarea over highlight overlay) ─────────────────────
@@ -151,15 +154,19 @@ function currentTheme() {
    transparent text + visible caret, and stays focusable. */
 const INDENT = '    '; // 4 spaces — matches the Python in DEFAULT_SOURCE
 
-function Editor({ value, onChange }) {
+function Editor({ value, onChange, onRunNow }) {
     const taRef = useRef(null);
     const preRef = useRef(null);
+    const gutRef = useRef(null); // the line-number column follows vertical scroll
     const selRef = useRef(null); // [start, end] to restore after a Tab edit
 
     const syncScroll = () => {
         if (preRef.current && taRef.current) {
             preRef.current.scrollTop = taRef.current.scrollTop;
             preRef.current.scrollLeft = taRef.current.scrollLeft;
+        }
+        if (gutRef.current && taRef.current) {
+            gutRef.current.style.transform = `translateY(${-taRef.current.scrollTop}px)`;
         }
     };
 
@@ -176,6 +183,11 @@ function Editor({ value, onChange }) {
     // Tab → indent (insert spaces / indent selected lines). Shift+Tab →
     // dedent. Keeps focus in the editor instead of tabbing away.
     const onKeyDown = (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+            e.preventDefault();
+            if (onRunNow) onRunNow();
+            return;
+        }
         if (e.key !== 'Tab') return;
         e.preventDefault();
         const el = taRef.current;
@@ -232,31 +244,41 @@ function Editor({ value, onChange }) {
         }
     };
 
+    // The printed listing's line numbers (Faint, like every specimen on
+    // the site). Derived from `value` — deterministic, so SSR markup and
+    // the first client render match byte-for-byte.
+    const lineCount = value.split('\n').length;
+    let gutter = '';
+    for (let n = 1; n <= lineCount; n += 1) gutter += (n === 1 ? '' : '\n') + n;
+
     return (
-        <div className="relative h-full overflow-hidden font-mono text-[12.5px] leading-[1.7]">
-            <pre ref={preRef} aria-hidden="true" className="pointer-events-none absolute inset-0 m-0 overflow-auto whitespace-pre p-4 text-zinc-300">
-                <code>
-                    {tokenizeBlock(value, 'pyxl').map((toks, i) => (
-                        <React.Fragment key={i}>
-                            {toks.length === 0 ? ' ' : toks.map((t, j) => <span key={j} className={t.cls}>{t.text}</span>)}
-                            {'\n'}
-                        </React.Fragment>
-                    ))}
-                </code>
-            </pre>
-            <textarea
-                ref={taRef}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                onKeyDown={onKeyDown}
-                onScroll={syncScroll}
-                spellCheck={false}
-                autoCapitalize="off"
-                autoCorrect="off"
-                aria-label="Edit the .pyxl source"
-                className="focus-ring absolute inset-0 m-0 block h-full w-full resize-none overflow-auto whitespace-pre bg-transparent p-4 text-transparent caret-emerald-400 outline-none"
-                style={{ fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit' }}
-            />
+        <div className="pg-editor">
+            <div className="pg-gutter" aria-hidden="true">
+                <div ref={gutRef} className="pg-gutter-in">{gutter}</div>
+            </div>
+            <div className="pg-code">
+                <pre ref={preRef} aria-hidden="true">
+                    <code>
+                        {tokenizeBlock(value, 'pyxl').map((toks, i) => (
+                            <React.Fragment key={i}>
+                                {toks.length === 0 ? ' ' : toks.map((t, j) => <span key={j} className={t.cls}>{t.text}</span>)}
+                                {'\n'}
+                            </React.Fragment>
+                        ))}
+                    </code>
+                </pre>
+                <textarea
+                    ref={taRef}
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    onKeyDown={onKeyDown}
+                    onScroll={syncScroll}
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    aria-label="Edit the .pyxl source"
+                />
+            </div>
         </div>
     );
 }
@@ -266,6 +288,8 @@ export function LivePlayground({
     fileLabel = 'counter.pyxl',
     paneHeight = 'h-[300px] sm:h-[380px]',
     defaultPreview = null,
+    headerExtra = null,
+    onEvent = null,
 } = {}) {
     const [source, setSource] = useState(initialSource);
     const [engineStarted, setEngineStarted] = useState(false); // sandbox booted (first edit only)
@@ -280,12 +304,23 @@ export function LivePlayground({
     const DefaultComp = defaultPreview || (initialSource === DEFAULT_SOURCE ? DefaultPreview : null);
 
     const iframeRef = useRef(null);
+    const pvBodyRef = useRef(null);   // the result bed — flashed on a real run (green job 6)
+    const flashTimer = useRef(null);
     const startedRef = useRef(false);
     const iframeReadyRef = useRef(false);  // sandbox posted 'pg-ready'
     const initSentRef = useRef(false);     // we've sent files + first source
     const vendorRef = useRef(null);
     const latestSrc = useRef(initialSource);
     const timer = useRef(null);
+
+    // Optional host-page event tap (drives the wire log on /playground).
+    // Ref-stored: a fresh callback each render never re-binds anything, and
+    // every event corresponds to a REAL runtime event — nothing simulated.
+    const onEventRef = useRef(onEvent);
+    onEventRef.current = onEvent;
+    const emit = useCallback((ev) => {
+        if (onEventRef.current) onEventRef.current(ev);
+    }, []);
 
     const postToIframe = useCallback((msg) => {
         const w = iframeRef.current && iframeRef.current.contentWindow;
@@ -306,6 +341,7 @@ export function LivePlayground({
         startedRef.current = true;
         setEngineStarted(true);
         setPyStatus('booting');
+        emit({ type: 'boot' });
         // Lazy-load the sandbox document (a separate chunk) + the vendored
         // parser files. Both only happen on first interaction — never on load.
         import('./playground-sandbox.js')
@@ -314,7 +350,7 @@ export function LivePlayground({
         fetchVendorFiles()
             .then((files) => { vendorRef.current = files; sendInit(); })
             .catch(() => setPyStatus('failed'));
-    }, [sendInit]);
+    }, [sendInit, emit]);
 
     // Listen for messages FROM our sandbox only (verified by source).
     useEffect(() => {
@@ -323,13 +359,28 @@ export function LivePlayground({
             const m = e.data;
             if (!m || typeof m !== 'object') return;
             if (m.type === 'pg-ready') { iframeReadyRef.current = true; sendInit(); }
-            else if (m.type === 'pg-status') { setPyStatus(m.status); }
-            else if (m.type === 'pg-ran') { if (typeof m.ms === 'number') setMs(m.ms); setIframeLive(true); }
+            else if (m.type === 'pg-status') { setPyStatus(m.status); emit({ type: 'status', status: m.status }); }
+            else if (m.type === 'pg-ran') {
+                if (typeof m.ms === 'number') setMs(m.ms);
+                setIframeLive(true);
+                const ok = m.ok !== false;
+                // Execution flash (green job 6): only when a run REALLY
+                // completed. Post-mount DOM class, never SSR markup.
+                if (ok && pvBodyRef.current) {
+                    const el = pvBodyRef.current;
+                    el.classList.remove('ran');
+                    void el.offsetWidth;
+                    el.classList.add('ran');
+                    clearTimeout(flashTimer.current);
+                    flashTimer.current = setTimeout(() => el.classList.remove('ran'), 750);
+                }
+                emit({ type: 'ran', ok, ms: typeof m.ms === 'number' ? m.ms : null });
+            }
             else if (m.type === 'pg-shown') { setIframeLive(true); }
         };
         window.addEventListener('message', onMsg);
         return () => window.removeEventListener('message', onMsg);
-    }, [sendInit]);
+    }, [sendInit, emit]);
 
     // Boot watchdog: if Python hasn't reported ready within the budget (a
     // stalled Pyodide download that never resolves or throws), fail loudly so
@@ -362,7 +413,18 @@ export function LivePlayground({
         }, 300);
     }, [startEngine, postToIframe]);
 
-    useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+    useEffect(() => () => {
+        if (timer.current) clearTimeout(timer.current);
+        if (flashTimer.current) clearTimeout(flashTimer.current);
+    }, []);
+
+    // ⌘/Ctrl+Enter — run immediately: flush the debounce and re-run the
+    // current source (boots the engine first if it is still cold).
+    const runNow = useCallback(() => {
+        if (!startedRef.current) startEngine();
+        if (timer.current) clearTimeout(timer.current);
+        if (initSentRef.current) postToIframe({ type: 'pg-run', source: latestSrc.current });
+    }, [startEngine, postToIframe]);
 
     // Switching examples (parent changes initialSource): load it into the
     // editor. If the sandbox is already warm, re-run there; if it's cold,
@@ -382,12 +444,15 @@ export function LivePlayground({
         if (!startedRef.current && DefaultComp == null) startEngine();
     }, [DefaultComp, startEngine]);
 
+    // Honest states, house voice: before any edit the pane is a plain-JS
+    // mirror (and says so); green appears only once the sandbox is
+    // genuinely rendering the visitor's code.
     const statusText =
-        pyStatus === 'booting' ? 'booting Python (one-time)…'
+        pyStatus === 'booting' ? 'booting CPython — one-time, ~10 MB'
         : pyStatus === 'failed' ? 'sandbox offline'
         : pyStatus === 'timeout' ? 'stopped — runaway code killed'
-        : ms ? `${ms}ms · real Python, sandboxed`
-        : 'sandboxed preview · no install';
+        : iframeLive ? (ms ? `real Python · ${ms} ms` : 'real Python, sandboxed')
+        : 'plain JS until you edit';
 
     // Preview pane has three states: the instant-on JS mirror of the current
     // example (zero Pyodide), the one-time "booting Python…" window, then the
@@ -399,35 +464,31 @@ export function LivePlayground({
         // The sandbox (React + Sucrase + ~10 MB Pyodide) mounts lazily on
         // the user's first EDIT — never on page load or hover. Until then
         // the preview is the instant-on JS DefaultPreview below.
-        <div className="grid grid-cols-1 sm:grid-cols-2">
-            {/* editor */}
-            <div className="flex flex-col border-b border-white/5 sm:border-b-0 sm:border-r">
-                <div className="flex items-center gap-2 border-b border-white/5 px-4 py-2.5">
-                    <span className="flex gap-1.5" aria-hidden="true">
-                        <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/80" />
-                        <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/60" />
-                        <span className="h-2.5 w-2.5 rounded-full bg-zinc-600/40" />
-                    </span>
-                    <span className="ml-1 font-mono text-[11px] text-zinc-400">{fileLabel}</span>
-                    <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-300">
-                        <span className="h-1 w-1 rounded-full bg-emerald-400" /> edit me
+        <div className="pg-bench">
+            {/* editor — the specimen, powered on */}
+            <div className="pg-ed">
+                <div className="pg-ed-head">
+                    {headerExtra || <span className="pg-file">{fileLabel}</span>}
+                    <span className="pg-ed-note">
+                        {engineStarted ? 'every keystroke re-runs it' : 'edit me — your first edit boots CPython'}
                     </span>
                 </div>
-                <div className={paneHeight}>
-                    <Editor value={source} onChange={onChange} />
+                <div className={`pg-ed-body ${paneHeight}`}>
+                    <Editor value={source} onChange={onChange} onRunNow={runNow} />
                 </div>
             </div>
 
-            {/* preview */}
-            <div className="flex flex-col bg-white dark:bg-[#0a0a0b]">
-                <div className="flex items-center gap-2 border-b border-zinc-200/70 px-4 py-2.5 dark:border-white/5">
-                    <span className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400">Preview</span>
-                    <span className="ml-auto inline-flex items-center gap-1.5 font-mono text-[10px] text-zinc-500 dark:text-zinc-400">
-                        {pyStatus === 'booting' && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />}
+            {/* result */}
+            <div className="pg-pv">
+                <div className="pg-pv-head">
+                    <span className={`pg-dot${iframeLive ? ' live' : pyStatus === 'failed' ? ' err' : ''}`} aria-hidden="true" />
+                    <span>{iframeLive ? 'rendered by your code' : 'result'}</span>
+                    <span className="pg-pv-note">
+                        {pyStatus === 'booting' && <span className="pg-boot-dot pulse" aria-hidden="true" style={{ display: 'inline-block', marginRight: 8, verticalAlign: 'baseline' }} />}
                         {statusText}
                     </span>
                 </div>
-                <div className={`relative overflow-hidden ${paneHeight}`}>
+                <div ref={pvBodyRef} className={`pg-pv-body ${paneHeight}`}>
                     {engineStarted && sandboxHtml && (
                         <iframe
                             ref={iframeRef}
@@ -435,35 +496,32 @@ export function LivePlayground({
                             title="Live Pyxle preview (sandboxed)"
                             sandbox="allow-scripts"
                             referrerPolicy="no-referrer"
-                            className="absolute inset-0 h-full w-full border-0 bg-white dark:bg-[#0a0a0b]"
                             style={{ display: iframeLive ? 'block' : 'none' }}
                         />
                     )}
                     {showBooting && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                        <div className="pg-boot">
                             {pyStatus === 'failed' ? (
                                 <>
-                                    <span className="h-2.5 w-2.5 rounded-full bg-red-400/80" aria-hidden="true" />
-                                    <p className="max-w-[36ch] font-mono text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-                                        Couldn't load the in-browser Python runtime — a one-time ~10&nbsp;MB download. Check your connection, then{' '}
-                                        <button type="button" onClick={() => window.location.reload()} className="rounded text-emerald-500 underline decoration-1 underline-offset-2 hover:decoration-2">reload</button>.
+                                    <span className="pg-boot-dot" aria-hidden="true" />
+                                    <p>
+                                        Couldn&rsquo;t load the in-browser Python runtime — a one-time ~10&nbsp;MB download.
+                                        Check your connection, then{' '}
+                                        <button type="button" onClick={() => window.location.reload()} className="link" style={{ background: 'none', border: 0, padding: 0, font: 'inherit', cursor: 'pointer' }}>reload</button>.
                                     </p>
                                 </>
                             ) : (
                                 <>
-                                    <span className="relative flex h-2.5 w-2.5">
-                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-70" />
-                                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-400" />
-                                    </span>
-                                    <p className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
-                                        booting Python… <span className="opacity-60">(one-time, a few seconds)</span>
+                                    <span className="pg-boot-dot pulse" aria-hidden="true" />
+                                    <p>
+                                        booting CPython&hellip; <span className="dim">one-time, a few seconds</span>
                                     </p>
                                 </>
                             )}
                         </div>
                     )}
                     {showDefault && (
-                        <div className="preview-scope absolute inset-0 overflow-auto p-6">
+                        <div className="preview-scope pg-default">
                             <DefaultComp />
                         </div>
                     )}

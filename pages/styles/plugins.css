@@ -1,0 +1,220 @@
+/* ═══════════════════════════════════════════════════════════════════
+   THE WORKING COPY · /plugins — "the directory".
+   The homepage's framework table grown into a registry: shared
+   hairline cells, one
+   plugin per cell — mono tab + live version chip, a real four-line
+   usage specimen on a Deck bed, the registry's own spec lines, and
+   docs → with its path ghost. The founding cohort is a printed slot
+   ledger (ruled rows — NOT a fake terminal; dark beds are only for
+   real terminal quotes). Counts are computed from the registry,
+   never typed. Page-owned classes are pl-*.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rulebar-hero { border-top: none; height: 0; }
+.rulebar-hero .tab { top: -8px; }
+
+/* ── cadence ────────────────────────────────────────────────────── */
+.pl-hero { padding-top: 0; padding-bottom: 84px; }
+.pl-hero-head { margin-top: 64px; margin-bottom: 40px; }
+.sec-official .rulebar { margin-bottom: 84px; }
+.sec-official { padding-bottom: 96px; }
+.sec-founding .rulebar { margin-bottom: 84px; }
+.sec-founding { padding-bottom: 92px; }
+.sec-build .rulebar { margin-bottom: 84px; }
+.sec-build { padding-bottom: 88px; }
+
+/* ── the claim — a plugin is one line of config ─────────────────── */
+.pl-claim {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+    gap: 36px;
+    align-items: end;
+}
+.pl-code {
+    margin: 0;
+    padding: 14px 0;
+    font: 400 13.5px/1.65 var(--mono);
+    color: var(--ink);
+    overflow-x: auto;
+}
+.pl-code .row { display: block; padding: 0 16px 0 0; white-space: pre; }
+.pl-code .n {
+    display: inline-block;
+    width: 40px;
+    padding-right: 14px;
+    text-align: right;
+    color: var(--faint);
+    user-select: none;
+}
+.pl-code .c { color: var(--graphite); }
+.pl-cap { font: 400 12.5px/1.7 var(--mono); color: var(--graphite); margin: 0; padding-bottom: 6px; }
+.pl-cap b { font-weight: 500; color: var(--ink); }
+
+/* ── the directory cells ────────────────────────────────────────── */
+.pl-cells {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+}
+.pl-cell {
+    background: var(--sheet);
+    padding: 26px 26px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+    transition: background-color .18s ease;
+}
+.pl-cell:hover { background: var(--bond); }
+.pl-tab {
+    font: 500 11px/16px var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--graphite);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0;
+    transition: color .15s ease;
+}
+.pl-cell:hover .pl-tab { color: var(--ink); }
+.pl-ver {
+    font: 400 10.5px/1 var(--mono);
+    letter-spacing: 0.02em;
+    text-transform: none;
+    color: var(--graphite);
+    border: 1px solid var(--rule2);
+    border-radius: 6px;
+    padding: 3px 7px;
+}
+.pl-cat { font-weight: 400; color: var(--faint); letter-spacing: 0.06em; margin-left: auto; }
+.pl-art {
+    background: var(--deck);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font: 400 12.5px/1.55 var(--mono);
+    color: var(--ink);
+    overflow-x: auto;
+    margin: 0;
+}
+.pl-art .c { color: var(--graphite); }
+.pl-art .g { color: var(--green); font-weight: 500; }   /* the anatomy that runs — job 5 */
+.pl-hls { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--rule); flex: 1; }
+.pl-hls li {
+    font: 400 12px/1.6 var(--mono);
+    color: var(--graphite);
+    padding: 7px 0;
+    border-bottom: 1px solid var(--rule);
+}
+.pl-links {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    min-width: 0;
+    margin: 0;
+    font: 400 14px/1 var(--sans);
+}
+.pl-links .link { white-space: nowrap; }
+.pl-path {
+    font: 400 11px/1.4 var(--mono);
+    color: var(--faint);
+    opacity: 0;
+    transition: opacity .25s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    margin-left: auto;
+}
+.pl-cell:hover .pl-path { opacity: 1; }
+
+/* ── the founding slot ledger — printed rows, not a fake terminal ── */
+.pl-founding {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    gap: 48px;
+    align-items: start;
+}
+.pl-slots { border-top: 1px solid var(--rule); }
+.pl-slot {
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr) 92px;
+    gap: 16px;
+    align-items: baseline;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+    font: 400 13px/1.5 var(--mono);
+}
+.pl-slot .sn { color: var(--faint); }
+.pl-slot .sp { color: var(--graphite); min-width: 0; }
+.pl-slot .ss { color: var(--faint); text-align: right; }
+.pl-slot.claimed .sp { color: var(--ink); }
+.pl-slot.claimed .ss { color: var(--green); }   /* a live plugin — job 3's status green */
+
+.pl-grants { border-top: 1px solid var(--rule); }
+.pl-grant {
+    display: grid;
+    grid-template-columns: 118px minmax(0, 1fr);
+    gap: 18px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+}
+.pl-grant .fk { font: 400 12px/1.65 var(--mono); color: var(--graphite); }
+.pl-grant .fv { font: 400 14px/1.6 var(--sans); color: var(--ink); min-width: 0; }
+
+/* ── three steps to a founding slot ─────────────────────────────── */
+.pl-steps { border-top: 1px solid var(--rule); max-width: 940px; }
+.pl-step {
+    display: grid;
+    grid-template-columns: 64px 220px minmax(0, 1fr);
+    gap: 22px;
+    align-items: baseline;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--rule);
+}
+.pl-step .n {
+    font: 500 26px/1 var(--mono);
+    letter-spacing: -0.02em;
+    color: var(--folio);
+}
+.pl-step .t { font: 600 16.5px/1.4 var(--sans); color: var(--ink); letter-spacing: -0.01em; }
+.pl-step .b2 { min-width: 0; }
+.pl-step .l { margin: 0; font: 400 14.5px/1.6 var(--sans); color: var(--graphite); }
+.pl-step .go { margin: 8px 0 0; font: 400 14px/1.4 var(--sans); }
+
+.pl-close { margin-top: 44px; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.pl-close .chip-wrap { max-width: 420px; flex: 1 1 300px; }
+
+/* ── responsive ─────────────────────────────────────────────────── */
+@media (max-width: 1020px) {
+    .pl-cells { grid-template-columns: minmax(0, 1fr); max-width: 640px; }
+    .pl-founding { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+}
+@media (max-width: 860px) {
+    .pl-claim { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .pl-cap { padding-bottom: 0; }
+}
+@media (max-width: 760px) {
+    .pl-hero-head { margin-top: 44px; margin-bottom: 30px; }
+    .sec-official .rulebar, .sec-founding .rulebar, .sec-build .rulebar { margin-bottom: 60px; }
+    .pl-cell { padding: 20px 16px 18px; }
+    .pl-code { font-size: 12px; }
+    .pl-code .n { width: 30px; padding-right: 10px; }
+    .pl-slot { grid-template-columns: 64px minmax(0, 1fr) 84px; gap: 10px; font-size: 12px; }
+    .pl-step { grid-template-columns: 44px minmax(0, 1fr); }
+    .pl-step .b2 { grid-column: 2; }
+    .pl-step .n { font-size: 20px; }
+    .pl-links .link, .pl-step .go .link { display: inline-block; padding-block: 11px; margin-block: -6px; }
+    .pl-path { display: none; }
+    .pl-close .link { display: inline-block; padding-block: 11px; margin-block: -6px; }
+}
+
+/* ── motion discipline ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .pl-cell, .pl-tab, .pl-path { transition: none !important; }
+}

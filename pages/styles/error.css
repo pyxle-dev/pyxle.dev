@@ -1,0 +1,82 @@
+/* ═══ THE WORKING COPY · error — the fault, quoted ═══════════════════
+   One quiet ruled block: the running head (`!! · ERROR`, the status
+   as the folio numeral), the couplet, and the page's one dark
+   artifact — a Terminal bed quoting the honest generic line. No
+   internals are ever printed here; the framework sanitises server
+   error messages before they reach this boundary. */
+
+.er-main { min-height: calc(100vh - 65px); display: flex; }
+.er-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 56px 24px;
+    width: 100%;
+}
+.er-box { width: 100%; max-width: 620px; }
+.er-box .rulebar { margin-bottom: 46px; }
+.er-box h1 { font-size: clamp(40px, 5vw, 56px); }
+
+/* the quoted fault — Terminal bed, same apparatus as every log */
+.pane.er-term {
+    margin: 36px 0 0;
+    background: var(--term);
+    border-color: var(--term);
+}
+html.dark .pane.er-term { border-color: var(--rule2); }
+.er-term-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font: 500 10px/1 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--term-dim);
+    padding: 10px 14px 0;
+}
+.er-term-body {
+    margin: 0;
+    padding: 8px 14px 12px;
+    font: 400 12.5px/1.9 var(--mono);
+    color: var(--term-text);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.er-term-body .dim { color: var(--term-dim); }
+
+.er-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 22px;
+    margin-top: 30px;
+}
+.er-btn {
+    display: inline-block;
+    font: 500 14px/1 var(--sans);
+    color: var(--ink);
+    background: var(--sheet);
+    border: 1px solid var(--rule2);
+    border-radius: 6px;
+    padding: 11px 16px;
+    text-decoration: none;
+    transition: border-color .15s ease, background-color .15s ease;
+}
+.er-btn:hover { border-color: var(--ink); }
+.er-btn:active { background: var(--deck); }
+.er-row .link { font: 500 15px/1.4 var(--sans); }
+
+.er-note {
+    margin: 34px 0 0;
+    font: 400 12.5px/1.7 var(--mono);
+    color: var(--graphite);
+}
+
+@media (max-width: 768px) {
+    .er-btn { padding: 14px 18px; }  /* tap-target law */
+}
+@media (max-width: 480px) {
+    .er-wrap { padding: 40px 16px; }
+    .er-box .rulebar { margin-bottom: 36px; }
+}

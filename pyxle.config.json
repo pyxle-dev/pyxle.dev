@@ -15,6 +15,7 @@
   "cache": {
     "/": 60,
     "/compare": 1800,
+    "/demos": 300,
     "/benchmarks": 3600,
     "/docs/*": 1800,
     "/plugins": 1800,

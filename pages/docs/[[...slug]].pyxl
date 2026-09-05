@@ -4,9 +4,26 @@ import os
 import re
 from pathlib import Path
 
+# ═══ /docs — The Working Copy: the manual ═══════════════════════════
+# The docs are the manual of the working copy, one numbered listing
+# (lines 01..NN). `/docs` is the landing — the printed index; a
+# `/docs/<path>` article is one printed page (running head, folio
+# numeral = its line number, claim/receipt couplet). Article HTML
+# comes from the generated public/docs-data JSON and is transformed
+# HERE, server-side, into the house chrome (Sheet code panes with Deck
+# heads and the server/client badges, wrapped tables, heading
+# anchors) — so the SSR document already carries the finished article
+# and the client only hydrates behaviour on top. Body prose is
+# untouched.
+
 DOCS_DIR = Path(os.getcwd()) / "public" / "docs-data"
 
+# Caches keyed on process lifetime — docs-data is regenerated only by
+# scripts/build-docs.mjs + a redeploy (same trade the manifest cache
+# has always made).
 _manifest_cache = None
+_listing_cache = None
+_page_cache = {}
 
 
 def _read_manifest():
@@ -35,924 +52,494 @@ def _is_safe_slug(slug: str) -> bool:
     return all(part and part != ".." for part in parts)
 
 
-@server
-async def load_docs(request):
-    slug = request.path_params.get("slug", "") or "getting-started/introduction"
-    # A @server loader may return ``(payload, status_code)`` to set the HTTP
-    # status. An unknown/unsafe doc slug renders the in-page "Back to docs" 404
-    # *and* returns a real HTTP 404 (not a 200), so crawlers and link checkers
-    # see the right status.
-    if not _is_safe_slug(slug):
-        return {"version": __version__, "slug": slug, "page": None, "nav": [], "notFound": True}, 404
+def _listing():
+    """The manifest nav flattened into the numbered listing.
 
-    manifest = _read_manifest()
-    if manifest is None:
-        return {"version": __version__, "slug": slug, "page": None, "nav": []}
+    Returns ``(shelves, meta_of, total)`` where shelves are the nav
+    categories with per-item line numbers (01..NN in reading order) and
+    curated search keywords (the ⌘K palette index), and ``meta_of`` maps
+    a page path to its ``{"line", "cat"}``. Cached for the process.
+    """
+    global _listing_cache
+    if _listing_cache is None:
+        manifest = _read_manifest()
+        if manifest is None:
+            return None
+        keywords = {
+            entry["path"]: " ".join(entry.get("keywords", []))
+            for entry in manifest.get("searchIndex", [])
+        }
+        shelves = []
+        meta_of = {}
+        line = 0
+        for cat in manifest["nav"]:
+            items = []
+            for item in cat["items"]:
+                line += 1
+                meta_of[item["path"]] = {"line": line, "cat": cat["slug"]}
+                items.append({
+                    "title": item["title"],
+                    "path": item["path"],
+                    "line": line,
+                    "k": keywords.get(item["path"], ""),
+                })
+            shelves.append({"category": cat["category"], "slug": cat["slug"], "items": items})
+        _listing_cache = (shelves, meta_of, line)
+    return _listing_cache
+
+
+# ── the body transform: code frames, wrapped tables, anchors ─────────
+# It operates on the already-escaped generated HTML. Real syntax
+# highlighting lives in highlight.py (app root): Python through the
+# stdlib tokenizer, JS/JSX through a stateful scanner, JSON, and the
+# two-domain ```pyxl split — those engines take raw source, so blocks
+# they own are unescaped first and come back as finished escaped HTML.
+# The shell-and-config languages keep the quiet treatment below.
+
+_CMT_HASH = {"bash", "gitignore", "yaml", "toml", "ini", "dockerfile"}
+
+_WS_RE = re.compile(r"^[ \t]*")
+_CODE_BLOCK_RE = re.compile(
+    r'<div class="code-block" data-lang="([^"]*)">'
+    r'<pre><code(?: class="language-[^"]*")?>(.*?)</code></pre></div>',
+    re.S,
+)
+_HEADING_RE = re.compile(r'<h([23]) id="([^"]+)">(.*?)</h\1>', re.S)
+
+
+def _cm(line: str) -> str:
+    """Wrap a whole comment line in the graphite comment scope."""
+    ws = _WS_RE.match(line).group(0)
+    return f'{ws}<span class="cm">{line[len(ws):]}</span>'
+
+
+def _colorize(code: str, lang: str) -> str:
+    """Comment-only treatment for the languages highlight.py doesn't
+    own — bash keeps its printed look: graphite comments, and the frame
+    badge's green $ says how it runs."""
+    if lang not in _CMT_HASH:
+        return code
+    out = []
+    for line in code.split("\n"):
+        out.append(_cm(line) if line.lstrip(" \t").startswith("#") else line)
+    return "\n".join(out)
+
+
+def _where(lang: str) -> str:
+    """The frame-header badge: cause before effect — say WHERE code runs.
+    Ember = server, arc = client; a ```pyxl fence is the whole file and
+    says so (its halves genuinely run in both places)."""
+    if lang == "pyxl":
+        return (
+            '<span class="where"><b>server</b> <i class="sep">+</i> '
+            '<b class="cb">client</b> · one file</span>'
+        )
+    if lang == "python":
+        return '<span class="where">runs on the <b>server</b></span>'
+    if lang in ("jsx", "tsx"):
+        return '<span class="where">runs on the <b class="cb">client</b></span>'
+    if lang == "bash":
+        return '<span class="where"><b>$</b> shell</span>'
+    return '<span class="where"></span>'
+
+
+def _unescape(code: str) -> str:
+    """Reverse build-docs.mjs's renderer.code escaping (&, <, > — amp last)."""
+    return code.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+
+
+def _frame(match: re.Match) -> str:
+    # Root-module import, function-scoped per the house pattern (db.py,
+    # emails.py); Python caches it, and _page_cache means each article
+    # is transformed once per process anyway.
+    from highlight import highlight_block
+
+    lang, code = match.group(1), match.group(2)
+    label = lang or "output"
+    # A ```pyxl frame draws NOTHING at its Python/JSX boundary — the
+    # blank line renders as a plain blank line and the badge alone
+    # states one-file-ness. The boundary detection in highlight.py
+    # serves tokenization only: each half carries the exact token
+    # classes a separate ```python / ```jsx fence would emit.
+    body = highlight_block(_unescape(code), lang)
+    if body is None:
+        body = _colorize(code, lang)
+    return (
+        f'<figure class="dcode frame" data-lang="{label}">'
+        f'<figcaption class="fhd"><span class="nm">{label}</span>{_where(lang)}'
+        f'<button class="cpb" type="button" data-copy>copy</button></figcaption>'
+        f'<pre><code>{body}</code></pre></figure>'
+    )
+
+
+def _anchor(match: re.Match) -> str:
+    depth, hid, inner = match.group(1), match.group(2), match.group(3)
+    return (
+        f'<h{depth} id="{hid}">{inner}'
+        f'<a class="ha" href="#{hid}" aria-label="Link to section">#</a></h{depth}>'
+    )
+
+
+def _transform_body(html: str) -> str:
+    # Tables scroll inside their own container, never the page.
+    html = html.replace("<table>", '<div class="tw"><table>')
+    html = html.replace("</table>", "</table></div>")
+    # Code blocks → the homepage frame chrome (badge + copy button).
+    html = _CODE_BLOCK_RE.sub(_frame, html)
+    # Heading self-links.
+    html = _HEADING_RE.sub(_anchor, html)
+    return html
+
+
+def _load_page(slug: str):
+    """Load + transform one article, or ``None`` if it doesn't exist."""
+    if slug in _page_cache:
+        return _page_cache[slug]
 
     page_path = DOCS_DIR / f"{slug}.json"
     try:
         page_path = page_path.resolve(strict=False)
         page_path.relative_to(DOCS_DIR.resolve())
     except (ValueError, OSError):
-        return {"version": __version__, "slug": slug, "page": None, "nav": manifest["nav"], "notFound": True}, 404
-
-    if not page_path.exists():
-        return {"version": __version__, "slug": slug, "page": None, "nav": manifest["nav"], "notFound": True}, 404
-
-    page = json.loads(page_path.read_text())
-
-    return {"version": __version__, "slug": slug, "page": page, "nav": manifest["nav"]}
-
-
-def _bounded_levenshtein(a, b, max_dist):
-    """Levenshtein edit distance, short-circuiting once it exceeds ``max_dist``."""
-    la, lb = len(a), len(b)
-    if abs(la - lb) > max_dist:
-        return max_dist + 1
-    previous = list(range(lb + 1))
-    for i in range(1, la + 1):
-        current = [i] + [0] * lb
-        row_min = current[0]
-        ai = a[i - 1]
-        for j in range(1, lb + 1):
-            cost = 0 if ai == b[j - 1] else 1
-            current[j] = min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + cost)
-            if current[j] < row_min:
-                row_min = current[j]
-        if row_min > max_dist:
-            return max_dist + 1
-        previous = current
-    return previous[lb]
-
-
-def _word_set(blob):
-    """Distinct alphanumeric words (3+ chars) from a blob, for fuzzy matching."""
-    return set(re.findall(r"[a-z0-9]{3,}", blob))
-
-
-def _fuzzy_best_distance(term, words):
-    """Smallest edit distance from ``term`` to any word in ``words`` that is
-    within the typo threshold, or ``None`` if none qualifies.
-
-    Only applied to terms of 4+ characters (fuzzy-matching 1-3 char terms is
-    noisy). The threshold scales with length — 1 edit up to 7 chars, 2 beyond —
-    which is enough for common typos and transpositions ("comparsion" ->
-    "comparison", "instalation" -> "installation") without matching unrelated
-    words. Returning the distance lets the ranker score closer matches higher.
-    """
-    if len(term) < 4:
         return None
-    max_dist = min(2, len(term) // 4)
-    best = None
-    for word in words:
-        if abs(len(word) - len(term)) > max_dist:
-            continue
-        d = _bounded_levenshtein(term, word, max_dist)
-        if d <= max_dist and (best is None or d < best):
-            best = d
-            if best == 1:  # closest a fuzzy (non-exact) match can be
-                break
-    return best
+    if not page_path.exists():
+        return None
+
+    raw = json.loads(page_path.read_text())
+    _, meta_of, _ = _listing()
+    meta = meta_of.get(raw["path"], {})
+
+    def nav_ref(ref):
+        if not ref:
+            return None
+        ref_meta = meta_of.get(ref["path"], {})
+        return {"title": ref["title"], "path": ref["path"], "line": ref_meta.get("line")}
+
+    page = {
+        "title": raw["title"],
+        "description": raw.get("description") or "",
+        "path": raw["path"],
+        "html": _transform_body(raw["html"]),
+        "toc": raw.get("toc") or [],
+        "markdown": raw.get("markdown") or "",
+        "prev": nav_ref(raw.get("prev")),
+        "next": nav_ref(raw.get("next")),
+        "line": meta.get("line"),
+        "catSlug": meta.get("cat") or raw["path"].split("/")[0],
+    }
+    _page_cache[slug] = page
+    return page
 
 
-def _fuzzy_score(term, fields):
-    """Best field-weighted fuzzy score for ``term`` across ``(weight, words)``
-    fields, or 0 if nothing is close enough.
+@server
+async def load_docs(request):
+    slug = request.path_params.get("slug", "") or ""
+    base = {"version": __version__, "slug": slug, "shelves": [], "total": 0}
 
-    A field contributes ``weight - (distance - 1)`` when ``term`` is within the
-    typo threshold of one of its words; the highest contribution wins. All
-    fuzzy weights sit below their exact counterparts, so a correctly-spelled
-    hit always outranks a typo'd one, and a typo near a page's title/keywords
-    outranks the same typo near a mere heading mention.
-    """
-    best = 0
-    for weight, words in fields:
-        d = _fuzzy_best_distance(term, words)
-        if d is not None:
-            best = max(best, weight - (d - 1))
-    return best
+    # A @server loader may return ``(payload, status_code)``. An unknown or
+    # unsafe doc slug renders the in-page "Back to docs" 404 *and* returns a
+    # real HTTP 404, so crawlers and link checkers see the right status.
+    if not _is_safe_slug(slug):
+        return {**base, "landing": False, "page": None, "notFound": True}, 404
 
+    listing = _listing()
+    if listing is None:
+        # docs-data not generated (fresh checkout without build-docs). The
+        # landing degrades to its empty state; article URLs are honestly 404.
+        if not slug:
+            return {**base, "landing": True, "page": None}
+        return {**base, "landing": False, "page": None, "notFound": True}, 404
+    shelves, _, total = listing
+    base.update({"shelves": shelves, "total": total})
 
-def _rank_search_results(search_index, query):
-    """Score and rank docs search results for a query.
+    if not slug:
+        return {**base, "landing": True, "page": None}
 
-    Each query term must match somewhere in a candidate page (AND semantics);
-    pages are then ranked by *where* the terms matched — title and curated
-    keyword aliases weigh most, then the page's slug/path words, headings,
-    category, description, and finally the body text. Whole-query phrase
-    matches add a bonus so an exact title or alias hit floats to the top.
-
-    This is why searching "comparison" finds the page titled "Pyxle vs. other
-    frameworks": the word lives in its slug (`guides/comparison`) and its
-    curated keyword aliases, both of which are scored here.
-    """
-    terms = [t for t in query.split() if t]
-    if not terms:
-        return []
-
-    ranked = []
-    for entry in search_index:
-        title = entry["title"].lower()
-        keywords = " ".join(entry.get("keywords", [])).lower()
-        headings = [h.lower() for h in entry.get("headings", [])]
-        headings_blob = " ".join(headings)
-        category = entry.get("category", "").lower()
-        description = entry.get("description", "").lower()
-        text = entry.get("searchText", "").lower()
-        # Tokenize the slug/path so "comparison" matches "guides/comparison".
-        path_words = entry["path"].lower().replace("/", " ").replace("-", " ")
-
-        # Per-field word sets for the typo-tolerant fallback, weighted so a
-        # fuzzy hit in the title/keywords outranks one in a heading. The body is
-        # excluded on purpose — too many words to fuzzy-scan per request, and
-        # edit-distance over prose is noisy.
-        fuzzy_fields = (
-            (7, _word_set(title)),
-            (6, _word_set(keywords)),
-            (5, _word_set(path_words)),
-            (3, _word_set(headings_blob)),
-        )
-
-        score = 0
-        matched_every_term = True
-        for term in terms:
-            term_score = 0
-            if term in title:
-                term_score += 10
-            if term in keywords:
-                term_score += 9
-            if term in path_words:
-                term_score += 7
-            if term in headings_blob:
-                term_score += 5
-            if term in category:
-                term_score += 4
-            if term in description:
-                term_score += 3
-            if term in text:
-                term_score += 1
-            # Typo tolerance: if nothing matched exactly, fall back to an
-            # edit-distance match against the high-signal field words. Scored
-            # below every exact field (so correctly-spelled hits always win),
-            # and closer matches score higher (dist 1 -> 4, dist 2 -> 3) so the
-            # best-spelled candidate ranks first.
-            if term_score == 0:
-                term_score += _fuzzy_score(term, fuzzy_fields)
-            if term_score == 0:
-                matched_every_term = False
-                break
-            score += term_score
-
-        if not matched_every_term:
-            continue
-
-        # Whole-query phrase bonuses (reward exact title / alias / slug hits).
-        if query == title:
-            score += 30
-        elif title.startswith(query):
-            score += 15
-        elif query in title:
-            score += 12
-        if query in keywords:
-            score += 12
-        if query in path_words:
-            score += 8
-
-        matching_heading = next(
-            (entry["headings"][i] for i, h in enumerate(headings) if query in h),
-            None,
-        )
-        ranked.append((score, entry, matching_heading))
-
-    # Stable sort: ties fall back to documentation order.
-    ranked.sort(key=lambda item: item[0], reverse=True)
-    return [
-        {
-            "title": entry["title"],
-            "path": entry["path"],
-            "category": entry["category"],
-            "matchingHeading": matching_heading,
-        }
-        for _, entry, matching_heading in ranked[:12]
-    ]
+    page = _load_page(slug)
+    if page is None:
+        return {**base, "landing": False, "page": None, "notFound": True}, 404
+    return {**base, "landing": False, "page": page}
 
 
-@action
-async def search_docs(request):
-    from db import check_rate_limit, get_client_ip
-    from pyxle.runtime import ActionError
-
-    # 300 searches per hour per IP. With a 150ms debounce, a ~15-char query
-    # fires ~15 requests, so 300 allows ~20 search sessions per hour — plenty
-    # for power users browsing docs, but still blocks automated scraping.
-    client_ip = get_client_ip(request)
-    if not await check_rate_limit(
-        client_ip,
-        scope="search_docs",
-        max_attempts=300,
-        window_seconds=3600,
-    ):
-        raise ActionError("Too many searches — slow down a bit.", status_code=429)
-
-    body = await request.json()
-    raw_query = body.get("query")
-    if not isinstance(raw_query, str):
-        return {"results": []}
-    # Cap query length to prevent pathological substring scans across the
-    # whole manifest searchText per entry.
-    query = raw_query.lower().strip()[:200]
-    if not query:
-        return {"results": []}
-
-    manifest = _read_manifest()
-    if manifest is None:
-        return {"results": []}
-
-    return {"results": _rank_search_results(manifest["searchIndex"], query)}
-
-
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, navigate, useAction, Head } from 'pyxle/client';
-import { tokenizeBlock, HIGHLIGHT_CSS, looksLikePyxl } from '../components/code-highlighter.jsx';
+import '../styles/docs.css';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, navigate } from 'pyxle/client';
+import { PageMeta } from '../components/page-meta.jsx';
+import {
+    NN, DocsMobileBarActions, DocsRail, DocsShelves, DocsTerms, DocsToc,
+} from '../components/docs-chrome.jsx';
+import { QuickOpen } from '../components/docs-quick-open.jsx';
 import NotFoundContent from '../components/not-found-content.jsx';
 
-// Docs-specific controls injected into the shared navbar (right side). The
-// search modal and mobile sidebar both live on DocsPage, whose state these
-// buttons can't reach directly — so they signal intent via window events that
-// DocsPage listens for. This keeps a single navbar in the layout while letting
-// the docs page contribute its own actions.
-export const slots = {
-    'nav-extra': () => (
-        <>
-            <button
-                type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent('pyxle:docs-sidebar'))}
-                aria-label="Browse documentation sections"
-                title="Browse sections"
-                className="focus-ring rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:hidden"
-            >
-                Sections
-            </button>
-            <button
-                type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent('pyxle:docs-search'))}
-                aria-label="Search docs"
-                title="Search docs"
-                className="focus-ring inline-flex h-8 items-center gap-2 rounded-[3px] border border-rule bg-transparent px-3 font-mono text-[12px] text-ink2 transition-colors hover:border-accent hover:text-ink"
-            >
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                </svg>
-                <span className="hidden lg:inline">Search</span>
-                <kbd className="font-mono text-[10px] text-ink2" aria-hidden="true">/</kbd>
-            </button>
-            <a
-                href="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/docs/%5B%5B...slug%5D%5D.pyxl"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="View page source"
-                title="View this page's source"
-                className="focus-ring hidden rounded font-mono text-[13px] text-ink2 transition-colors hover:text-ink lg:inline"
-            >
-                source ↗
-            </a>
-        </>
-    ),
-};
-export const createSlots = () => slots;
+const LANDING_DESC =
+    'Pyxle documentation — every page of the manual, one listing. Getting '
+    + 'started, core concepts, guides, reference, plugins, architecture.';
 
-/* ── DocLink — prefetch on hover only, not on viewport ───── */
-/* Setting prefetch={false} disables the IntersectionObserver.           */
-/* Hover-based prefetch still fires via the global anchor hover handler. */
+const DOCS_REPO = 'https://github.com/pyxle-dev/pyxle';
 
-function DocLink(props) {
-    return <Link {...props} prefetch={false} />;
-}
-
-/* ── Search Modal ─────────────────────────────────────────── */
-
-function SearchModal({ onClose }) {
-    const [query, setQuery] = useState('');
-    const [results, setResults] = useState([]);
-    const [selectedIdx, setSelectedIdx] = useState(0);
-    const [searching, setSearching] = useState(false);
-    const [errorMsg, setErrorMsg] = useState(null);
-    const inputRef = useRef(null);
-    const search = useAction('search_docs');
-
-    useEffect(() => { inputRef.current?.focus(); }, []);
-
-    // Debounced server-side search.
-    useEffect(() => {
-        if (!query.trim()) {
-            setResults([]);
-            setSearching(false);
-            setErrorMsg(null);
-            return;
-        }
-        setSearching(true);
-        setErrorMsg(null);
-        const timeout = setTimeout(async () => {
-            const res = await search({ query: query.trim() });
-            if (res.ok) {
-                setResults(res.results || []);
-                setErrorMsg(null);
-            } else if (res.error === 'Request aborted') {
-                // useAction aborts the previous in-flight request when a new
-                // one fires — this is normal during fast typing, not an error.
-                return;
-            } else {
-                setResults([]);
-                setErrorMsg(res.error || 'Search is unavailable right now. Please try again.');
-            }
-            setSearching(false);
-        }, 150);
-        return () => clearTimeout(timeout);
-    }, [query]);
-
-    useEffect(() => { setSelectedIdx(0); }, [results.length]);
-
-    const handleKeyDown = useCallback((e) => {
-        if (e.key === 'Escape') { onClose(); return; }
-        if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIdx(i => Math.min(i + 1, results.length - 1)); }
-        if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIdx(i => Math.max(i - 1, 0)); }
-        if (e.key === 'Enter' && results[selectedIdx]) {
-            navigate(`/docs/${results[selectedIdx].path}`);
-            onClose();
-        }
-    }, [results, selectedIdx, onClose]);
-
-    return (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/60" />
-            <div
-                className="relative w-full max-w-xl overflow-hidden rounded-[6px] border border-rule bg-paper shadow-[0_2px_8px_rgba(20,25,21,0.08)]"
-                onClick={e => e.stopPropagation()}
-            >
-                <div className="flex items-center gap-3 border-b border-rule px-4 py-3">
-                    <svg className="h-4 w-4 shrink-0 text-ink2" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                    </svg>
-                    <input
-                        ref={inputRef}
-                        value={query}
-                        onChange={e => setQuery(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Search documentation..."
-                        className="flex-1 bg-transparent font-mono text-sm text-ink outline-none placeholder:text-ink2 placeholder:opacity-60"
-                    />
-                    <kbd className="rounded-[3px] border border-rule px-1.5 py-0.5 font-mono text-[10px] text-ink2">Esc</kbd>
-                </div>
-                {results.length > 0 && (
-                    <div className="max-h-80 overflow-y-auto py-2">
-                        {results.map((r, i) => (
-                            <DocLink
-                                key={r.path}
-                                href={`/docs/${r.path}`}
-                                onClick={() => onClose()}
-                                className={`flex w-full items-start gap-3 border-l-2 px-4 py-2.5 text-left transition-colors ${
-                                    i === selectedIdx
-                                        ? 'border-accent'
-                                        : 'border-transparent'
-                                }`}
-                            >
-                                <svg className="mt-0.5 h-4 w-4 shrink-0 text-ink2" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                                </svg>
-                                <div className="min-w-0">
-                                    <p className="truncate text-sm text-ink">{r.title}</p>
-                                    <p className="truncate font-mono text-[11px] text-ink2">
-                                        {r.category}{r.matchingHeading ? ` > ${r.matchingHeading}` : ''}
-                                    </p>
-                                </div>
-                            </DocLink>
-                        ))}
-                    </div>
-                )}
-                {query && results.length === 0 && searching && (
-                    <div className="flex items-center justify-center gap-2 px-4 py-8 font-mono text-sm text-ink2">
-                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        Searching...
-                    </div>
-                )}
-                {query && results.length === 0 && !searching && errorMsg && (
-                    <div className="flex items-start gap-3 px-4 py-6">
-                        <svg className="mt-0.5 h-5 w-5 shrink-0 text-press" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                        </svg>
-                        <div className="min-w-0">
-                            <p className="text-sm font-medium text-ink">
-                                {errorMsg}
-                            </p>
-                            <p className="mt-1 text-xs text-ink2">
-                                You can still browse the sidebar on the left.
-                            </p>
-                        </div>
-                    </div>
-                )}
-                {query && results.length === 0 && !searching && !errorMsg && (
-                    <div className="px-4 py-8 text-center font-mono text-sm text-ink2">
-                        No results for &ldquo;{query}&rdquo;
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
-/* ── Sidebar ──────────────────────────────────────────────── */
-
-function Sidebar({ nav, currentPath }) {
-    if (!nav) return null;
-
-    return (
-        <nav className="space-y-7">
-            {nav.map(section => (
-                <div key={section.slug}>
-                    <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">{section.category}</h3>
-                    {/* The items hang on a hairline rail; the active page is a
-                        2px accent rule set ON the rail — manuscript style. */}
-                    <ul className="mt-2.5 border-l border-rule">
-                        {section.items.map(item => {
-                            const isActive = currentPath === item.path;
-                            return (
-                                <li key={item.path}>
-                                    <DocLink
-                                        href={`/docs/${item.path}`}
-                                        className={`block py-1.5 text-[13.5px] transition-colors ${
-                                            isActive
-                                                ? '-ml-px border-l-2 border-accent pl-3 font-medium text-ink'
-                                                : 'pl-3 text-ink2 hover:text-ink'
-                                        }`}
-                                    >{item.title}</DocLink>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </div>
-            ))}
-        </nav>
-    );
-}
-
-/* ── Table of Contents ────────────────────────────────────── */
-
-function TableOfContents({ toc }) {
-    if (!toc || toc.length === 0) return null;
-
-    return (
-        <nav>
-            <h4 className="font-mono text-[11px] uppercase tracking-[0.14em] text-press">On this page</h4>
-            <div className="mt-3 border-l border-rule">
-                {toc.map((item, i) => (
-                    <a
-                        key={i}
-                        href={`#${item.slug}`}
-                        className={`block py-1 text-[13px] leading-snug text-ink2 transition-colors hover:text-ink ${
-                            item.depth === 3 ? 'pl-7' : 'pl-3'
-                        }`}
-                    >{item.text}</a>
-                ))}
-            </div>
-        </nav>
-    );
-}
-
-/* ── Code Block Enhancement (Copy + Syntax Highlighting) ──── */
-
-function useDocEnhancements(contentRef) {
-    useEffect(() => {
-        if (!contentRef.current) return;
-        const blocks = contentRef.current.querySelectorAll('.code-block');
-        blocks.forEach(block => {
-            // Skip if already processed
-            if (block.dataset.highlighted) return;
-            block.dataset.highlighted = 'true';
-
-            const codeEl = block.querySelector('code');
-            if (!codeEl) return;
-            const rawText = codeEl.textContent || '';
-
-            // Detect language from class or data attribute
-            const langClass = codeEl.className.match(/language-(\w+)/);
-            const dataLang = block.dataset.lang;
-            let lang = langClass?.[1] || dataLang || '';
-            // Map common aliases
-            if (lang === 'py') lang = 'python';
-            if (lang === 'sh') lang = 'bash';
-            if (lang === 'ts') lang = 'typescript';
-            // A .pyxl file is fenced as ```python but has a React/JSX section —
-            // highlight it with the dual Python/JSX tokenizer, not plain Python.
-            if ((lang === 'python' || lang === '') && looksLikePyxl(rawText)) lang = 'pyxl';
-
-            // Apply syntax highlighting
-            const tokenizedLines = tokenizeBlock(rawText, lang);
-            const fragment = document.createDocumentFragment();
-            tokenizedLines.forEach((lineTokens, i) => {
-                lineTokens.forEach(tok => {
-                    const span = document.createElement('span');
-                    span.className = tok.cls;
-                    span.textContent = tok.text;
-                    fragment.appendChild(span);
-                });
-                if (i < tokenizedLines.length - 1) {
-                    fragment.appendChild(document.createTextNode('\n'));
-                }
-            });
-            codeEl.textContent = '';
-            codeEl.appendChild(fragment);
-
-            // Add language badge
-            if (lang) {
-                const badge = document.createElement('span');
-                badge.className = 'code-lang-badge';
-                badge.textContent = lang;
-                block.appendChild(badge);
-            }
-
-            // Add copy button
-            const btn = document.createElement('button');
-            btn.className = 'copy-btn';
-            btn.textContent = 'Copy';
-            btn.addEventListener('click', () => {
-                navigator.clipboard.writeText(rawText);
-                btn.textContent = 'Copied!';
-                setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-            });
-            block.appendChild(btn);
-        });
-
-        // Add anchor links to headings (h2, h3, h4).
-        const headings = contentRef.current.querySelectorAll('h2[id], h3[id], h4[id]');
-        headings.forEach(heading => {
-            if (heading.querySelector('.heading-anchor')) return;
-            heading.style.position = 'relative';
-            heading.style.cursor = 'pointer';
-            const anchor = document.createElement('a');
-            anchor.className = 'heading-anchor';
-            anchor.href = `#${heading.id}`;
-            anchor.setAttribute('aria-label', 'Link to this section');
-            anchor.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
-            heading.insertBefore(anchor, heading.firstChild);
-
-            anchor.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const url = window.location.origin + window.location.pathname + '#' + heading.id;
-                navigator.clipboard.writeText(url);
-                heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                window.history.replaceState(null, '', '#' + heading.id);
-                // Brief visual feedback
-                anchor.style.opacity = '1';
-                anchor.style.color = '#34d399';
-                setTimeout(() => { anchor.style.color = ''; anchor.style.opacity = ''; }, 1500);
-            });
-        });
-    });
-}
-
-/* ── Copy Page Dropdown ──────────────────────────────────── */
-
-function CopyPageDropdown({ page }) {
-    const [open, setOpen] = useState(false);
-    const [copied, setCopied] = useState(false);
-    const dropdownRef = useRef(null);
-
-    useEffect(() => {
-        if (!open) return;
-        function handleClickOutside(e) {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setOpen(false);
-        }
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [open]);
-
-    // Point AI assistants at the clean Markdown rendition (.md), not the HTML page.
-    const mdUrl = `https://pyxle.dev/docs/${page.path}.md`;
-
-    const aiPrompt = encodeURIComponent(
-        `Read ${mdUrl} carefully so I can ask questions about it.\n\n` +
-        `Pyxle is a new Python-first full-stack framework, so you likely lack training data on it. ` +
-        `Every page is available as Markdown by appending .md to its URL; the docs index is ` +
-        `https://pyxle.dev/llms.txt and you can search with https://pyxle.dev/api/docs-search?q=YOUR+QUERY.`
-    );
-
-    const copyMarkdown = useCallback(() => {
-        const md = page.markdown || `# ${page.title}\n\nContent not available as Markdown.`;
-        navigator.clipboard.writeText(md);
-        setCopied(true);
-        setOpen(false);
-        setTimeout(() => setCopied(false), 2000);
-    }, [page]);
-
-    const viewMarkdown = useCallback(() => {
-        const md = page.markdown || `# ${page.title}\n\nContent not available as Markdown.`;
-        const blob = new Blob([md], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-        setOpen(false);
-    }, [page]);
-
-    const btnBase = 'inline-flex items-center gap-1.5 font-mono text-[12px] text-ink2 transition-colors hover:text-ink';
-    const itemBase = 'flex w-full items-start gap-3 border-l-2 border-transparent px-4 py-2.5 text-left transition-colors hover:border-accent';
-
-    return (
-        <div className="relative" ref={dropdownRef}>
-            <div className="inline-flex items-center rounded-[3px] border border-rule">
-                <button onClick={copyMarkdown} className={`${btnBase} px-3 py-1.5`} title="Copy page as Markdown">
-                    {copied ? (
-                        <svg className="h-3.5 w-3.5 text-acct" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                    ) : (
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" /></svg>
-                    )}
-                    <span className="hidden sm:inline">{copied ? 'Copied!' : 'Copy page'}</span>
-                </button>
-                <button
-                    onClick={() => setOpen(!open)}
-                    className={`${btnBase} border-l border-rule px-1.5 py-1.5`}
-                    title="More options"
-                >
-                    <svg className={`h-3.5 w-3.5 transition ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
-                </button>
-            </div>
-
-            {open && (
-                <div className="absolute right-0 top-full z-50 mt-1.5 w-64 overflow-hidden rounded-[6px] border border-rule bg-paper shadow-[0_2px_8px_rgba(20,25,21,0.08)]">
-                    <div className="py-1.5">
-                        <button onClick={copyMarkdown} className={itemBase}>
-                            <svg className="mt-0.5 h-4 w-4 shrink-0 text-ink2" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" /></svg>
-                            <div className="min-w-0">
-                                <p className="text-sm font-medium text-ink">Copy page</p>
-                                <p className="text-xs text-ink2">Copy this page as Markdown for LLMs</p>
-                            </div>
-                        </button>
-
-                        <button onClick={viewMarkdown} className={itemBase}>
-                            <svg className="mt-0.5 h-4 w-4 shrink-0 text-ink2" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v18H3V3zm2 4v10h2.5l3-3.75L13.5 17H16V7h-3v5.6L10.5 9 8 12.6V7H5z"/></svg>
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5">
-                                    <p className="text-sm font-medium text-ink">View as Markdown</p>
-                                    <svg className="h-3 w-3 text-ink2 opacity-60" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
-                                </div>
-                                <p className="text-xs text-ink2">View this page as plain text</p>
-                            </div>
-                        </button>
-
-                        <div className="my-1 border-t border-rule" />
-
-                        <a href={`https://claude.ai/new?q=${aiPrompt}`} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={`${itemBase} no-underline`}>
-                            <svg className="mt-0.5 h-4 w-4 shrink-0 text-ink2" viewBox="0 0 24 24" fill="currentColor"><path d="M4.709 15.955l4.71-10.96a1.257 1.257 0 012.326 0l4.696 10.96c.092.212.15.436.15.672 0 .942-.764 1.706-1.706 1.706a1.71 1.71 0 01-1.573-1.04L12 13.467l-1.312 3.826a1.71 1.71 0 01-1.573 1.04 1.706 1.706 0 01-1.556-2.378zm7.998-4.498L12 9.726l-.707 1.731L12 13.188l.707-1.731z"/></svg>
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5">
-                                    <p className="text-sm font-medium text-ink">Open in Claude</p>
-                                    <svg className="h-3 w-3 text-ink2 opacity-60" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
-                                </div>
-                                <p className="text-xs text-ink2">Ask questions about this page</p>
-                            </div>
-                        </a>
-
-                        <a href={`https://chatgpt.com/?q=${aiPrompt}`} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={`${itemBase} no-underline`}>
-                            <svg className="mt-0.5 h-4 w-4 shrink-0 text-ink2" viewBox="0 0 24 24" fill="currentColor"><path d="M22.282 9.821a5.985 5.985 0 00-.516-4.91 6.046 6.046 0 00-6.51-2.9A6.065 6.065 0 0011.052.5a6.046 6.046 0 00-5.788 4.22 6.046 6.046 0 00-4.033 2.929 6.046 6.046 0 00.748 7.101 5.98 5.98 0 00.51 4.911 6.051 6.051 0 006.515 2.9A5.985 5.985 0 0013.2 23.5a6.046 6.046 0 005.787-4.22 6.046 6.046 0 004.033-2.93 6.046 6.046 0 00-.738-6.529zM13.2 21.784a4.5 4.5 0 01-2.895-1.05l.144-.082 4.81-2.78a.78.78 0 00.395-.678v-6.79l2.033 1.174a.072.072 0 01.04.055v5.625a4.52 4.52 0 01-4.527 4.526zm-9.72-4.153a4.495 4.495 0 01-.54-3.025l.144.084 4.81 2.78a.78.78 0 00.79 0l5.87-3.39v2.348a.072.072 0 01-.03.062l-4.86 2.806a4.52 4.52 0 01-6.184-1.665zM2.34 7.896a4.485 4.485 0 012.36-1.974v5.73a.78.78 0 00.39.678l5.87 3.39-2.034 1.174a.072.072 0 01-.068.005L3.998 14.1a4.52 4.52 0 01-1.658-6.204zm16.776 3.905l-5.87-3.39 2.034-1.174a.072.072 0 01.068-.005l4.86 2.806a4.514 4.514 0 01-.7 8.143v-5.702a.78.78 0 00-.392-.678zm2.022-3.04l-.144-.085-4.81-2.78a.78.78 0 00-.79 0l-5.87 3.39V6.94a.072.072 0 01.03-.062l4.86-2.806a4.52 4.52 0 016.724 4.69zm-12.72 4.18L6.385 11.77a.072.072 0 01-.04-.056V6.09a4.52 4.52 0 017.42-3.47l-.143.082-4.81 2.78a.78.78 0 00-.395.678zm1.1-2.38l2.614-1.51 2.614 1.51v3.018l-2.614 1.51-2.614-1.51z"/></svg>
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5">
-                                    <p className="text-sm font-medium text-ink">Open in ChatGPT</p>
-                                    <svg className="h-3 w-3 text-ink2 opacity-60" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
-                                </div>
-                                <p className="text-xs text-ink2">Ask questions about this page</p>
-                            </div>
-                        </a>
-
-                        <div className="my-1 border-t border-rule" />
-
-                        <a href={`https://github.com/pyxle-dev/pyxle.dev/blob/main/public/docs-data/${page.path}.json`} target="_blank" rel="noreferrer" onClick={() => setOpen(false)} className={`${itemBase} no-underline`}>
-                            <svg className="mt-0.5 h-4 w-4 shrink-0 text-ink2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5">
-                                    <p className="text-sm font-medium text-ink">View source on GitHub</p>
-                                    <svg className="h-3 w-3 text-ink2 opacity-60" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
-                                </div>
-                                <p className="text-xs text-ink2">See this page's data on GitHub</p>
-                            </div>
-                        </a>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-/* ── Doc Content ──────────────────────────────────────────── */
-
-function DocContent({ page }) {
-    const contentRef = useRef(null);
-    useDocEnhancements(contentRef);
-
-    if (!page) return <div className="animate-pulse h-96" />;
-
-    return (
-        <div>
-            {/* Header */}
-            <div className="mb-10 flex items-start justify-between gap-4">
-                <h1 className="font-display text-[2.2rem] font-[550] leading-[1.1] tracking-[-0.01em] text-ink sm:text-[2.6rem]">{page.title}</h1>
-                <div className="mt-2 shrink-0">
-                    <CopyPageDropdown page={page} />
-                </div>
-            </div>
-
-            {/* Content */}
-            <div
-                ref={contentRef}
-                className="docs-content prose prose-sm max-w-none dark:prose-invert"
-                dangerouslySetInnerHTML={{ __html: page.html }}
+/* ── the mobile quick-action bar, docs edition ────────────────────
+ * Fills the layout MobileBar's `m-bar` slot: on articles ▤ index
+ * (the rail overlay) + ⌘K search; on the landing ⌘K search + a jump
+ * to line 01. Slot factories get the page props, so this is SSR'd
+ * with the right variant on both server and client. */
+export const createSlots = (props) => {
+    const data = props && props.data;
+    if (!data || data.notFound) return {};
+    const firstShelf = data.shelves && data.shelves[0];
+    const first = firstShelf && firstShelf.items && firstShelf.items[0];
+    return {
+        'm-bar': () => (
+            <DocsMobileBarActions
+                landing={Boolean(data.landing)}
+                firstPath={first ? first.path : null}
+                firstLine={first ? first.line : 1}
             />
+        ),
+    };
+};
 
-            {/* Prev / Next */}
-            {(page.prev || page.next) && (
-                <div className="mt-16 flex justify-between gap-4 border-t border-rule pt-8">
-                    {page.prev ? (
-                        <DocLink href={`/docs/${page.prev.path}`} className="focus-ring group rounded text-left">
-                            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">Previous</span>
-                            <span className="mt-1 flex items-center gap-1.5 text-sm font-medium text-ink">
-                                <svg className="h-3.5 w-3.5 text-ink2 transition group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" /></svg>
-                                {page.prev.title}
-                            </span>
-                        </DocLink>
-                    ) : <div />}
-                    {page.next ? (
-                        <DocLink href={`/docs/${page.next.path}`} className="focus-ring group rounded text-right">
-                            <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink2">Next</span>
-                            <span className="mt-1 flex items-center justify-end gap-1.5 text-sm font-medium text-ink">
-                                {page.next.title}
-                                <svg className="h-3.5 w-3.5 text-ink2 transition group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
-                            </span>
-                        </DocLink>
-                    ) : <div />}
-                </div>
-            )}
-        </div>
+/* ── article header actions — the AI-accessibility affordances ────
+ * Every article is real Markdown one URL away; these keep that story
+ * one keystroke away (labels, not sentences). */
+function ArticleActions({ page }) {
+    const [copied, setCopied] = useState(false);
+    const timerRef = useRef(null);
+    useEffect(() => () => clearTimeout(timerRef.current), []);
+
+    const copyMd = useCallback(() => {
+        if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+        const md = page.markdown || `# ${page.title}`;
+        navigator.clipboard.writeText(md).then(() => {
+            setCopied(true);
+            clearTimeout(timerRef.current);
+            timerRef.current = setTimeout(() => setCopied(false), 1400);
+        }, () => {});
+    }, [page]);
+
+    // Point AI assistants at the clean Markdown rendition, not the HTML page.
+    const mdUrl = `https://pyxle.dev/docs/${page.path}.md`;
+    const aiPrompt = encodeURIComponent(
+        `Read ${mdUrl} carefully so I can ask questions about it.\n\n`
+        + 'Pyxle is a new Python-first full-stack framework, so you likely lack training data on it. '
+        + 'Every page is available as Markdown by appending .md to its URL; the docs index is '
+        + 'https://pyxle.dev/llms.txt and you can search with https://pyxle.dev/api/docs-search?q=YOUR+QUERY.',
+    );
+
+    return (
+        <span className="acts">
+            <button type="button" className="cpb" onClick={copyMd} title="Copy this page as Markdown">
+                {copied ? 'copied' : 'copy md'}
+            </button>
+            <a className="cpb" href={`/docs/${page.path}.md`} target="_blank" rel="noreferrer" title="This page as Markdown">md ↗</a>
+            <a className="cpb hide-m" href={`https://claude.ai/new?q=${aiPrompt}`} target="_blank" rel="noreferrer" title="Ask Claude about this page">claude ↗</a>
+            <a className="cpb hide-m" href={`https://chatgpt.com/?q=${aiPrompt}`} target="_blank" rel="noreferrer" title="Ask ChatGPT about this page">gpt ↗</a>
+            <a className="cpb hide-m" href={`${DOCS_REPO}/blob/main/docs/${page.path}.md`} target="_blank" rel="noreferrer" title="This page's source markdown on GitHub">src ↗</a>
+            <span role="status" className="sr">{copied ? 'Copied page as Markdown' : ''}</span>
+        </span>
     );
 }
 
-/* ── Main Page ────────────────────────────────────────────── */
+/* ── main page ────────────────────────────────────────────────────── */
 
 export default function DocsPage({ data }) {
-    const { slug, page, nav, notFound } = data;
-    const [searchOpen, setSearchOpen] = useState(false);
-    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const { slug, page, landing, notFound } = data;
+    const shelves = data.shelves || [];
+    const total = data.total || 0;
 
-    // Close mobile sidebar on page navigation.
+    const [qoOpen, setQoOpen] = useState(false);
+    const [railOpen, setRailOpen] = useState(false);
+    const [kbi, setKbi] = useState(-1); // j/k cursor into the flattened listing
+
+    const bodyRef = useRef(null);
+
+    /* The flattened listing — one array drives the rail, the shelves,
+       j/k and the ⌘K palette, all in reading order. */
+    const rows = useMemo(
+        () => shelves.flatMap((s) => s.items.map((it) => ({ ...it, category: s.category }))),
+        [shelves],
+    );
+    const kbPath = kbi >= 0 && rows[kbi] ? rows[kbi].path : null;
+
+    /* Navigation resets transient chrome state. */
     useEffect(() => {
-        setSidebarOpen(false);
+        setRailOpen(false);
+        setKbi(-1);
     }, [slug]);
 
-    const pageTitle = notFound
-        ? '404 - Page Not Found | Pyxle Docs'
-        : (page?.title ? `${page.title} - Pyxle Docs` : 'Documentation - Pyxle Framework');
-
-    // Keyboard shortcut: / for search.
+    /* The mobile rail overlay is CSS keyed on body.rail-open (the rail
+       markup is always SSR'd); broadcast state so the m-bar slot's
+       label can follow. */
     useEffect(() => {
-        function handleKey(e) {
-            if (e.key === '/' && !e.ctrlKey && !e.metaKey && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
-                e.preventDefault();
-                setSearchOpen(true);
-            }
-        }
-        window.addEventListener('keydown', handleKey);
-        return () => window.removeEventListener('keydown', handleKey);
-    }, []);
+        document.body.classList.toggle('rail-open', railOpen);
+        window.dispatchEvent(new CustomEvent('pyxle:docs-rail', { detail: { open: railOpen } }));
+        return () => document.body.classList.remove('rail-open');
+    }, [railOpen]);
 
-    // The docs nav controls (search + sidebar toggle) live in the shared navbar
-    // via the `nav-extra` slot, which can't reach this component's state. They
-    // dispatch window events that we translate into state changes here.
+    /* Intent events from the m-bar slot (module scope can't reach here). */
     useEffect(() => {
-        const openSearch = () => setSearchOpen(true);
-        const toggleSidebar = () => setSidebarOpen(v => !v);
-        window.addEventListener('pyxle:docs-search', openSearch);
-        window.addEventListener('pyxle:docs-sidebar', toggleSidebar);
+        const toggleRail = () => setRailOpen((v) => !v);
+        const openQo = () => setQoOpen(true);
+        window.addEventListener('pyxle:docs-rail-toggle', toggleRail);
+        window.addEventListener('pyxle:docs-qo', openQo);
         return () => {
-            window.removeEventListener('pyxle:docs-search', openSearch);
-            window.removeEventListener('pyxle:docs-sidebar', toggleSidebar);
+            window.removeEventListener('pyxle:docs-rail-toggle', toggleRail);
+            window.removeEventListener('pyxle:docs-qo', openQo);
         };
     }, []);
 
+    /* Keyboard: ⌘K / ^K / "/" open the palette; j/k walk the listing,
+       enter opens the highlighted line. Arrow keys join in while the
+       mobile rail overlay is open. */
+    useEffect(() => {
+        function onKey(e) {
+            const tag = (document.activeElement && document.activeElement.tagName) || '';
+            const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(tag);
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                setQoOpen((v) => !v);
+                return;
+            }
+            if (typing || e.metaKey || e.ctrlKey || e.altKey || qoOpen || notFound) return;
+            if (e.key === '/') {
+                e.preventDefault();
+                setQoOpen(true);
+                return;
+            }
+            if (e.key === 'j' || (e.key === 'ArrowDown' && railOpen)) {
+                setKbi((i) => (i < 0
+                    ? Math.max(0, rows.findIndex((r) => r.path === slug))
+                    : Math.min(rows.length - 1, i + 1)));
+            } else if (e.key === 'k' || (e.key === 'ArrowUp' && railOpen)) {
+                setKbi((i) => (i < 0 ? 0 : Math.max(0, i - 1)));
+            } else if (e.key === 'Enter' && kbi >= 0 && rows[kbi]) {
+                navigate(`/docs/${rows[kbi].path}`);
+            }
+        }
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [qoOpen, railOpen, kbi, rows, slug, notFound]);
+
+    /* Keep the j/k cursor line in view. */
+    useEffect(() => {
+        if (kbi < 0) return;
+        const el = document.querySelector('.ri.kb');
+        if (el) el.scrollIntoView({ block: 'nearest' });
+    }, [kbi]);
+
+    /* Code-frame copy buttons live inside the SSR'd article HTML —
+       behaviour attaches by delegation after mount (the button text /
+       .did flips are outside React's tree, so hydration never sees
+       them). */
+    useEffect(() => {
+        const root = bodyRef.current;
+        if (!root) return undefined;
+        const timers = new Set();
+        const onClick = (e) => {
+            const btn = e.target.closest('[data-copy]');
+            if (!btn) return;
+            const frame = btn.closest('.dcode');
+            const pre = frame && frame.querySelector('pre');
+            if (!pre) return;
+            const done = () => {
+                btn.textContent = 'copied';
+                btn.classList.add('did');
+                const t = setTimeout(() => {
+                    btn.textContent = 'copy';
+                    btn.classList.remove('did');
+                    timers.delete(t);
+                }, 1400);
+                timers.add(t);
+            };
+            if (navigator.clipboard) navigator.clipboard.writeText(pre.textContent).then(done, done);
+            else done();
+        };
+        root.addEventListener('click', onClick);
+        return () => {
+            root.removeEventListener('click', onClick);
+            timers.forEach(clearTimeout);
+        };
+    }, [slug, landing, notFound]);
+
+    const openQo = useCallback(() => setQoOpen(true), []);
+    const closeQo = useCallback(() => setQoOpen(false), []);
+
     return (
-        <div className="min-h-screen pt-16">
-            <Head>
-                <title>{pageTitle}</title>
-                <meta name="description" content="Pyxle framework documentation. Learn to build full-stack Python + React apps." />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <meta name="theme-color" content="#101411" />
-                <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-                <meta property="og:title" content="Documentation - Pyxle Framework" />
-                <meta property="og:description" content="Pyxle framework documentation. Learn to build full-stack Python + React apps." />
-                <meta property="og:image" content="https://pyxle.dev/branding/og-default.png" />
-                <meta property="og:type" content="website" />
-                <meta name="twitter:card" content="summary_large_image" />
-                <meta name="twitter:image" content="https://pyxle.dev/branding/og-default.png" />
-            </Head>
-            {/* Mobile sidebar overlay */}
-            {sidebarOpen && (
-                <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setSidebarOpen(false)}>
-                    <div className="absolute inset-0 bg-black/40" />
-                    <div className="absolute bottom-0 left-0 top-0 w-72 overflow-y-auto border-r border-rule bg-paper p-6 pt-20" onClick={e => e.stopPropagation()}>
-                        <Sidebar nav={nav} currentPath={slug} />
-                    </div>
-                </div>
+        <div id="top" className="docs-page">
+            {notFound ? (
+                <PageMeta title="Page not found" description={LANDING_DESC} path="/docs" />
+            ) : landing ? (
+                <PageMeta title="Docs" description={LANDING_DESC} path="/docs" />
+            ) : (
+                <PageMeta
+                    title={page.title}
+                    description={page.description || LANDING_DESC}
+                    path={`/docs/${page.path}`}
+                    type="article"
+                />
             )}
 
             {notFound ? (
-                <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 64px)' }}>
+                <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 56px)' }}>
                     <NotFoundContent
                         backHref="/docs"
                         backLabel="Back to docs"
                         sourceUrl="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/components/not-found-content.jsx"
                     />
                 </div>
-            ) : (
-                <>
-                    {/* Desktop sidebar — fixed position */}
-                    <aside className="fixed bottom-0 left-0 top-16 z-30 hidden w-64 overflow-y-auto border-r border-rule bg-paper p-5 pb-12 lg:block">
-                        <Sidebar nav={nav} currentPath={slug} />
-                    </aside>
-
-                    {/* TOC — fixed position */}
-                    <aside className="fixed bottom-0 right-0 top-16 z-30 hidden w-56 overflow-y-auto border-l border-rule bg-paper p-5 pb-12 xl:block">
-                        <TableOfContents toc={page?.toc} />
-                    </aside>
-
-                    {/* Main content — offset by sidebar widths */}
-                    {/* mx-auto centers the article between the fixed rails —
-                       on wide monitors the dead space splits evenly instead of
-                       pooling on the right. */}
-                    <main className="lg:ml-64 xl:mr-56 py-10 px-6 sm:px-8 lg:px-14 pb-32">
-                        <div className="mx-auto max-w-4xl">
-                            <DocContent page={page} />
+            ) : landing ? (
+                <main className="frame">
+                    <section className="dhead">
+                        {/* the index's folio: the extent of the manual, in ghost ink */}
+                        <span className="dfolio b b-flat" aria-hidden="true">{NN(total)}</span>
+                        <p className="dtab b b-flat">Docs · {total} pages</p>
+                        <h1 className="dtitle b">The whole manual, one&nbsp;listing.</h1>
+                        <p className="receipt b" style={{ '--bd': '.1s' }}>
+                            {total} pages · {shelves.length} sections · generated from pyxle/docs
+                        </p>
+                        <div className="dhint b" style={{ '--bd': '.18s' }}>
+                            <button className="qbtn" type="button" onClick={openQo}>
+                                <span className="pr" aria-hidden="true">⌘K</span> quick open{' '}
+                                <span className="qk">or press /</span>
+                            </button>
+                            <span className="meta">j/k move · enter opens</span>
                         </div>
-                    </main>
-                </>
+                    </section>
+                    <DocsShelves shelves={shelves} kbPath={kbPath} />
+                </main>
+            ) : page && (
+                <div className="frame">
+                    <div className="dgrid">
+                        <DocsRail
+                            shelves={shelves}
+                            currentPath={page.path}
+                            kbPath={kbPath}
+                            onSearch={openQo}
+                        />
+                        <article className="art">
+                            <span className="artfolio" aria-hidden="true">{NN(page.line)}</span>
+                            <div className="crumb">
+                                <Link href="/docs">docs</Link>
+                                <span className="sl">/</span>
+                                <span>{page.catSlug}</span>
+                                <ArticleActions page={page} />
+                            </div>
+                            <h1 className="atitle">{page.title}</h1>
+                            <p className="receipt arec">
+                                docs/{page.path}.md · line {NN(page.line)} of {NN(total)}
+                            </p>
+                            <div
+                                className="body"
+                                ref={bodyRef}
+                                dangerouslySetInnerHTML={{ __html: page.html }}
+                            />
+                            <DocsTerms prev={page.prev} next={page.next} />
+                        </article>
+                        <DocsToc toc={page.toc} slug={slug} />
+                    </div>
+                </div>
             )}
 
-            {/* Search modal */}
-            {searchOpen && (
-                <SearchModal onClose={() => setSearchOpen(false)} />
-            )}
-
-            {/* Syntax highlighting + docs prose styles. Everything reads from
-                the --c-* theme tokens, so the prose follows both themes with no
-                html.dark overrides. Code blocks are dark plates in both themes
-                (fixed plate-chrome colors mirroring .duotone in tailwind.css). */}
-            <style dangerouslySetInnerHTML={{ __html: `
-                ${HIGHLIGHT_CSS}
-                .heading-anchor { opacity: 0; display: inline-flex; align-items: center; margin-right: 0.4rem; vertical-align: middle; transition: opacity 0.15s, color 0.15s; color: var(--c-ink2); }
-                h2:hover .heading-anchor, h3:hover .heading-anchor, h4:hover .heading-anchor { opacity: 1; }
-                .heading-anchor:hover { color: var(--c-accent) !important; opacity: 1 !important; }
-                .code-lang-badge { position: absolute; top: 0.6rem; left: 0.9rem; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8A9086; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; pointer-events: none; }
-
-                .docs-content { font-size: 0.9375rem; }
-                .docs-content h2[id], .docs-content h3[id], .docs-content h4[id] { scroll-margin-top: 88px; }
-                .docs-content h2 { font-family: 'Fraunces Variable', FrauncesFallback, Georgia, serif; font-size: 1.55rem; font-weight: 540; letter-spacing: -0.01em; margin-top: 2.75rem; margin-bottom: 0.85rem; padding-bottom: 0.55rem; color: var(--c-ink); border-bottom: 1px solid var(--c-rule); }
-                .docs-content h3 { font-size: 1.18rem; font-weight: 600; letter-spacing: -0.01em; margin-top: 2.1rem; margin-bottom: 0.55rem; color: var(--c-ink); }
-                .docs-content h4 { font-size: 1rem; font-weight: 600; margin-top: 1.6rem; margin-bottom: 0.5rem; color: var(--c-ink); }
-                .docs-content p { margin-bottom: 1rem; line-height: 1.75; color: var(--c-ink2); }
-                .docs-content a { color: var(--c-accent-text); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
-                .docs-content a:hover { text-decoration-thickness: 2px; }
-                .docs-content h2 a, .docs-content h3 a, .docs-content h4 a { color: inherit; }
-                .docs-content ul, .docs-content ol { margin-bottom: 1rem; margin-left: 0; padding-left: 1.4rem; color: var(--c-ink2); }
-                .docs-content li { margin-bottom: 0.35rem; line-height: 1.75; }
-                .docs-content li::marker { color: var(--c-accent); }
-                .docs-content li > ul, .docs-content li > ol { margin-top: 0.35rem; margin-bottom: 0; }
-                .docs-content code:not(pre code) { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.82em; padding: 0.15em 0.42em; border-radius: 4px; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.18); color: var(--c-accent-text); }
-                .docs-content code::before, .docs-content code::after { content: none; }  /* kill prose's literal backticks */
-                .docs-content .code-block { position: relative; margin-bottom: 1.25rem; border-radius: 10px; overflow: hidden; border: 1px solid var(--c-plate-border); background: #0b0b0d; }
-                .docs-content .code-block pre { margin: 0; padding: 2rem 1.25rem 1rem; overflow-x: auto; }
-                .docs-content .code-block code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.8rem; line-height: 1.7; color: #CDD3C9; background: none; border: none; padding: 0; border-radius: 0; }
-                .docs-content .code-block .copy-btn { position: absolute; top: 0.55rem; right: 0.7rem; padding: 0.25rem 0.4rem; border: none; background: transparent; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: #8A9086; cursor: pointer; transition: color 0.15s; }
-                .docs-content .code-block .copy-btn:hover { color: #EDEFE8; }
-
-                /* Doc code blocks print duotone-plus — emerald structure,
-                   ochre literals, bright names, receding punctuation
-                   (mirrors .duotone in tailwind.css; the plate is dark in
-                   both themes). */
-                .docs-content .code-block code, .docs-content .code-block .sh-pl,
-                .docs-content .code-block .sh-attr, .docs-content .code-block .sh-prop { color: #C6CCC2; }
-                .docs-content .code-block .sh-kw, .docs-content .code-block .sh-cmd { color: #34D399; }
-                .docs-content .code-block .sh-dec { color: #6EE7B7; }
-                .docs-content .code-block .sh-cmt { color: #8A9086; font-style: italic; }
-                .docs-content .code-block .sh-str, .docs-content .code-block .sh-num, .docs-content .code-block .sh-flg { color: #CFA265; }
-                .docs-content .code-block .sh-fn, .docs-content .code-block .sh-comp, .docs-content .code-block .sh-elem { color: #F1EFE6; }
-                .docs-content .code-block .sh-brc, .docs-content .code-block .sh-tag { color: #878D83; }
-
-                .docs-content table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; margin-bottom: 1.25rem; border-collapse: collapse; font-size: 0.875rem; }
-                .docs-content th { text-align: left; padding: 0.6rem 0.75rem; font-weight: 600; color: var(--c-ink); border-bottom: 2px solid var(--c-rule); }
-                .docs-content td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--c-rule); color: var(--c-ink2); }
-                .docs-content blockquote { border-left: 2px solid var(--c-accent); padding: 0.75rem 1rem; margin: 1rem 0; background: rgba(16,185,129,0.05); }
-                .docs-content blockquote p { margin-bottom: 0; }
-                .docs-content strong { color: var(--c-ink); font-weight: 650; }
-                .docs-content hr { border: none; border-top: 1px solid var(--c-rule); margin: 2.25rem 0; }
-            `}} />
+            <QuickOpen open={qoOpen} onClose={closeQo} rows={rows} />
         </div>
     );
 }
