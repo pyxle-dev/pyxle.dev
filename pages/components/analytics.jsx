@@ -60,6 +60,19 @@ function load() {
                     // UX insight.
                     maskAllInputs: true,
                     maskTextSelector: '[data-private]',
+                    // Attribute hygiene without breaking the replay: strip
+                    // query strings from recorded hrefs (unsubscribe links
+                    // carry signed tokens). Everything else — class, style —
+                    // must reach the recorder untouched: the whole design is
+                    // class-driven CSS, and masking those renders replays as
+                    // blank pages.
+                    maskAttributeFn: (key, value) => {
+                        if (key === 'href' && typeof value === 'string') {
+                            const q = value.indexOf('?');
+                            if (q !== -1) return value.slice(0, q) + '?…';
+                        }
+                        return value;
+                    },
                 },
                 // Autocapture is on despite the noise, because it is the only
                 // part of this that works *retroactively*: a funnel defined next
@@ -71,10 +84,13 @@ function load() {
                 // Real-user LCP/CLS/INP — better evidence than a synthetic
                 // Lighthouse run, and this site is built around that score.
                 capture_performance: { web_vitals: true },
-                // Autocapture records which element was clicked. Attributes can
-                // carry ids and query strings, so they are masked; visible text
+                // Autocapture records which element was clicked; visible text
                 // is kept, because "which button" is the entire point.
-                mask_all_element_attributes: true,
+                // mask_all_element_attributes stays OFF: it masks class and
+                // style too, which starved session replays of every CSS hook
+                // and rendered whole pages blank. Sensitive attribute values
+                // are handled surgically by maskAttributeFn above.
+                mask_all_element_attributes: false,
                 mask_all_text: false,
             });
             if (import.meta.env && import.meta.env.DEV) {
