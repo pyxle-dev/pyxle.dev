@@ -75,7 +75,16 @@ const BOOT = `(function(){try{`
     + `if(t==='dark'){var m=document.querySelector('meta[name="theme-color"]');`
     + `if(m)m.setAttribute('content','#20231D');}`
     + `}catch(e){document.documentElement.classList.add('light');`
-    + `document.documentElement.classList.add('js');}})();`;
+    + `document.documentElement.classList.add('js');}`
+    /* Boot COMMIT: the load-time reveals live as completed CSS
+       animations (fill-mode: forwards), which never write to the DOM —
+       a paused replayer (session replay freezes animation-play-state)
+       is left staring at their opacity-0 base and shows a blank page.
+       Once every boot animation has had time to finish, stamp `booted`
+       so the stylesheet's html.booted rules pin the final frames as
+       plain styles. Visually a no-op for live visitors. */
+    + `setTimeout(function(){document.documentElement.classList.add('booted');},3000);`
+    + `})();`;
 
 /** The theme hook — state + toggle + persistence live in
  *  components/theme.jsx; this re-export keeps the original app's

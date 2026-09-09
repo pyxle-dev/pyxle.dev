@@ -626,6 +626,10 @@ html.dark .pane-log { border-color: var(--rule2); }  /* the quote reads by appar
 .js .seen .bar { transform: scaleX(0); animation: barin .7s var(--ease) forwards; }
 .js .seen .bar-k { animation-delay: .15s; }
 @keyframes barin { to { transform: scaleX(1); } }
+/* settled commit (replay-safe): once the section's reveal has run, the
+   bar's final frame is pinned as plain style — see kit.jsx useSeen. */
+html.js [data-settled] .bar { transform: scaleX(1); animation: none; }
+html.js [data-settled] .pip-pyxle, html.js [data-settled] .pip-conv { animation: none; opacity: 0; }
 
 /* ============================ 05 · DEMOS ============================ */
 .demos {

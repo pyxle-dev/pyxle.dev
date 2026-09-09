@@ -26,23 +26,38 @@ export function useSeen({ rootMargin = '0px 0px -12% 0px', threshold = 0.05, imm
     const ref = useRef(null);
     const [seen, setSeen] = useState(false);
     useEffect(() => {
-        if (immediate) { setSeen(true); return undefined; }
         const el = ref.current;
+        /* Once the reveal animations have run, commit the fact to the
+           DOM: forwards-fill animations leave no attribute trace, so a
+           paused animation clock (session-replay reconstruction) shows
+           their opacity-0 base state. `data-settled` lets the stylesheet
+           pin the final frames as plain style. Set via the node, not
+           React state — an unmanaged attribute survives re-renders and
+           records as an ordinary mutation. */
+        let settleTimer = null;
+        const settle = () => {
+            settleTimer = setTimeout(() => {
+                if (ref.current) ref.current.setAttribute('data-settled', '');
+            }, 1600);
+        };
+        if (immediate) { setSeen(true); settle(); return () => clearTimeout(settleTimer); }
         if (!el || typeof IntersectionObserver === 'undefined'
             || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             setSeen(true);
-            return undefined;
+            settle();
+            return () => clearTimeout(settleTimer);
         }
         const io = new IntersectionObserver((entries) => {
             entries.forEach((en) => {
                 if (en.isIntersecting) {
                     setSeen(true);
+                    settle();
                     io.disconnect();
                 }
             });
         }, { rootMargin, threshold });
         io.observe(el);
-        return () => io.disconnect();
+        return () => { io.disconnect(); clearTimeout(settleTimer); };
     }, [immediate, rootMargin, threshold]);
     return [ref, seen];
 }

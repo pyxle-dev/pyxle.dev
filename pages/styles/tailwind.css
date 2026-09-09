@@ -508,6 +508,19 @@ html:not(.js) .tgl { display: none; }
 .js .pane-specimen .row { opacity: 0; animation: rowin .18s ease-out forwards; animation-delay: var(--rd, .35s); }
 @keyframes rowin { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: none; } }
 
+/* ── 8b · boot COMMIT (replay-safe) ────────────────────────────────
+   The boot reveals above exist only as completed forwards-fill
+   animations; a paused animation clock (session-replay reconstruction,
+   for one) leaves their opacity-0 base state on screen. `booted` is
+   stamped on <html> by the layout's boot script once every load-time
+   animation has finished: these rules commit the final frames as
+   plain, animation-free style. Identical pixels for live visitors. */
+html.booted .b, html.booted .b-flat { opacity: 1; transform: none; animation: none; }
+html.booted .b-stamp { opacity: 1; transform: rotate(-2.5deg) scale(1); animation: none; }
+html.booted .emph-rule { transform: scaleX(1); animation: none; }
+html.booted .stance .emph-rule { transform: none; }
+html.booted .pane-specimen .row { opacity: 1; transform: none; animation: none; }
+
 /* ── 9 · REVEAL — apparatus stamps in on scroll ────────────────────
    One quick pass per section; rules draw, tabs and folios stamp,
    content rises 14px. All gated on .js + .seen (useSeen, kit.jsx). */
