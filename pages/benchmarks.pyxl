@@ -1,3 +1,7 @@
+# Loaderless page: the ISR CACHE directive mirrors the 3600s the edge cache
+# (pyxle.config.json) already serves this page for.
+CACHE = {"revalidate": 3600}
+
 import './styles/benchmarks.css';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'pyxle/client';
@@ -176,12 +180,12 @@ function Hero() {
             <div className="frame">
                 <Rulebar hero tab="Benchmarks · The datasheet" />
                 <div className="bm-hero-head">
-                    <h1 className="b" style={{ '--bd': '.05s' }}>Numbers we can defend.</h1>
+                    <h1>Numbers we can defend.</h1>
                     <Receipt className="b" style={{ '--bd': '.16s' }}>
                         every figure below carries its own test conditions · measured July 2026
                         on Pyxle 0.7.1 · not re-measured for the 0.9 line
                     </Receipt>
-                    <nav className="bm-contents b" style={{ '--bd': '.28s' }} aria-label="Findings">
+                    <nav className="bm-contents" aria-label="Findings">
                         {TOC.map(([href, n, v, l]) => (
                             <a key={n} className="bm-toc" href={href}>
                                 <span className="n">{n}</span>
@@ -255,7 +259,11 @@ function FieldSection() {
                 </div>
                 <div className="rv" style={{ '--rvd': '.08s' }}>
                     <Plate tag="FIG 02 · identical endpoints, side by side">
-                        <div className="bm-tabs" role="tablist" aria-label="Endpoint">
+                        {/* role="group", not "tablist": these are aria-pressed
+                           toggle buttons, and a tablist may only contain tabs
+                           (axe aria-required-children) — the two sibling
+                           switchers below already use "group" */}
+                        <div className="bm-tabs" role="group" aria-label="Endpoint">
                             {Object.entries(EP).map(([key, t]) => (
                                 <button key={key} type="button" className="bm-tab" aria-pressed={ep === key} onClick={() => setEp(key)}>
                                     {t.label}

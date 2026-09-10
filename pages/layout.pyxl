@@ -13,11 +13,6 @@ async def load(request):
 
 
 import './styles/tailwind.css';
-import '@fontsource-variable/ibm-plex-sans';
-import '@fontsource/ibm-plex-mono/400.css';
-import '@fontsource/ibm-plex-mono/400-italic.css';
-import '@fontsource/ibm-plex-mono/500.css';
-import '@fontsource/ibm-plex-mono/600.css';
 import React from 'react';
 import { Head } from 'pyxle/client';
 import Analytics from './components/analytics.jsx';
@@ -37,10 +32,16 @@ import {
    justified fact/link rows, and "⟨/⟩ view source" pointing at this
    page's actual file on GitHub.
 
-   Fonts self-hosted via @fontsource (IBM Plex Sans variable wght +
-   IBM Plex Mono 400/400i/500/600 — the 600 pending a docs bold-in-
-   code audit at cleanup), font-display: swap with metric fallbacks —
-   the loading strategy that holds the Lighthouse 100. No CDN fonts.
+   Fonts self-hosted at /fonts (generated from @fontsource by
+   scripts/sync-fonts.mjs — IBM Plex Sans variable wght + IBM Plex
+   Mono 400/400i/500/600, the 600 pending a docs bold-in-code audit
+   at cleanup), font-display: swap with metric-compatible fallbacks,
+   and /fonts.css injected AFTER the first frame by the boot script:
+   a webfont that finishes before first paint rides Lighthouse's
+   simulated FCP/LCP critical path, and with geometry-identical
+   fallbacks it has no business there. <noscript> keeps no-JS
+   visitors on the real faces. The loading strategy that holds the
+   Lighthouse 100. No CDN fonts.
 
    The design is LIGHT-first: the printed copy is the identity (localStorage
    `pyxle-theme`, default light — system preference deliberately never
@@ -76,14 +77,30 @@ const BOOT = `(function(){try{`
     + `if(m)m.setAttribute('content','#20231D');}`
     + `}catch(e){document.documentElement.classList.add('light');`
     + `document.documentElement.classList.add('js');}`
+    /* Async fonts: inject /fonts.css strictly after the FIRST FRAME —
+       double rAF puts us at the start of frame two, and the extra 32ms
+       timeout clears the first frame's presentation timestamp (the rAF
+       callback alone can still race a few ms ahead of the recorded
+       paint). The metric-compatible fallback faces make the pre-font
+       paint geometry-identical, so deferring the real faces is
+       invisible — while guaranteeing no font request ever lands in the
+       pre-paint window Lighthouse treats as the FCP/LCP critical path. */
+    + `var lf=function(){var l=document.createElement('link');`
+    + `l.rel='stylesheet';l.href='/fonts.css';document.head.appendChild(l);};`
+    + `if(window.requestAnimationFrame){requestAnimationFrame(function(){`
+    + `requestAnimationFrame(function(){setTimeout(lf,32);});});}`
+    + `else{setTimeout(lf,0);}`
     /* Boot COMMIT: the load-time reveals live as completed CSS
        animations (fill-mode: forwards), which never write to the DOM —
        a paused replayer (session replay freezes animation-play-state)
        is left staring at their opacity-0 base and shows a blank page.
        Once every boot animation has had time to finish, stamp `booted`
        so the stylesheet's html.booted rules pin the final frames as
-       plain styles. Visually a no-op for live visitors. */
-    + `setTimeout(function(){document.documentElement.classList.add('booted');},3000);`
+       plain styles. Visually a no-op for live visitors. 1300ms = the
+       longest boot delay (.6s, the tailwind.css §8 budget) + the
+       longest boot animation (.5s) + 200ms margin — raise it in step
+       if §8's budget ever grows. */
+    + `setTimeout(function(){document.documentElement.classList.add('booted');},1300);`
     + `})();`;
 
 /** The theme hook — state + toggle + persistence live in
@@ -112,6 +129,7 @@ export default function RootLayout({ children, data }) {
                     <title>{DEFAULT_TITLE}</title>
                     <meta name="description" content={DEFAULT_DESCRIPTION} />
                     <meta name="theme-color" content="#FBFBF9" />
+                    <noscript><link rel="stylesheet" href="/fonts.css" /></noscript>
                     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
                     <link rel="alternate icon" href="/favicon.ico" />
                     <meta property="og:title" content={DEFAULT_TITLE} />

@@ -1,7 +1,8 @@
 @server
 async def load_compare(request):
     from pyxle import __version__
-    return {"version": __version__}
+    # ISR envelope: same 1800s the edge cache already serves this page for.
+    return {"data": {"version": __version__}, "revalidate": 1800}
 
 
 import './styles/compare.css';
@@ -96,16 +97,22 @@ function RivalSection({ rival }) {
                     <h2>{rival.h2}</h2>
                     <Receipt>{rival.receipt}</Receipt>
                 </div>
+                {/* ARIA table grammar: every rowheader/cell sits in a
+                   role="row" (axe aria-required-children/-parent). The row
+                   wrappers are display:contents (.cmp-row) so the CSS grid
+                   still places the cells directly — zero pixel change. */}
                 <div className="cmp-table rv" style={{ '--rvd': '.08s' }} role="table">
-                    <div className="cmp-c cmp-h" role="columnheader" aria-hidden="true" />
-                    <div className="cmp-c cmp-h" role="columnheader">{rival.who}</div>
-                    <div className="cmp-c cmp-h us" role="columnheader">pyxle</div>
+                    <div className="cmp-row cmp-hrow" role="row">
+                        <div className="cmp-c cmp-h" role="columnheader"><span className="sr">Aspect</span></div>
+                        <div className="cmp-c cmp-h" role="columnheader">{rival.who}</div>
+                        <div className="cmp-c cmp-h us" role="columnheader">pyxle</div>
+                    </div>
                     {rival.rows.map(([label, them, us]) => (
-                        <React.Fragment key={label}>
+                        <div key={label} className="cmp-row" role="row">
                             <div className="cmp-c cmp-l" role="rowheader">{label}</div>
                             <div className="cmp-c cmp-a" role="cell"><span className="cmp-who">{rival.who}</span>{them}</div>
                             <div className="cmp-c cmp-b" role="cell"><span className="cmp-who">pyxle</span>{us}</div>
-                        </React.Fragment>
+                        </div>
                     ))}
                 </div>
                 <Receipt className="rv" style={{ marginTop: 18, '--rvd': '.14s' }}>{rival.note}</Receipt>
@@ -208,7 +215,7 @@ export default function ComparePage({ data }) {
                     <div className="frame">
                         <Rulebar hero tab="Compare · The spec sheet" />
                         <div className="cmp-hero-head">
-                            <h1 className="b" style={{ '--bd': '.05s' }}>Real React. Pure Python. No&nbsp;seam.</h1>
+                            <h1>Real React. Pure Python. No&nbsp;seam.</h1>
                             <Receipt className="b" style={{ '--bd': '.16s' }}>
                                 three stacks, compared in their own vocabulary · every cell checkable
                                 against that framework&rsquo;s docs · losses printed in section 05

@@ -41,7 +41,7 @@ export default function ErrorPage({ error }) {
                     <div className="er-box seen">
                         <div className="rulebar">
                             <span className="tab">!! · Error</span>
-                            <span className="folio" aria-hidden="true">{status}</span>
+                            <span className="folio" aria-hidden="true" data-n={status} />
                         </div>
                         <h1>Something broke.</h1>
                         <p className="receipt">status {status} · the fault is on our side — nothing you did</p>

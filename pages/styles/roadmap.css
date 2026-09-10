@@ -9,8 +9,6 @@
    Page-owned classes are rm-*.
    ═══════════════════════════════════════════════════════════════════ */
 
-.rulebar-hero { border-top: none; height: 0; }
-.rulebar-hero .tab { top: -8px; }
 
 /* ── cadence ────────────────────────────────────────────────────── */
 .rm-hero { padding-top: 0; padding-bottom: 72px; }

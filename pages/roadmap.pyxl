@@ -1,7 +1,8 @@
 @server
 async def load_roadmap(request):
     from pyxle import __version__
-    return {"version": __version__}
+    # ISR envelope: same 1800s the edge cache already serves this page for.
+    return {"data": {"version": __version__}, "revalidate": 1800}
 
 
 import './styles/roadmap.css';
@@ -196,7 +197,7 @@ export default function RoadmapPage({ data }) {
                     <div className="frame">
                         <Rulebar hero tab="Roadmap · The ledger" />
                         <div className="rm-hero-head">
-                            <h1 className="b" style={{ '--bd': '.05s' }}>Every shipped line cites its release.</h1>
+                            <h1>Every shipped line cites its release.</h1>
                             <Receipt className="b" style={{ '--bd': '.16s' }}>
                                 0.1 → 0.9 in under five months · ahead is undated on purpose ·
                                 the detail lives in the <Link className="link" href="/docs/changelog">changelog</Link>

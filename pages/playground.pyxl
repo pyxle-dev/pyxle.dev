@@ -375,7 +375,7 @@ function SandboxSection() {
             <div className="frame">
                 <Rulebar hero tab="01 · Sandbox" href="#sandbox" />
                 <div className="pg-head">
-                    <h1 className="b" style={{ '--bd': '.05s' }}>The working copy, powered&nbsp;on.</h1>
+                    <h1>The working copy, powered&nbsp;on.</h1>
                     <Receipt className="b" style={{ '--bd': '.2s' }}>
                         edit the file below — the actual Pyxle parser and real CPython re-run it in this tab
                     </Receipt>
@@ -404,7 +404,7 @@ function SandboxSection() {
                 </div>
 
                 {/* the bench — machinery intact, restyled shell */}
-                <div className="pane pane-bench b b-flat" style={{ '--bd': '.5s' }}>
+                <div className="pane pane-bench">
                     <LivePlayground
                         initialSource={ex.source}
                         fileLabel={ex.file}
@@ -415,7 +415,7 @@ function SandboxSection() {
                 </div>
 
                 {/* the quoted log — every real engine event, and nothing else */}
-                <div className="pane pane-log pg-log b b-flat" style={{ '--bd': '.62s' }}>
+                <div className="pane pane-log pg-log b b-flat" style={{ '--bd': '.55s' }}>
                     <div className="log-head">
                         <span>sandbox log · boots, runs, errors</span>
                         <span className="log-up">{engineState}</span>
@@ -429,7 +429,7 @@ function SandboxSection() {
                     </div>
                 </div>
 
-                <p className="pg-iso b b-flat" style={{ '--bd': '.7s' }}>
+                <p className="pg-iso b b-flat" style={{ '--bd': '.6s' }}>
                     sandboxed iframe · opaque origin · no cookies, no page DOM — in a real app the
                     Python half runs server-side on Starlette; here CPython stands in for the server
                 </p>

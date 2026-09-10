@@ -10,8 +10,6 @@
    diegetic. Page-owned classes are dm-*.
    ═══════════════════════════════════════════════════════════════════ */
 
-.rulebar-hero { border-top: none; height: 0; }
-.rulebar-hero .tab { top: -8px; }
 
 /* ── cadence ────────────────────────────────────────────────────── */
 .dm-hero { padding-top: 0; padding-bottom: 72px; }

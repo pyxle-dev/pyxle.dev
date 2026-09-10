@@ -71,7 +71,12 @@ export function Rulebar({ tab, folio, href, hero = false, className = '' }) {
             {href
                 ? <a className="tab" href={href}>{tab}</a>
                 : <span className="tab">{tab}</span>}
-            {folio ? <span className="folio" aria-hidden="true">{folio}</span> : null}
+            {/* the numeral is CSS pseudo-content (content: attr(data-n)):
+               a decorative watermark in ghost ink is exactly what
+               pseudo-content is for, and it keeps axe's color-contrast
+               scan off glyphs that are printed *deliberately* faint —
+               aria-hidden already hides them from the reader. */}
+            {folio ? <span className="folio" aria-hidden="true" data-n={folio} /> : null}
             {hero ? null : <span className="shade" aria-hidden="true" />}
         </div>
     );

@@ -18,8 +18,6 @@
 .sec-start    .rulebar { margin-bottom: 164px; } .sec-start    { padding-bottom: 96px; }
 
 /* the hero borrows the header hairline as its rule */
-.rulebar-hero { border-top: none; height: 0; }
-.rulebar-hero .tab { top: -8px; }
 
 /* ============================ 01 · HERO =========================== */
 .hero-head { position: relative; margin-top: 72px; margin-bottom: 44px; }
@@ -321,12 +319,18 @@
 }
 .gb-clear:hover { color: var(--ink); text-decoration-color: var(--ink); }
 
-/* ---- the quoted log (first dark artifact) ---- */
-.pane-log {
+/* ---- the quoted log (first dark artifact) ----
+   `.pane.pane-log`, not `.pane-log`: this page's CSS chunk loads BEFORE
+   the shared layout chunk, so at equal specificity the layout's
+   `.pane { background: var(--sheet) }` was winning and quietly bleaching
+   the quoted-terminal bed to white — leaving --term-* inks near-invisible
+   (contrast 1.3–3.1). Doubling up wins the cascade regardless of chunk
+   order; playground.css already does exactly this for the same pane. */
+.pane.pane-log {
     background: var(--term);
     border-color: var(--term);
 }
-html.dark .pane-log { border-color: var(--rule2); }  /* the quote reads by apparatus, not luminance */
+html.dark .pane.pane-log { border-color: var(--rule2); }  /* the quote reads by apparatus, not luminance */
 .log-head {
     display: flex;
     justify-content: space-between;

@@ -21,6 +21,12 @@
     "/plugins": 1800,
     "/roadmap": 1800
   },
+  "assets": {
+    "inlineStylesheets": "always",
+    "publicMaxAge": 604800,
+    "modulePreload": false,
+    "hydration": "after-paint"
+  },
   "csrf": {
     "exemptPaths": [
       "/api/__actions/",

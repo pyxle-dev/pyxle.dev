@@ -46,17 +46,53 @@
     /* Metric-compatible local fallbacks so the webfont swap causes no
        CLS. Fonts are self-hosted via @fontsource (imported in
        layout.pyxl), font-display: swap — the strategy that holds the
-       Lighthouse 100. Plex Sans runs narrower than Arial, hence the
-       size-adjust. */
+       Lighthouse 100.
+
+       The overrides are COMPUTED from the real font tables (fontTools
+       over the shipped woff2 + Liberation faces, which are the
+       metric-aliases Arial/monospace resolve to on Linux), using the
+       standard fallback formula (size-adjust = targetAvg/fallbackAvg
+       over a–z+space; each vertical override = targetMetric/em ÷
+       size-adjust):
+         IBM Plex Sans   upm 1000 · asc 1025 · desc 275 · gap 0 · avg .4950
+         Arial/Liberation upm 2048 · asc 1854 · desc 434 · gap 67 · avg .4817
+         IBM Plex Mono   fixed advance .600 = Liberation Mono's .6001
+       Plex Sans runs WIDER than Arial (.495 vs .482/em — the old
+       hand-tuned 96.5% shrank the fallback the wrong way and left a
+       ~0.05 font-swap CLS); with these values the swap is
+       geometry-neutral: identical advances, line boxes and wraps. */
     @font-face {
         font-family: 'PlexSansFallback';
-        src: local('Arial'), local('Helvetica Neue');
-        size-adjust: 96.5%;
+        font-weight: 100 500;
+        src: local('Arial'), local('Liberation Sans'), local('Helvetica Neue');
+        size-adjust: 102.76%;
+        ascent-override: 99.75%;
+        descent-override: 26.76%;
+        line-gap-override: 0%;
+    }
+    /* Bold gets its own face: a single all-weights fallback face makes the
+       browser SYNTHESIZE bold from regular-width advances, and Plex Sans
+       bold runs ~2.8% wider than that — measured as a one-line h1 wrap flip
+       (47px CLS) on /plugins. Real local bold + its own size-adjust
+       (browser-measured: Plex700/Arial700 = 98.14%, Plex600/ArialBold =
+       97.31% → 97.8% splits the difference) keeps headline wraps stable
+       through the swap. */
+    @font-face {
+        font-family: 'PlexSansFallback';
+        font-weight: 600 900;
+        src: local('Arial Bold'), local('Liberation Sans Bold'), local('Helvetica Neue Bold');
+        size-adjust: 97.8%;
+        ascent-override: 104.81%;
+        descent-override: 28.12%;
+        line-gap-override: 0%;
     }
     @font-face {
         font-family: 'PlexMonoFallback';
         src: local('Menlo'), local('Consolas'), local('Liberation Mono');
         size-adjust: 100%;
+        ascent-override: 102.5%;
+        descent-override: 27.5%;
+        line-gap-override: 0%;
     }
 
     /* ── 0 · tokens — light (the design prototype's :root values) ── */
@@ -69,7 +105,11 @@
         --rule2: #C9CCC5;     /* section-divider rules */
         --ink: #151713;       /* text — 17.42:1 on bond */
         --graphite: #5D625A;  /* secondary text — 6.03:1 */
-        --faint: #9AA096;     /* line numbers, disabled — never body text */
+        --faint: #6B7168;     /* line numbers, disabled — never body text.
+                                 AA-checked at 12–13px (needs 4.5:1): 5.02 on
+                                 Sheet · 4.84 on Bond · 4.55 on Deck — the
+                                 same grey-green hue at 60% ink instead of
+                                 40% (the old #9AA096 sat at 2.4–2.7). */
         --green: #087443;     /* Run Green — code that runs. 5.65:1 */
         --green-down: #066037;   /* Install hover */
         --green-press: #054D2C;  /* Install active */
@@ -114,7 +154,9 @@
         --rule2: #4C5246;
         --ink: #E7EAE0;
         --graphite: #A9B1A0;
-        --faint: #798171;
+        --faint: #8E9684;   /* AA-checked like the light side: 5.07 on Sheet ·
+                               5.54 on Bond · 4.69 on Deck (was #798171 at
+                               3.6–4.2 — under the house every-pair-AA law) */
         --green: #55BD82;
         --green-down: #63C78F;
         --green-press: #4FAF78;
@@ -242,6 +284,15 @@ h2 {
    the document's running heads: you always know which part of the
    file you're in. */
 .rulebar { position: relative; border-top: 1px solid var(--rule2); }
+/* the hero variant drops the rule — it borrows the header's hairline.
+   Shared here (kit.jsx owns <Rulebar hero>), and at .rulebar.rulebar-hero
+   specificity ON PURPOSE: page sheets and this sheet load in
+   manifest order and prefetched pages inject their sheets later, so an
+   equal-specificity override is decided by arrival order — measured as a
+   37-44px margin-collapse flip (CLS 0.05) when a late sheet re-decided
+   the hero border. Doubling up wins the cascade deterministically. */
+.rulebar.rulebar-hero { border-top: none; height: 0; }
+.rulebar.rulebar-hero .tab { top: -8px; }
 .rulebar .tab {
     position: absolute;
     left: 0;
@@ -267,6 +318,11 @@ a.tab:hover { color: var(--ink); }
     color: var(--folio);
     user-select: none;
 }
+/* the numeral itself is pseudo-content from data-n (kit.jsx Rulebar):
+   ghost-ink watermarks are decoration, and pseudo-content keeps them out
+   of accessibility contrast scans — aria-hidden already keeps them out
+   of the reader's way. Same idiom on .dfolio/.artfolio (docs.css). */
+.folio::after { content: attr(data-n); }
 .sec { scroll-margin-top: 80px; }
 
 /* ── 3 · panes: 1px rule border, 6px radius, no shadows ─────────── */
@@ -365,7 +421,7 @@ a.tab:hover { color: var(--ink); }
     gap: 24px;
 }
 .hd .wordmark { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
-.hd .wordmark img { display: block; }
+.hd .wordmark img, .hd .wordmark svg { display: block; }
 .hd .wm { font: 600 17px/1 var(--sans); color: var(--ink); letter-spacing: -0.01em; }
 .hd nav { display: flex; align-items: center; gap: 22px; margin-left: auto; min-width: 0; }
 .hd nav a {
@@ -482,11 +538,23 @@ html:not(.js) .tgl { display: none; }
 }
 @media (max-width: 760px) { .foot-row { flex-direction: column; gap: 10px; } }
 
-/* ── 8 · BOOT — the document prints itself ─────────────────────────
+/* ── 8 · BOOT — the marginalia land on a printed page ──────────────
+   STATIC-FIRST LCP LAW (the Lighthouse-100 rule, relearned twice):
+   the LCP-critical elements — every hero h1 and every content pane
+   (specimen, result, editor, TOC) — are NEVER members of the boot
+   troupe. An element that starts at opacity 0 does not count as
+   painted, so Chrome holds LCP until the `booted` commit pins it:
+   measured cost ≈3.5s of LCP on the homepage. The document is
+   simply printed; only small decorations boot — receipts, the
+   stamp, leaders/marginalia, annotation strips, log panes, CTAs.
+
    Gated on html.js (stamped pre-paint by the layout boot script);
    pure opacity/transform, zero layout shift. No-JS: everything is
    simply there. Delays ride --bd (set inline, deterministically, so
-   SSR == first client render). */
+   SSR == first client render) and MUST stay ≤ .6s: the layout's
+   `booted` commit fires at 1.3s, sized as last delay (.6s) + longest
+   animation (.5s) + 200ms margin. A longer delay gets its final
+   frame snapped in by the commit. */
 .js .b {
     opacity: 0;
     animation: bootup .5s var(--ease) forwards;
@@ -500,13 +568,10 @@ html:not(.js) .tgl { display: none; }
     from { opacity: 0; transform: rotate(-6deg) scale(1.22); }
     to   { opacity: 1; transform: rotate(-2.5deg) scale(1); }
 }
-/* the ledger rule draws itself after the claim lands */
-.js .emph-rule { transform: scaleX(0); transform-origin: left center; animation: drawx .45s var(--ease) .62s forwards; }
+/* the ledger rule draws itself under the (statically printed) claim */
+.js .emph-rule { transform: scaleX(0); transform-origin: left center; animation: drawx .45s var(--ease) .55s forwards; }
 .js .stance .emph-rule { transform: none; animation: none; }
 @keyframes drawx { to { transform: scaleX(1); } }
-/* the file prints, line by line (delays set per-row, inline) */
-.js .pane-specimen .row { opacity: 0; animation: rowin .18s ease-out forwards; animation-delay: var(--rd, .35s); }
-@keyframes rowin { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: none; } }
 
 /* ── 8b · boot COMMIT (replay-safe) ────────────────────────────────
    The boot reveals above exist only as completed forwards-fill
@@ -519,7 +584,6 @@ html.booted .b, html.booted .b-flat { opacity: 1; transform: none; animation: no
 html.booted .b-stamp { opacity: 1; transform: rotate(-2.5deg) scale(1); animation: none; }
 html.booted .emph-rule { transform: scaleX(1); animation: none; }
 html.booted .stance .emph-rule { transform: none; }
-html.booted .pane-specimen .row { opacity: 1; transform: none; animation: none; }
 
 /* ── 9 · REVEAL — apparatus stamps in on scroll ────────────────────
    One quick pass per section; rules draw, tabs and folios stamp,
@@ -641,7 +705,7 @@ html:not(.js) .shade { display: none; }
 /* ── 14 · MOTION DISCIPLINE — everything dies under reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
-    .js .b, .js .pane-specimen .row, .js .rv,
+    .js .b, .js .rv,
     .js .rulebar .tab, .js .rulebar .folio { opacity: 1 !important; transform: none !important; animation: none !important; transition: none !important; }
     .js .emph-rule { transform: none !important; animation: none !important; }
     .js .rulebar .shade { display: none; }
