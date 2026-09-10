@@ -46,6 +46,7 @@
     user-select: none;
     pointer-events: none;
 }
+.docs-page .dfolio::after { content: attr(data-n); }  /* pseudo-content numeral — see tailwind.css .folio */
 .docs-page .dtab {
     font: 500 11px/16px var(--mono);
     letter-spacing: 0.08em;
@@ -167,6 +168,7 @@
     user-select: none;
     pointer-events: none;
 }
+.docs-page .artfolio::after { content: attr(data-n); }  /* pseudo-content numeral — see tailwind.css .folio */
 
 /* running head: docs / category ·· then the md/AI controls */
 .docs-page .crumb {

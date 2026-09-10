@@ -14,8 +14,6 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 /* the hero borrows the header hairline as its rule (shared idiom) */
-.rulebar-hero { border-top: none; height: 0; }
-.rulebar-hero .tab { top: -8px; }
 
 /* ── cadence — asymmetric on purpose ────────────────────────────── */
 .bm-hero { padding-top: 0; padding-bottom: 64px; }
@@ -138,6 +136,8 @@
 .js .seen .bm-bar { transform: scaleX(0); animation: bm-barin .7s var(--ease) forwards; }
 .js .seen .bm-bar-k { animation-delay: .12s; }
 @keyframes bm-barin { to { transform: scaleX(1); } }
+/* settled commit (replay-safe) — see kit.jsx useSeen */
+html.js [data-settled] .bm-bar { transform: scaleX(1); animation: none; }
 
 /* ── FIG 01 — the SSR pairs ─────────────────────────────────────── */
 .bm-pairs { display: flex; flex-direction: column; gap: 26px; }

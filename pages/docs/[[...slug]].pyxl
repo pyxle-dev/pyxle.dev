@@ -253,12 +253,14 @@ async def load_docs(request):
     base.update({"shelves": shelves, "total": total})
 
     if not slug:
-        return {**base, "landing": True, "page": None}
+        # ISR envelope on the happy paths (landing + article): the same 1800s
+        # the edge cache already serves /docs/* for. 404s stay uncached.
+        return {"data": {**base, "landing": True, "page": None}, "revalidate": 1800}
 
     page = _load_page(slug)
     if page is None:
         return {**base, "landing": False, "page": None, "notFound": True}, 404
-    return {**base, "landing": False, "page": page}
+    return {"data": {**base, "landing": False, "page": page}, "revalidate": 1800}
 
 
 import '../styles/docs.css';
@@ -479,20 +481,21 @@ export default function DocsPage({ data }) {
             )}
 
             {notFound ? (
-                <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 56px)' }}>
+                <main className="flex flex-col" style={{ minHeight: 'calc(100vh - 56px)' }}>
                     <NotFoundContent
                         backHref="/docs"
                         backLabel="Back to docs"
                         sourceUrl="https://github.com/pyxle-dev/pyxle.dev/blob/main/pages/components/not-found-content.jsx"
                     />
-                </div>
+                </main>
             ) : landing ? (
                 <main className="frame">
                     <section className="dhead">
                         {/* the index's folio: the extent of the manual, in ghost ink */}
-                        <span className="dfolio b b-flat" aria-hidden="true">{NN(total)}</span>
+                        {/* pseudo-content numeral — see kit.jsx Rulebar */}
+                        <span className="dfolio" aria-hidden="true" data-n={NN(total)} />
                         <p className="dtab b b-flat">Docs · {total} pages</p>
-                        <h1 className="dtitle b">The whole manual, one&nbsp;listing.</h1>
+                        <h1 className="dtitle">The whole manual, one&nbsp;listing.</h1>
                         <p className="receipt b" style={{ '--bd': '.1s' }}>
                             {total} pages · {shelves.length} sections · generated from pyxle/docs
                         </p>
@@ -507,7 +510,9 @@ export default function DocsPage({ data }) {
                     <DocsShelves shelves={shelves} kbPath={kbPath} />
                 </main>
             ) : page && (
-                <div className="frame">
+                /* <main>, not <div>: an article page renders no other main
+                   landmark (the landing's is above) — axe landmark-one-main */
+                <main className="frame">
                     <div className="dgrid">
                         <DocsRail
                             shelves={shelves}
@@ -516,7 +521,7 @@ export default function DocsPage({ data }) {
                             onSearch={openQo}
                         />
                         <article className="art">
-                            <span className="artfolio" aria-hidden="true">{NN(page.line)}</span>
+                            <span className="artfolio" aria-hidden="true" data-n={NN(page.line)} />
                             <div className="crumb">
                                 <Link href="/docs">docs</Link>
                                 <span className="sl">/</span>
@@ -536,7 +541,7 @@ export default function DocsPage({ data }) {
                         </article>
                         <DocsToc toc={page.toc} slug={slug} />
                     </div>
-                </div>
+                </main>
             )}
 
             <QuickOpen open={qoOpen} onClose={closeQo} rows={rows} />

@@ -40,7 +40,7 @@ export default function NotFoundContent({
             <div className="nf-box seen">
                 <div className="rulebar">
                     <span className="tab">?? · Not found</span>
-                    <span className="folio" aria-hidden="true">404</span>
+                    <span className="folio" aria-hidden="true" data-n="404" />
                 </div>
                 <h1>No such file.</h1>
                 <p className="receipt">GET {path} → 404 · nothing at this route in pages/</p>

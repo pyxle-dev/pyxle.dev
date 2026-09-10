@@ -104,13 +104,21 @@ async def load_home(request):
     docs_count = _docs_page_count()
     uptime_s = int(time.time() - _T0)
     load_ms = round((time.perf_counter() - t0) * 1000, 2)
+    # ISR envelope: the origin caches this render for the same 60s the edge
+    # cache (pyxle.config.json::cache["/"]) already serves it to every
+    # visitor — no new staleness, but TTFB stops paying the SSR render on
+    # every origin hit. Everything above is visitor-independent by
+    # construction, so a shared render is safe.
     return {
-        "version": __version__,
-        "stars": _STARS["n"],
-        "entries": entries,
-        "docsCount": docs_count,
-        "uptimeS": uptime_s,
-        "loadMs": load_ms,
+        "data": {
+            "version": __version__,
+            "stars": _STARS["n"],
+            "entries": entries,
+            "docsCount": docs_count,
+            "uptimeS": uptime_s,
+            "loadMs": load_ms,
+        },
+        "revalidate": 60,
     }
 
 
@@ -348,16 +356,21 @@ import { track } from './components/analytics.jsx';
 
    STATIC-FIRST: the full document — all 33 printed lines, seed entries,
    the FIG, the complete terminal transcript — is the server-rendered
-   HTML. Boot print and reveals are CSS gated on `html.js` + `.seen`;
-   with JS off the whole argument reads at rest. SSR markup == first
-   client render everywhere: `useSeen` starts false on both, measured
-   values (nav timing, my_entries) land post-mount only, and every
-   animation delay is a deterministic inline style.
+   HTML, and the LCP-critical elements (the h1, the specimen pane, the
+   result pane) PAINT IMMEDIATELY — they are never members of the boot
+   troupe (tailwind.css §8's static-first LCP law: an opacity-0 start
+   holds LCP hostage until the booted commit). Only the marginalia boot
+   — receipts, stamp, leaders, annotation strips, the log pane, CTAs —
+   with delays ≤ .6s, CSS gated on `html.js` + `.seen`; with JS off the
+   whole argument reads at rest. SSR markup == first client render
+   everywhere: `useSeen` starts false on both, measured values (nav
+   timing, my_entries) land post-mount only, and every animation delay
+   is a deterministic inline style.
 
-   MOTION: diegetic only — the boot print (once), act-to-animate flashes
-   on the real guestbook request, one FIG draw + race, one terminal
-   replay of a real captured session, breathing LIVE dots. No framer
-   needed; everything dies under prefers-reduced-motion.
+   MOTION: diegetic only — the marginalia landing (once), act-to-animate
+   flashes on the real guestbook request, one FIG draw + race, one
+   terminal replay of a real captured session, breathing LIVE dots. No
+   framer needed; everything dies under prefers-reduced-motion.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── the printed specimen — pages/guestbook.pyxl, 33 lines ──────────
@@ -670,14 +683,16 @@ function HeroSection({ data }) {
         if (ann) ann.classList[on2 ? 'add' : 'remove']('lit');
     }, []);
 
-    let printIdx = 0;
-
     return (
         <section className={`sec sec-hero${seen ? ' seen' : ''}`} id="file">
             <div className="frame">
                 <Rulebar hero tab="01 · File" href="#file" />
                 <div className="hero-head">
-                    <h1 className="b" style={{ '--bd': '.05s' }}>
+                    {/* the h1 is the page's LCP element — statically printed,
+                       never opacity-0 (§8 static-first LCP law); its ledger
+                       rule still draws itself, a decoration on a printed
+                       claim */}
+                    <h1>
                         The backend and&nbsp;the&nbsp;page.<br />
                         <span className="emph">One&nbsp;file.<span className="emph-rule" aria-hidden="true" /></span>
                     </h1>
@@ -697,13 +712,13 @@ function HeroSection({ data }) {
                 <div className="hero-grid">
                     {/* left: the specimen */}
                     <div className="specimen-wrap">
-                        <svg className="leaders b b-flat" style={{ '--bd': '1.15s' }} aria-hidden="true" viewBox="0 0 32 780" preserveAspectRatio="none">
+                        <svg className="leaders b b-flat" style={{ '--bd': '.45s' }} aria-hidden="true" viewBox="0 0 32 780" preserveAspectRatio="none">
                             <polyline points="0,211 10,211 26,238" /><circle cx="28" cy="238" r="2" />
                             <polyline points="0,289 10,289 26,260" /><circle cx="28" cy="260" r="2" />
                             <polyline points="0,413 10,413 26,414" /><circle cx="28" cy="414" r="2" />
                             <polyline points="0,487 10,487 26,458" /><circle cx="28" cy="458" r="2" />
                         </svg>
-                        <div className="marginalia b b-flat" style={{ '--bd': '1.15s' }}>
+                        <div className="marginalia b b-flat" style={{ '--bd': '.45s' }}>
                             {ANNS.map((ann) => (
                                 <p
                                     key={ann.target}
@@ -718,21 +733,21 @@ function HeroSection({ data }) {
                             ))}
                         </div>
 
-                        <figure className="pane pane-specimen b b-flat" style={{ '--bd': '.14s', margin: 0 }}>
+                        {/* the specimen is content, not theater: it prints
+                           statically (an LCP candidate — §8 law) */}
+                        <figure className="pane pane-specimen" style={{ margin: 0 }}>
                             <figcaption className="pane-head">
                                 <span className="ph-path">pages/guestbook.pyxl</span>
                                 <span className="ph-meta">33 lines</span>
                             </figcaption>
                             <pre className="code" id="specimen"><code>
-                                {SPEC_ROWS.map((row) => {
-                                    const rd = `${(0.4 + printIdx * 0.021).toFixed(3)}s`;
-                                    printIdx += 1;
+                                {SPEC_ROWS.map((row, rowIdx) => {
                                     if (row.seam) {
                                         return (
                                             <span
                                                 key="L16" id="L16"
                                                 ref={(el) => { rowEls.current.L16 = el; }}
-                                                className="row seam-row" style={{ '--rd': rd }}
+                                                className="row seam-row"
                                                 aria-label="line 16, blank — the seam"
                                             >
                                                 <span className="n">16</span>
@@ -745,7 +760,7 @@ function HeroSection({ data }) {
                                     }
                                     if (row.cont) {
                                         return (
-                                            <span key={`cont-${printIdx}`} className="row mob-only" style={{ '--rd': rd }}>
+                                            <span key={`cont-${rowIdx}`} className="row mob-only">
                                                 <span className="n" />
                                                 <span className="t"><Segs segs={row.segs} /></span>
                                             </span>
@@ -755,7 +770,7 @@ function HeroSection({ data }) {
                                     const cls = `row${row.act ? ' act' : ''}${row.wire ? ' wire' : ''}`;
                                     return (
                                         <span
-                                            key={id} id={id} className={cls} style={{ '--rd': rd }}
+                                            key={id} id={id} className={cls}
                                             ref={(el) => { rowEls.current[id] = el; }}
                                             onMouseEnter={ANNS.some((a) => a.target === id) ? () => light(id, true) : undefined}
                                             onMouseLeave={ANNS.some((a) => a.target === id) ? () => light(id, false) : undefined}
@@ -775,7 +790,7 @@ function HeroSection({ data }) {
                             </code></pre>
                         </figure>
 
-                        <ol className="ann-strip b" style={{ '--bd': '.9s' }} aria-label="How to read the file">
+                        <ol className="ann-strip b" style={{ '--bd': '.5s' }} aria-label="How to read the file">
                             <li><span className="ann-n">1·</span> loader runs on the server <span className="ann-at">— line 9</span></li>
                             <li><span className="ann-n">2·</span> its return value is the page&rsquo;s props <span className="ann-at">— line 10</span></li>
                             <li><span className="ann-n">3·</span> HTML arrives finished, then hydrates <span className="ann-at">— line 17</span></li>
@@ -785,7 +800,9 @@ function HeroSection({ data }) {
 
                     {/* right: the result — the file, running on this server */}
                     <div className="result-col">
-                        <figure className="pane pane-result b" style={{ '--bd': '1s', margin: 0 }}>
+                        {/* the running result is content too — statically
+                           painted, an LCP candidate (§8 law) */}
+                        <figure className="pane pane-result" style={{ margin: 0 }}>
                             <figcaption className="pane-head pane-head-url">
                                 <span className="urlbar">localhost:8000</span>
                                 <span className="devchip">dev</span>
@@ -817,7 +834,7 @@ function HeroSection({ data }) {
                             </div>
                         </figure>
 
-                        <p className="gb-honesty b" style={{ '--bd': '1.06s' }}>
+                        <p className="gb-honesty b" style={{ '--bd': '.5s' }}>
                             seed entries are authored · yours are real — stored by this
                             server, shown only to your browser
                             {entries.some((entry) => entry.you) ? (
@@ -825,7 +842,7 @@ function HeroSection({ data }) {
                             ) : null}
                         </p>
 
-                        <figure className="pane pane-log b" style={{ '--bd': '1.12s', margin: 0 }}>
+                        <figure className="pane pane-log b" style={{ '--bd': '.55s', margin: 0 }}>
                             <figcaption className="log-head">
                                 <span>request log</span>
                                 <span className="log-up" aria-hidden="true">{fmtUp(uptimeBase + tick)}</span>
@@ -854,7 +871,7 @@ function HeroSection({ data }) {
                             </div>
                         </figure>
 
-                        <div className="hero-ctas b" style={{ '--bd': '1.22s' }}>
+                        <div className="hero-ctas b" style={{ '--bd': '.6s' }}>
                             <CopyChip text={INSTALL} quickstart />
                             <p className="cta-line">
                                 <Link className="link" href="/playground">Open the playground <span className="a">→</span></Link>
@@ -872,6 +889,10 @@ function HeroSection({ data }) {
 
 /* ═══ 02 REQUEST — FIG 01 draws itself, then the request runs ═══════ */
 
+/* Below-fold sections ride the design system's `.cv`
+   (content-visibility: auto): the browser skips their style/layout work
+   until they approach the viewport — measured ~40% off the page's
+   style+layout cost, zero pixel change (the hero is untouched). */
 function RequestSection() {
     const [ref, seen] = useSeen();
     const figRef = useRef(null);
@@ -917,7 +938,7 @@ function RequestSection() {
     }, []);
 
     return (
-        <section ref={ref} className={`sec sec-request${seen ? ' seen' : ''}`} id="request">
+        <section ref={ref} className={`sec sec-request cv${seen ? ' seen' : ''}`} id="request">
             <div className="frame">
                 <Rulebar tab="02 · Request" href="#request" folio="02" />
                 <div className="sec-head rv">
@@ -989,7 +1010,7 @@ function Cell({ tab, ver, children, note, href, path, delay }) {
 function FrameworkSection({ docsCount }) {
     const [ref, seen] = useSeen();
     return (
-        <section ref={ref} className={`sec sec-framework${seen ? ' seen' : ''}`} id="framework">
+        <section ref={ref} className={`sec sec-framework cv${seen ? ' seen' : ''}`} id="framework">
             <div className="frame">
                 <Rulebar tab="03 · Framework" href="#framework" folio="03" />
                 <div className="sec-head rv">
@@ -1046,7 +1067,7 @@ function FrameworkSection({ docsCount }) {
                         note="Routes, requests, metrics — and breakpoints in .pyxl files."
                         href="/docs/guides/studio" path="/docs/guides/studio"
                     >
-                        <img className="cell-shot" src="/shots/studio.png" alt="Pyxle Studio at /__pyxle/studio — route table of a scaffolded app" width="1200" height="520" loading="lazy" />
+                        <img className="cell-shot" src="/shots/studio.webp" alt="Pyxle Studio at /__pyxle/studio — route table of a scaffolded app" width="1200" height="520" loading="lazy" />
                     </Cell>
                 </div>
             </div>
@@ -1059,7 +1080,7 @@ function FrameworkSection({ docsCount }) {
 function NumbersSection({ docsCount }) {
     const [ref, seen] = useSeen();
     return (
-        <section ref={ref} className={`sec sec-numbers${seen ? ' seen' : ''}`} id="numbers">
+        <section ref={ref} className={`sec sec-numbers cv${seen ? ' seen' : ''}`} id="numbers">
             <div className="frame">
                 <Rulebar tab="04 · Numbers" href="#numbers" folio="04" />
                 <div className="sec-head rv">
@@ -1103,7 +1124,7 @@ function NumbersSection({ docsCount }) {
 function ProductionSection({ stars, docsCount }) {
     const [ref, seen] = useSeen();
     return (
-        <section ref={ref} className={`sec sec-production${seen ? ' seen' : ''}`} id="production">
+        <section ref={ref} className={`sec sec-production cv${seen ? ' seen' : ''}`} id="production">
             <div className="frame">
                 <Rulebar tab="05 · Production" href="#production" folio="05" />
                 <div className="sec-head rv">
@@ -1114,7 +1135,7 @@ function ProductionSection({ stars, docsCount }) {
                 <div className="demos">
                     <div className="demo demo-feature rv" style={{ '--rvd': '.06s' }}>
                         <a className="demo-main" href="https://pyxle.dev" target="_blank" rel="noopener noreferrer">
-                            <span className="demo-shot"><img src="/shots/pyxle-dev.png" alt="pyxle.dev — this site's homepage, served by Pyxle" width="880" height="557" loading="lazy" /></span>
+                            <span className="demo-shot"><img src="/shots/pyxle-dev.webp" alt="pyxle.dev — this site's homepage, served by Pyxle" width="880" height="557" loading="lazy" /></span>
                             <span className="demo-body">
                                 <span className="demo-name">This site <span className="live"><span className="live-dot" style={{ '--dp': '.15s' }} />live</span></span>
                                 <span className="demo-url">pyxle.dev</span>
@@ -1125,7 +1146,7 @@ function ProductionSection({ stars, docsCount }) {
                     </div>
                     <div className="demo rv" style={{ '--rvd': '.14s' }}>
                         <a className="demo-main" href="https://today.pyxle.app" target="_blank" rel="noopener noreferrer">
-                            <span className="demo-shot"><img src="/shots/today.png" alt="Today — today.pyxle.app sign-in page" width="880" height="557" loading="lazy" /></span>
+                            <span className="demo-shot"><img src="/shots/today.webp" alt="Today — today.pyxle.app sign-in page" width="880" height="557" loading="lazy" /></span>
                             <span className="demo-body">
                                 <span className="demo-name">Today <span className="live"><span className="live-dot" style={{ '--dp': '.45s' }} />live</span></span>
                                 <span className="demo-url">today.pyxle.app</span>
@@ -1136,7 +1157,7 @@ function ProductionSection({ stars, docsCount }) {
                     </div>
                     <div className="demo rv" style={{ '--rvd': '.22s' }}>
                         <a className="demo-main" href="https://pulse.pyxle.app" target="_blank" rel="noopener noreferrer">
-                            <span className="demo-shot"><img src="/shots/pulse.png" alt="Pulse — pulse.pyxle.app status platform" width="880" height="557" loading="lazy" /></span>
+                            <span className="demo-shot"><img src="/shots/pulse.webp" alt="Pulse — pulse.pyxle.app status platform" width="880" height="557" loading="lazy" /></span>
                             <span className="demo-body">
                                 <span className="demo-name">Pulse <span className="live"><span className="live-dot" style={{ '--dp': '.75s' }} />live</span></span>
                                 <span className="demo-url">pulse.pyxle.app</span>
@@ -1279,7 +1300,7 @@ function StartSection() {
     const [ref, seen] = useSeen();
     const [stepOn, setStepOn] = useState(-1);
     return (
-        <section ref={ref} className={`sec sec-start${seen ? ' seen' : ''}`} id="start">
+        <section ref={ref} className={`sec sec-start cv${seen ? ' seen' : ''}`} id="start">
             <div className="frame">
                 <Rulebar tab="06 · Start" href="#start" folio="06" />
                 <div className="sec-head rv">

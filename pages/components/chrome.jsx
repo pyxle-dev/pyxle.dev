@@ -91,7 +91,14 @@ export function SiteHeader() {
         <header className="hd">
             <div className="frame hd-row">
                 <Link className="wordmark" href="/" aria-label="Pyxle home">
-                    <img src="/branding/pyxle-mark-flat.svg" width={22} height={22} alt="" aria-hidden="true" />
+                    {/* the mark inlined verbatim from public/branding/
+                       pyxle-mark-flat.svg: the header logo paints with the
+                       document instead of riding the pre-paint request
+                       window as a High-priority image fetch */}
+                    <svg width={22} height={22} viewBox="0 0 96 96" fill="none" aria-hidden="true">
+                        <path d="M28 80 V16 H56 Q76 16 76 36 Q76 56 56 56 H28" stroke="#087443" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                        <circle cx="56" cy="36" r="6.5" fill="#087443" />
+                    </svg>
                     <span className="wm">Pyxle</span>
                 </Link>
                 <nav aria-label="Site">
@@ -355,8 +362,11 @@ export function SiteFooter({ version }) {
     const path = usePathname() || '/';
     const [ref, seen] = useSeen({ rootMargin: '0px', threshold: 0.01 });
     const ver = version ? `v${version}` : 'pre-1.0';
+    /* `.cv` (content-visibility: auto): the EOF footer is below the fold on
+       every page — the browser skips its style/layout work until it
+       approaches the viewport. Zero pixel change. */
     return (
-        <footer ref={ref} className={`ft${seen ? ' seen' : ''}`}>
+        <footer ref={ref} className={`ft cv${seen ? ' seen' : ''}`}>
             <div className="frame">
                 <Rulebar tab="EOF" />
                 <NewsletterLine />

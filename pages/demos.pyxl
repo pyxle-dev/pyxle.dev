@@ -54,7 +54,11 @@ async def load(request):
             # honestly without figures.
             _status_cache["ok"] = False
 
-    return {"version": __version__, "status": _status_cache["data"]}
+    # ISR envelope: same 300s the edge cache already serves this page for.
+    return {
+        "data": {"version": __version__, "status": _status_cache["data"]},
+        "revalidate": 300,
+    }
 
 
 import './styles/demos.css';
@@ -107,14 +111,21 @@ function RunSection({ status, version }) {
         <section ref={ref} className={`sec sec-run${seen ? ' seen' : ''}`} id="production">
             <div className="frame">
                 <Rulebar tab="01 · In production" href="#production" folio="01" />
-                <div className="sec-head rv">
+                {/* the section head and the FEATURE card are above the fold —
+                   they paint statically (the card holds the page's LCP image;
+                   §8 static-first LCP law). The two cards below keep the
+                   scroll reveal. */}
+                <div className="sec-head">
                     <h2>The three we run in production.</h2>
                     <Receipt>real screenshots, live URLs — click them · uptime is the monitor&rsquo;s own, never typed</Receipt>
                 </div>
                 <div className="dm-demos">
-                    <div className="dm-demo dm-feature rv" style={{ '--rvd': '.06s' }}>
+                    <div className="dm-demo dm-feature">
                         <a className="dm-main" href="https://pyxle.dev" target="_blank" rel="noopener noreferrer">
-                            <span className="dm-shot"><img src="/shots/pyxle-dev.png" alt="pyxle.dev — this site's homepage, served by Pyxle" width="880" height="557" loading="lazy" /></span>
+                            {/* the page's LCP element: above the fold in the first card, so
+                                eager + high priority — lazy-loading it was costing ~4s of
+                                mobile LCP; the two cards below stay lazy */}
+                            <span className="dm-shot"><img src="/shots/pyxle-dev.webp" alt="pyxle.dev — this site's homepage, served by Pyxle" width="880" height="557" loading="eager" fetchpriority="high" /></span>
                             <span className="dm-body">
                                 <span className="dm-name">This site <LiveChip dp=".15s" /></span>
                                 <span className="dm-url">pyxle.dev</span>
@@ -142,7 +153,7 @@ function RunSection({ status, version }) {
                     </div>
                     <div className="dm-demo rv" style={{ '--rvd': '.14s' }}>
                         <a className="dm-main" href="https://today.pyxle.app" target="_blank" rel="noopener noreferrer">
-                            <span className="dm-shot"><img src="/shots/today.png" alt="Today — today.pyxle.app sign-in page" width="880" height="557" loading="lazy" /></span>
+                            <span className="dm-shot"><img src="/shots/today.webp" alt="Today — today.pyxle.app sign-in page" width="880" height="557" loading="lazy" /></span>
                             <span className="dm-body">
                                 <span className="dm-name">Today <LiveChip dp=".45s" /></span>
                                 <span className="dm-url">today.pyxle.app</span>
@@ -157,7 +168,7 @@ function RunSection({ status, version }) {
                     </div>
                     <div className="dm-demo rv" style={{ '--rvd': '.22s' }}>
                         <a className="dm-main" href="https://pulse.pyxle.app" target="_blank" rel="noopener noreferrer">
-                            <span className="dm-shot"><img src="/shots/pulse.png" alt="Pulse — pulse.pyxle.app status platform" width="880" height="557" loading="lazy" /></span>
+                            <span className="dm-shot"><img src="/shots/pulse.webp" alt="Pulse — pulse.pyxle.app status platform" width="880" height="557" loading="lazy" /></span>
                             <span className="dm-body">
                                 <span className="dm-name">Pulse <LiveChip dp=".75s" /></span>
                                 <span className="dm-url">pulse.pyxle.app</span>
@@ -271,7 +282,7 @@ export default function DemosPage({ data }) {
                     <div className="frame">
                         <Rulebar hero tab="Demos · Running now" />
                         <div className="dm-hero-head">
-                            <h1 className="b" style={{ '--bd': '.05s' }}>Six apps, running now.</h1>
+                            <h1>Six apps, running now.</h1>
                             <Receipt className="b" style={{ '--bd': '.16s' }}>
                                 every card opens a live deployment · uptime comes from{' '}
                                 <a className="link" href="https://status.pyxle.dev/api/status.json" target="_blank" rel="noopener noreferrer">our monitor&rsquo;s public API</a>

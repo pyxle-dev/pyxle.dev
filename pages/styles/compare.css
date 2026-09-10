@@ -9,8 +9,6 @@
    receipts, not trash talk. Page-owned classes are cmp-*.
    ═══════════════════════════════════════════════════════════════════ */
 
-.rulebar-hero { border-top: none; height: 0; }
-.rulebar-hero .tab { top: -8px; }
 
 /* ── cadence ────────────────────────────────────────────────────── */
 .cmp-hero { padding-top: 0; padding-bottom: 76px; }
@@ -30,6 +28,7 @@
     background: var(--rule);
     border: 1px solid var(--rule);
 }
+.cmp-row { display: contents; }  /* ARIA row wrapper — the grid still owns the cells */
 .cmp-c { background: var(--sheet); padding: 13px 16px; min-width: 0; }
 .cmp-h {
     background: var(--deck);
@@ -130,7 +129,10 @@ html.dark .cmp-term { border-color: var(--rule2); }  /* the quote reads by appar
     .sec-proof .rulebar { margin-bottom: 64px; }
     .sec-nots .rulebar { margin-bottom: 52px; }
     .cmp-table { grid-template-columns: minmax(0, 1fr); }
-    .cmp-h { display: none; }
+    /* hide the whole header ROW, not its cells: an ARIA row whose every
+       child is display:none reads as an empty row to axe
+       (aria-required-children); a hidden row leaves the tree cleanly */
+    .cmp-hrow { display: none; }
     .cmp-c { padding: 12px 14px; }
     .cmp-l {
         background: var(--deck);

@@ -8,7 +8,11 @@ async def load_plugins_page(request):
 
     registry_path = Path(os.getcwd()) / "public" / "plugins-registry.json"
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
-    return {"version": __version__, "registry": registry}
+    # ISR envelope: same 1800s the edge cache already serves this page for.
+    return {
+        "data": {"version": __version__, "registry": registry},
+        "revalidate": 1800,
+    }
 
 
 import './styles/plugins.css';
@@ -227,13 +231,13 @@ export default function PluginsPage({ data }) {
                     <div className="frame">
                         <Rulebar hero tab="Plugins · The directory" />
                         <div className="pl-hero-head">
-                            <h1 className="b" style={{ '--bd': '.05s' }}>Built to be built on.</h1>
+                            <h1>Built to be built on.</h1>
                             <Receipt className="b" style={{ '--bd': '.16s' }}>
                                 a plugin is one line of config · {officials.length} official on PyPI ·
                                 {' '}{open} of {total} founding slots open
                             </Receipt>
                         </div>
-                        <div className="pl-claim b" style={{ '--bd': '.28s' }}>
+                        <div className="pl-claim">
                             <Pane>
                                 <PaneHead>
                                     <span>pyxle.config.json</span>
