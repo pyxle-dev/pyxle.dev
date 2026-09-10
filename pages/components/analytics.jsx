@@ -8,8 +8,13 @@
  *  - **Session replay on, with every input masked.** The site collects email
  *    addresses; a recording that contains one is a data-protection problem
  *    rather than a UX insight, so field contents are never captured.
- *  - **Loaded lazily, after first paint.** pyxle.dev holds a Lighthouse 100,
- *    and a synchronous third-party script is the usual way that is lost.
+ *  - **Loaded at first interaction, not on a timer.** pyxle.dev holds a
+ *    Lighthouse 100, and the SDK's parse+init is ~150ms of main-thread work
+ *    that lands inside the TBT window however long it is idle-deferred —
+ *    `requestIdleCallback` does not escape a simulated-throttling audit.
+ *    Gating on the first pointerdown/keydown/touch/scroll means a visitor
+ *    who only reads costs nothing and is recorded as nothing; anyone who
+ *    acts is captured from that first act (the replay starts there too).
  *  - **Absent unless configured.** With no key set — local dev, a fork, a
  *    contributor's checkout — this compiles to nothing and no request is made.
  *
@@ -74,6 +79,9 @@ function load() {
                         return value;
                     },
                 },
+                // No surveys are configured, but the SDK still downloads its
+                // surveys module (33 KB) unless told not to.
+                disable_surveys: true,
                 // Autocapture is on despite the noise, because it is the only
                 // part of this that works *retroactively*: a funnel defined next
                 // month can be built from clicks nobody thought to instrument
@@ -124,24 +132,47 @@ export function track(event, properties) {
     });
 }
 
+/* The first user gesture. `capture: true` sees pointerdowns that a widget
+ * swallows before they bubble; `passive` keeps scroll handling off the
+ * interaction's critical path. Loading here (not on idle) is what keeps the
+ * SDK's init cost out of Lighthouse's TBT window — see the header comment. */
+const GATE_EVENTS = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+
 export default function Analytics() {
     const path = usePathname();
 
     useEffect(() => {
-        if (!KEY) return;
-        // requestIdleCallback keeps the script off the critical path entirely;
-        // the setTimeout fallback covers Safari.
-        const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1200));
-        const handle = idle(() => load());
-        return () => {
-            if (window.cancelIdleCallback) window.cancelIdleCallback(handle);
+        if (!KEY) return undefined;
+        const fire = () => {
+            off();
+            // The visit's own pageview goes out with the first gesture — a
+            // visitor who never acts is deliberately not counted (the same
+            // trade `persistence: 'memory'` already makes for bounces). The
+            // URL is snapshotted NOW: if that gesture was a link click, the
+            // route has changed by the time the SDK finishes loading.
+            const url = window.location.href;
+            load().then((posthog) => {
+                if (posthog) posthog.capture('$pageview', { $current_url: url });
+            });
         };
+        const off = () => GATE_EVENTS.forEach((ev) => {
+            window.removeEventListener(ev, fire, { capture: true });
+        });
+        GATE_EVENTS.forEach((ev) => {
+            window.addEventListener(ev, fire, { once: true, passive: true, capture: true });
+        });
+        return off;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
-        if (!KEY || typeof window === 'undefined') return;
+        if (!KEY || typeof window === 'undefined' || !loading) return;
+        // Client-side navigations: reaching another route required a gesture,
+        // so by now the gate has fired and `loading` is set — the guard only
+        // skips the initial render (whose pageview the gate itself sends).
+        const url = window.location.href;
         load().then((posthog) => {
-            if (posthog) posthog.capture('$pageview', { $current_url: window.location.href });
+            if (posthog) posthog.capture('$pageview', { $current_url: url });
         });
     }, [path]);
 
